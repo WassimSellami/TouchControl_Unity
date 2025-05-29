@@ -508,7 +508,7 @@ MonoBehaviour:
   serverAxisOriginOffset: {x: 0, y: 0, z: 0}
   serverAxisLength: 5
   serverAxisThickness: 0.03
-  serverArrowheadBaseRadiusFactor: 5
+  serverArrowheadRadiusFactor: 2.5
   serverArrowheadHeightFactor: 12
 --- !u!4 &1971269432
 Transform:

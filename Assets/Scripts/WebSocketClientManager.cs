@@ -4,6 +4,7 @@ using TMPro;
 using System;
 using WebSocketSharp;
 using static JsonUtilityHelper;
+// using static JsonUtilityHelper; // Only needed if JsonUtilityHelper has static methods you call directly
 
 public class WebSocketClientManager : MonoBehaviour
 {
@@ -14,18 +15,16 @@ public class WebSocketClientManager : MonoBehaviour
 
     [Header("Networking")]
     [SerializeField] private TMP_InputField ipAddressInput;
-    [SerializeField] private string defaultIpAddress = "127.0.0.1";
-    [SerializeField] private int serverPort = 8080;
-    [SerializeField] private string servicePath = "/control";
-    [SerializeField] private float cameraUpdateRateFPS = 15f;
+    [SerializeField] private string defaultIpAddress = "192.168.0.83";
+    [SerializeField] private int serverPort = 8070;
+    [SerializeField] private string servicePath = "/Control";
+    [SerializeField] private float cameraUpdateRateFPS = 60f;
 
     [Header("UI Elements for Connection & Control")]
     [SerializeField] private Button connectButton;
     [SerializeField] private Button loadCubeButton;
     [SerializeField] private Button loadCylinderButton;
     [SerializeField] private Button backButtonFromModelView;
-    [SerializeField] private Button toggleRotationGizmoButton_UI;
-    [SerializeField] private Button toggleCropBoxButton_UI;
     [SerializeField] private TMP_Text statusText;
 
     private WebSocket ws;
@@ -58,8 +57,6 @@ public class WebSocketClientManager : MonoBehaviour
         if (loadCubeButton != null) loadCubeButton.onClick.AddListener(() => OnLoadModelSelected("CUBE"));
         if (loadCylinderButton != null) loadCylinderButton.onClick.AddListener(() => OnLoadModelSelected("CYLINDER"));
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
-        if (toggleRotationGizmoButton_UI != null) toggleRotationGizmoButton_UI.onClick.AddListener(OnToggleRotationGizmoPressed);
-        if (toggleCropBoxButton_UI != null) toggleCropBoxButton_UI.onClick.AddListener(OnToggleCropBoxPressed);
 
         cameraUpdateInterval = 1.0f / Mathf.Max(1f, cameraUpdateRateFPS);
 
@@ -150,13 +147,12 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (mockedModelControllerRef != null)
         {
-            // Send the MockedModel's root transform. Its "ref" child is assumed to be at local (0,0,0) with identity rotation.
-            Transform mockedModelTransform = mockedModelControllerRef.transform;
+            Transform mockedModelRootTransform = mockedModelControllerRef.transform;
             ModelTransformStateData initialState = new ModelTransformStateData
             {
-                localPosition = mockedModelTransform.localPosition,
-                localRotation = mockedModelTransform.localRotation,
-                localScale = mockedModelTransform.localScale
+                localPosition = mockedModelRootTransform.localPosition,
+                localRotation = mockedModelRootTransform.localRotation,
+                localScale = mockedModelRootTransform.localScale
             };
             string transformJson = JsonUtility.ToJson(initialState);
             SendMessageToServer($"SET_INITIAL_MODEL_TRANSFORM:{transformJson}");
@@ -166,8 +162,6 @@ public class WebSocketClientManager : MonoBehaviour
     }
 
     private void OnBackToMainMenuPressed() { LogStatus("Returning to Main Menu."); if (uiManager != null) uiManager.ShowMainMenuPanel(); }
-    private void OnToggleRotationGizmoPressed() { if (uiManager != null) uiManager.ToggleRotationGizmoAndAxesVisibility(); }
-    private void OnToggleCropBoxPressed() { if (uiManager != null) uiManager.ToggleCropBoxVisibility(); }
 
     private void LogStatus(string message, bool isError = false)
     {

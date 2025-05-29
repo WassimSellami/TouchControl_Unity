@@ -57,7 +57,7 @@ public class ModelController : MonoBehaviour
     {
         float capHeight = thickness * serverArrowheadHeightFactor;
         float shaftActualLength = length - capHeight;
-        shaftActualLength = Mathf.Max(thickness, shaftActualLength);
+        shaftActualLength = Mathf.Max(thickness / 2f, shaftActualLength);
 
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         shaft.name = baseName + "_Shaft";
@@ -93,16 +93,16 @@ public class ModelController : MonoBehaviour
         rend.material.color = color;
     }
 
-    public void SetInitialTransform(Vector3 clientMockedModelLocalPos, Quaternion clientMockedModelLocalRot, Vector3 clientMockedModelLocalScale)
+    public void SetInitialTransform(Vector3 clientModelRootLocalPos, Quaternion clientModelRootLocalRot, Vector3 clientModelRootLocalScale)
     {
         if (currentInstantiatedModel == null)
         {
             Debug.LogWarning("[ModelController] SetInitialTransform called but no model is loaded.");
             return;
         }
-        currentInstantiatedModel.transform.localPosition = clientMockedModelLocalPos;
-        currentInstantiatedModel.transform.localRotation = clientMockedModelLocalRot;
-        currentInstantiatedModel.transform.localScale = clientMockedModelLocalScale;
+        currentInstantiatedModel.transform.localPosition = clientModelRootLocalPos;
+        currentInstantiatedModel.transform.localRotation = clientModelRootLocalRot;
+        currentInstantiatedModel.transform.localScale = clientModelRootLocalScale;
 
         Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
         if (refChildServer == null)

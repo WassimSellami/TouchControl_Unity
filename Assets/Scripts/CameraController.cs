@@ -15,6 +15,7 @@ public class CameraController : MonoBehaviour
     [SerializeField] private float zoomMax = 50.0f;
     [SerializeField] private float presetViewRotationStep = 90.0f;
     [SerializeField] private float orbitDeadZone = 0.1f;
+    [SerializeField] private float desiredInitialOrthoSize = 2.5f;
 
     private Vector3 panStartWorldPosAtScreenDepth;
     private bool isPanningState = false;
@@ -36,7 +37,19 @@ public class CameraController : MonoBehaviour
 
         if (mainCamera.orthographic)
         {
-            initialOrthoSize = mainCamera.orthographicSize;
+            if (desiredInitialOrthoSize > 0)
+            {
+                mainCamera.orthographicSize = desiredInitialOrthoSize;
+                initialOrthoSize = desiredInitialOrthoSize;
+            }
+            else
+            {
+                initialOrthoSize = mainCamera.orthographicSize;
+            }
+        }
+        else
+        {
+            initialOrthoSize = -1f;
         }
 
         if (orbitTarget == null)
@@ -78,9 +91,7 @@ public class CameraController : MonoBehaviour
     public void ProcessOrbit(Vector2 screenDelta)
     {
         if (orbitTarget == null) return;
-
         float absDeltaX = Mathf.Abs(screenDelta.x);
-
         if (absDeltaX > orbitDeadZone)
         {
             float horizontalInput = screenDelta.x * orbitSensitivity;
@@ -91,17 +102,12 @@ public class CameraController : MonoBehaviour
     public void ProcessZoom(float zoomAmount, Vector2 zoomCenterScreenPos)
     {
         if (mainCamera == null || !mainCamera.orthographic || zoomAmount == 0) return;
-
         Vector3 worldZoomCenterScreenDepth = new Vector3(zoomCenterScreenPos.x, zoomCenterScreenPos.y, (orbitTarget != null) ? mainCamera.WorldToScreenPoint(orbitTarget.position).z : mainCamera.nearClipPlane + 10f);
         Vector3 worldZoomCenterBefore = mainCamera.ScreenToWorldPoint(worldZoomCenterScreenDepth);
-
         float currentOrthoSize = mainCamera.orthographicSize;
         float newOrthoSize = Mathf.Clamp(currentOrthoSize - zoomAmount * zoomSensitivity, zoomMin, zoomMax);
-
         if (Mathf.Approximately(newOrthoSize, currentOrthoSize)) return;
-
         mainCamera.orthographicSize = newOrthoSize;
-
         Vector3 worldZoomCenterAfter = mainCamera.ScreenToWorldPoint(worldZoomCenterScreenDepth);
         Vector3 cameraPositionAdjustment = worldZoomCenterBefore - worldZoomCenterAfter;
         transform.position += cameraPositionAdjustment;
@@ -111,7 +117,7 @@ public class CameraController : MonoBehaviour
     {
         transform.position = initialPosition;
         transform.rotation = initialRotation;
-        if (mainCamera != null && mainCamera.orthographic)
+        if (mainCamera != null && mainCamera.orthographic && initialOrthoSize > 0)
         {
             mainCamera.orthographicSize = initialOrthoSize;
         }
@@ -119,11 +125,7 @@ public class CameraController : MonoBehaviour
 
     public void CyclePresetView()
     {
-        if (orbitTarget == null || mainCamera == null)
-        {
-            Debug.LogError("Cannot cycle preset view: OrbitTarget or MainCamera not set correctly.");
-            return;
-        }
+        if (orbitTarget == null || mainCamera == null) return;
         transform.RotateAround(orbitTarget.position, Vector3.up, presetViewRotationStep);
     }
 }

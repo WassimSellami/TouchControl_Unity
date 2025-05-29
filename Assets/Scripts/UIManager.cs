@@ -17,6 +17,8 @@ public class UIManager : MonoBehaviour
     [Header("Controller References")]
     [SerializeField] private CameraController cameraController;
     [SerializeField] private MockedModelController mockedModelController;
+    [SerializeField] private CropBoxController cropBoxController;
+    [SerializeField] private InputManager inputManagerRef;
 
     [Header("Buttons in ModelViewPanel")]
     [SerializeField] private Button backButtonToMainMenu;
@@ -35,6 +37,9 @@ public class UIManager : MonoBehaviour
 
     void Awake()
     {
+        if (mockedModelController == null && placeholderModelVisual != null) mockedModelController = placeholderModelVisual.GetComponentInChildren<MockedModelController>(true);
+        if (cropBoxController == null && cropBoxSystem != null) cropBoxController = cropBoxSystem.GetComponent<CropBoxController>();
+        if (inputManagerRef == null) inputManagerRef = FindObjectOfType<InputManager>();
         HideAllPanelsAndPopups();
         if (placeholderModelVisual != null) placeholderModelVisual.SetActive(false);
         DeactivateInteractionSystems();
@@ -42,18 +47,34 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
+        //ShowModelViewPanelInitiallyForTesting(); // Uncomment for PC test
+
         if (resetViewAndModelButton != null) resetViewAndModelButton.onClick.AddListener(HandleResetViewAndModel);
         if (presetViewCycleButton != null) presetViewCycleButton.onClick.AddListener(HandlePresetViewCycle);
-        if (toggleRotationGizmoButton != null) toggleRotationGizmoButton.onClick.AddListener(ToggleRotationGizmoAndAxesVisibility); // Changed listener
+        if (toggleRotationGizmoButton != null) toggleRotationGizmoButton.onClick.AddListener(ToggleRotationGizmoVisibility);
         if (toggleCropBoxButton != null) toggleCropBoxButton.onClick.AddListener(ToggleCropBoxVisibility);
         if (modelInfoButton != null) modelInfoButton.onClick.AddListener(() => ToggleModelInfoPopup(true));
         if (closeInfoButton != null) closeInfoButton.onClick.AddListener(() => ToggleModelInfoPopup(false));
+        if (confirmCropButton != null) confirmCropButton.onClick.AddListener(HandleConfirmCrop);
+    }
 
-        if (mockedModelController == null && placeholderModelVisual != null)
+    private void ShowModelViewPanelInitiallyForTesting()
+    {
+        HideAllPanelsAndPopups();
+        if (modelViewPanel != null) modelViewPanel.SetActive(true);
+        if (placeholderModelVisual != null)
         {
-            mockedModelController = placeholderModelVisual.GetComponentInChildren<MockedModelController>(true);
+            placeholderModelVisual.SetActive(true);
+            if (mockedModelController != null)
+            {
+                mockedModelController.gameObject.SetActive(true);
+                mockedModelController.EnsureAxisVisualsAreCreated();
+            }
         }
-        if (mockedModelController == null) Debug.LogError("UIManager: MockedModelController reference is not set and could not be found.");
+        isRotationGizmoVisible = false; if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(false);
+        isCropBoxVisible = false; if (cropBoxSystem != null) cropBoxSystem.SetActive(false);
+        if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(false);
+        if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(false);
     }
 
     private void HideAllPanelsAndPopups()
@@ -64,16 +85,10 @@ public class UIManager : MonoBehaviour
         if (modelInfoPopup != null) modelInfoPopup.SetActive(false);
     }
 
-    private void DeactivateInteractionSystems(bool keepAxesState = false)
+    private void DeactivateInteractionSystems()
     {
         if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(false);
-        // isRotationGizmoVisible = false; // State is managed by the toggle button
-
-        if (mockedModelController != null && !keepAxesState)
-        {
-            mockedModelController.SetAxisVisualsActive(false); // Hide axes when deactivating other systems
-        }
-
+        isRotationGizmoVisible = false;
         if (cropBoxSystem != null) cropBoxSystem.SetActive(false);
         isCropBoxVisible = false;
         if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(false);
@@ -98,42 +113,34 @@ public class UIManager : MonoBehaviour
     public void ShowModelViewPanel()
     {
         HideAllPanelsAndPopups();
-        // DeactivateInteractionSystems(); // Don't hide axes here, let button state control it
         if (modelViewPanel != null) modelViewPanel.SetActive(true);
         if (placeholderModelVisual != null)
         {
-            placeholderModelVisual.SetActive(true); // Activate the parent
+            placeholderModelVisual.SetActive(true);
             if (mockedModelController != null)
             {
-                mockedModelController.gameObject.SetActive(true); // Ensure MockedModel itself is active
-                mockedModelController.EnsureAxisVisualsAreCreated(); // Create axes if not already there
-                // Visibility of axes is now tied to gizmo visibility state
-                mockedModelController.SetAxisVisualsActive(isRotationGizmoVisible);
+                mockedModelController.gameObject.SetActive(true);
+                mockedModelController.EnsureAxisVisualsAreCreated();
             }
         }
-
         if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(isRotationGizmoVisible);
-        if (cropBoxSystem != null) cropBoxSystem.SetActive(isCropBoxVisible); // Keep this for crop system
+        if (cropBoxSystem != null)
+        {
+            cropBoxSystem.SetActive(isCropBoxVisible);
+            if (isCropBoxVisible && cropBoxController != null && cropBoxController.targetModel != null && cropBoxController.targetModel.gameObject.activeInHierarchy) cropBoxController.UpdateVisuals();
+        }
         if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(isCropBoxVisible);
+        if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(isCropBoxVisible);
     }
 
-    public void ToggleRotationGizmoAndAxesVisibility() // Renamed method
+    public void ToggleRotationGizmoVisibility()
     {
         isRotationGizmoVisible = !isRotationGizmoVisible;
-
-        if (rotationGizmoSystem != null)
+        if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(isRotationGizmoVisible);
+        if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(false);
+        if (isRotationGizmoVisible && cropBoxSystem != null)
         {
-            rotationGizmoSystem.SetActive(isRotationGizmoVisible);
-        }
-        if (mockedModelController != null)
-        {
-            mockedModelController.SetAxisVisualsActive(isRotationGizmoVisible);
-        }
-
-        if (isRotationGizmoVisible && cropBoxSystem != null) // If gizmo becomes active, hide crop
-        {
-            cropBoxSystem.SetActive(false);
-            isCropBoxVisible = false;
+            cropBoxSystem.SetActive(false); isCropBoxVisible = false;
             if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(false);
         }
     }
@@ -143,38 +150,24 @@ public class UIManager : MonoBehaviour
         if (cropBoxSystem == null) return;
         isCropBoxVisible = !isCropBoxVisible;
         cropBoxSystem.SetActive(isCropBoxVisible);
-        if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(isCropBoxVisible);
-
-        if (isCropBoxVisible) // If crop box becomes active, hide gizmo and its axes
+        if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(isCropBoxVisible);
+        if (isCropBoxVisible)
         {
-            if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(false);
-            if (mockedModelController != null) mockedModelController.SetAxisVisualsActive(false);
-            isRotationGizmoVisible = false;
+            if (cropBoxController != null && cropBoxController.targetModel != null && cropBoxController.targetModel.gameObject.activeInHierarchy) cropBoxController.UpdateVisuals();
+            if (rotationGizmoSystem != null) { rotationGizmoSystem.SetActive(false); isRotationGizmoVisible = false; }
         }
+        if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(isCropBoxVisible);
     }
 
-    public void ToggleModelInfoPopup(bool show)
+    private void HandleConfirmCrop()
     {
-        if (modelInfoPopup != null) modelInfoPopup.SetActive(show);
+        if (cropBoxSystem != null) cropBoxSystem.SetActive(false);
+        isCropBoxVisible = false;
+        if (confirmCropButton != null) confirmCropButton.gameObject.SetActive(false);
+        if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(false);
     }
 
-    public void HandleResetViewAndModel()
-    {
-        if (cameraController != null) cameraController.ResetView();
-        if (mockedModelController != null) mockedModelController.ResetState(); // This will hide axes
-
-        isRotationGizmoVisible = false; // Reset gizmo state
-        if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(false);
-
-        DeactivateInteractionSystems(); // This will also ensure axes are hidden by default after reset
-    }
-
-    private void HandlePresetViewCycle()
-    {
-        if (cameraController != null) cameraController.CyclePresetView();
-        DeactivateInteractionSystems(true); // Keep axes state as per gizmo button
-        if (rotationGizmoSystem != null) rotationGizmoSystem.SetActive(isRotationGizmoVisible);
-        if (mockedModelController != null) mockedModelController.SetAxisVisualsActive(isRotationGizmoVisible);
-
-    }
+    public void ToggleModelInfoPopup(bool show) { if (modelInfoPopup != null) modelInfoPopup.SetActive(show); }
+    public void HandleResetViewAndModel() { if (cameraController != null) cameraController.ResetView(); if (mockedModelController != null) mockedModelController.ResetState(); DeactivateInteractionSystems(); if (inputManagerRef != null) inputManagerRef.SetCroppingModeActive(false); }
+    private void HandlePresetViewCycle() { if (cameraController != null) cameraController.CyclePresetView(); }
 }
