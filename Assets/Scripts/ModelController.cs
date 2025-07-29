@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 public class ModelController : MonoBehaviour
 {
-    [Header("Transform Control Speeds")]
-    public float rotationLerpSpeed = 5.0f;
-    public float scaleLerpSpeed = 5.0f;
-
     [Header("Model Prefabs")]
     [SerializeField] private GameObject cubePrefab;
     [SerializeField] private GameObject cylinderPrefab;
@@ -21,19 +17,8 @@ public class ModelController : MonoBehaviour
 
     private GameObject currentInstantiatedModel;
     private List<GameObject> currentModelAxisVisuals = new List<GameObject>();
-    private Quaternion targetRootModelRotation = Quaternion.identity;
-    private Vector3 targetRootModelScale = Vector3.one;
 
     public string CurrentModelID { get; private set; } = null;
-
-    void Update()
-    {
-        if (currentInstantiatedModel != null)
-        {
-            currentInstantiatedModel.transform.localRotation = Quaternion.Slerp(currentInstantiatedModel.transform.localRotation, targetRootModelRotation, Time.deltaTime * rotationLerpSpeed);
-            currentInstantiatedModel.transform.localScale = Vector3.Lerp(currentInstantiatedModel.transform.localScale, targetRootModelScale, Time.deltaTime * scaleLerpSpeed);
-        }
-    }
 
     void ClearCurrentModelAxisVisuals()
     {
@@ -66,21 +51,18 @@ public class ModelController : MonoBehaviour
         shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
         shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
         shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        Renderer shaftRend = shaft.GetComponent<Renderer>();
-        ApplyServerMaterial(shaftRend, color);
+        ApplyServerMaterial(shaft.GetComponent<Renderer>(), color);
         currentModelAxisVisuals.Add(shaft);
 
         GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         arrowheadCap.name = baseName + "_HeadCap";
         arrowheadCap.transform.SetParent(parentRef);
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-
         float capRadius = thickness * serverArrowheadRadiusFactor;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
         arrowheadCap.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
         arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        Renderer headRend = arrowheadCap.GetComponent<Renderer>();
-        ApplyServerMaterial(headRend, color);
+        ApplyServerMaterial(arrowheadCap.GetComponent<Renderer>(), color);
         currentModelAxisVisuals.Add(arrowheadCap);
     }
 
@@ -105,17 +87,8 @@ public class ModelController : MonoBehaviour
         currentInstantiatedModel.transform.localScale = clientModelRootLocalScale;
 
         Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
-        if (refChildServer == null)
-        {
-            CreateServerAxisVisuals(currentInstantiatedModel.transform);
-        }
-        else
-        {
-            CreateServerAxisVisuals(refChildServer);
-        }
-
-        targetRootModelRotation = currentInstantiatedModel.transform.localRotation;
-        targetRootModelScale = currentInstantiatedModel.transform.localScale;
+        if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
+        else CreateServerAxisVisuals(refChildServer);
     }
 
     public void LoadNewModel(string modelId)
@@ -143,21 +116,11 @@ public class ModelController : MonoBehaviour
 
         if (prefabToLoad != null)
         {
-            currentInstantiatedModel = Instantiate(prefabToLoad);
-            currentInstantiatedModel.transform.SetParent(this.transform);
+            currentInstantiatedModel = Instantiate(prefabToLoad, this.transform);
             currentInstantiatedModel.transform.localPosition = Vector3.zero;
             currentInstantiatedModel.transform.localRotation = Quaternion.identity;
             currentInstantiatedModel.transform.localScale = Vector3.one;
-
-            targetRootModelRotation = currentInstantiatedModel.transform.localRotation;
-            targetRootModelScale = currentInstantiatedModel.transform.localScale;
         }
         else { Debug.LogError($"[ModelController] Failed to find prefab for model ID: {modelId}"); CurrentModelID = null; }
     }
-
-    public void SetRotation(Vector3 newEulerAngles) { targetRootModelRotation = Quaternion.Euler(newEulerAngles); }
-    public void ApplyRotationDelta(Vector3 rotationDeltaEuler) { targetRootModelRotation = Quaternion.AngleAxis(rotationDeltaEuler.y, Vector3.up) * Quaternion.AngleAxis(rotationDeltaEuler.x, Vector3.right) * targetRootModelRotation; }
-    public void SetScale(Vector3 newScale) { targetRootModelScale = newScale; }
-    public void ApplyScaleFactor(float scaleFactor) { targetRootModelScale *= scaleFactor; }
-    public Transform GetCurrentModelTransform() { return currentInstantiatedModel != null ? currentInstantiatedModel.transform : null; }
 }
