@@ -4,6 +4,7 @@ using WebSocketSharp.Server;
 using System;
 using System.Collections.Concurrent;
 using System.Net;
+using static JsonUtilityHelper; // To use ModelBoundsSizeData
 
 public class WebSocketServerManager : MonoBehaviour
 {
@@ -48,9 +49,10 @@ public class WebSocketServerManager : MonoBehaviour
     {
         if (modelController == null) Debug.LogError("[Server] ModelController reference not set!");
         if (commandInterpreter == null) Debug.LogError("[Server] CommandInterpreter reference not set!");
-        else if (commandInterpreter.WebSocketServerManager == null)
+        else
         {
             commandInterpreter.WebSocketServerManager = this;
+            commandInterpreter.ModelController = modelController;
         }
 
         StartWebSocketServer();
@@ -121,5 +123,32 @@ public class WebSocketServerManager : MonoBehaviour
     private void QueueMainThreadAction(Action action)
     {
         mainThreadActions.Enqueue(action);
+    }
+
+    // Now takes a Vector3 for model size
+    public void SendModelSizeUpdate(Vector3 modelSize)
+    {
+        if (wsServer != null && wsServer.IsListening)
+        {
+            ModelBoundsSizeData sizeData = new ModelBoundsSizeData { size = modelSize };
+            string jsonData = JsonUtility.ToJson(sizeData);
+            string message = $"MODEL_SIZE_UPDATE:{jsonData}";
+
+            QueueMainThreadAction(() =>
+            {
+                foreach (var serviceHost in wsServer.WebSocketServices.Hosts)
+                {
+                    if (serviceHost.Sessions.Count > 0)
+                    {
+                        serviceHost.Sessions.Broadcast(message);
+                    }
+                }
+            });
+            LogOnMainThread($"[Server] Broadcasted Model Size Update: {modelSize}", false);
+        }
+        else
+        {
+            LogOnMainThread("[Server] Not listening to broadcast model size update.", true);
+        }
     }
 }

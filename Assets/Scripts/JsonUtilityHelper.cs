@@ -9,6 +9,14 @@ public static class JsonUtilityHelper
         public Quaternion localRotation;
         public Vector3 localScale;
     }
+
+    // New class for model bounds size (Vector3)
+    [System.Serializable]
+    public class ModelBoundsSizeData
+    {
+        public Vector3 size;
+    }
+
     private struct Vector3Wrapper { public float x; public float y; public float z; }
     [System.Serializable]
     private struct QuaternionWrapper { public float x; public float y; public float z; public float w; }

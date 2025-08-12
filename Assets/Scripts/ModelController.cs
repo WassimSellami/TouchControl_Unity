@@ -20,6 +20,9 @@ public class ModelController : MonoBehaviour
 
     public string CurrentModelID { get; private set; } = null;
 
+    // Change from float to Vector3
+    public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one; // Default to Vector3.one
+
     void ClearCurrentModelAxisVisuals()
     {
         foreach (GameObject vis in currentModelAxisVisuals)
@@ -120,7 +123,26 @@ public class ModelController : MonoBehaviour
             currentInstantiatedModel.transform.localPosition = Vector3.zero;
             currentInstantiatedModel.transform.localRotation = Quaternion.identity;
             currentInstantiatedModel.transform.localScale = Vector3.one;
+
+            // Calculate and store the model bounds size (Vector3) after instantiation
+            CurrentModelBoundsSize = CalculateModelBoundsSize(currentInstantiatedModel);
         }
         else { Debug.LogError($"[ModelController] Failed to find prefab for model ID: {modelId}"); CurrentModelID = null; }
+    }
+
+    // New method to calculate the Vector3 size of the instantiated model's bounds
+    private Vector3 CalculateModelBoundsSize(GameObject model)
+    {
+        if (model == null) return Vector3.one;
+
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return Vector3.one; // Default size if no renderers
+
+        Bounds bounds = new Bounds(renderers[0].bounds.center, Vector3.zero);
+        foreach (Renderer rend in renderers)
+        {
+            bounds.Encapsulate(rend.bounds);
+        }
+        return bounds.size;
     }
 }

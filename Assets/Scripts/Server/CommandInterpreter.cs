@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Globalization;
 using static JsonUtilityHelper;
 
 public class CommandInterpreter : MonoBehaviour
@@ -98,6 +99,15 @@ public class CommandInterpreter : MonoBehaviour
         if (!string.IsNullOrEmpty(args))
         {
             ModelController.LoadNewModel(args);
+            // After loading the model, send its size (Vector3) to the clients
+            if (WebSocketServerManager != null)
+            {
+                WebSocketServerManager.SendModelSizeUpdate(ModelController.CurrentModelBoundsSize);
+            }
+            else
+            {
+                Debug.LogWarning("[CommandInterpreter] WebSocketServerManager not assigned, cannot send model size update.");
+            }
         }
         else
         {
