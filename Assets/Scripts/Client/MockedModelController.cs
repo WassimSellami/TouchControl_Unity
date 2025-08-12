@@ -3,6 +3,18 @@ using System.Collections.Generic;
 
 public class MockedModelController : MonoBehaviour
 {
+    [Header("Control Settings")]
+    [SerializeField] private float panSensitivity = 0.01f;
+    [SerializeField] private float orbitSensitivity = 0.5f;
+    [SerializeField] private float zoomSensitivity = 0.1f;
+    [SerializeField] private float scaleMin = 0.1f;
+    [SerializeField] private float scaleMax = 10.0f;
+    [SerializeField] private float presetViewRotationStep = 45f;
+
+    [Header("References")]
+    [SerializeField] private GameObject mockVisualModel;
+    [SerializeField] private Camera referenceCamera;
+
     [Header("Axis Visuals")]
     [SerializeField] private Vector3 axisOriginOffset = new Vector3(0f, 0f, 0f);
     [SerializeField] private float axisLength = 10f;
@@ -10,43 +22,29 @@ public class MockedModelController : MonoBehaviour
     [SerializeField] private float arrowheadRadiusFactor = 2.5f;
     [SerializeField] private float arrowheadHeightFactor = 3f;
 
-    [Header("Axis Materials (Assign in Inspector)")]
+    [Header("Axis Materials")]
     [SerializeField] private Material redAxisMaterial;
     [SerializeField] private Material greenAxisMaterial;
     [SerializeField] private Material blueAxisMaterial;
 
-    [Header("Mock Model Reference")]
-    [SerializeField] private GameObject mockVisualModel; // Drag your mock cube/model here
+    private Vector3 initialPosition;
+    private Quaternion initialRotation;
+    private Vector3 initialScale;
 
-    private Vector3 initialLocalEulerAngles;
-    private Vector3 initialLocalScale;
     private List<GameObject> axisVisuals = new List<GameObject>();
     private bool axesCreated = false;
-    // Removed [SerializeField] for refChildTransform, will always be this.transform for axes
-    private Transform axesParentTransform; // Renamed for clarity
+    private Transform axesParentTransform;
 
     void Awake()
     {
-        // axesParentTransform will be this GameObject, ensuring axes aren't scaled with mockVisualModel
         axesParentTransform = this.transform;
+        initialPosition = transform.position;
+        initialRotation = transform.rotation;
+        initialScale = transform.localScale;
 
-        // Store initial transform of the visual model, not the controller itself
-        if (mockVisualModel != null)
-        {
-            initialLocalEulerAngles = mockVisualModel.transform.localEulerAngles;
-            initialLocalScale = mockVisualModel.transform.localScale;
-        }
-        else
-        {
-            Debug.LogWarning("[MockedModelController] Mock Visual Model not assigned! Initial scale/rotation cannot be stored or reset.");
-            initialLocalEulerAngles = Vector3.zero;
-            initialLocalScale = Vector3.one;
-        }
-
-        if (redAxisMaterial == null || greenAxisMaterial == null || blueAxisMaterial == null)
-        {
-            Debug.LogError("[MockedModelController] Axis materials are not assigned in the Inspector!");
-        }
+        if (mockVisualModel == null) Debug.LogWarning("[MockedModelController] Mock Visual Model not assigned.");
+        if (redAxisMaterial == null || greenAxisMaterial == null || blueAxisMaterial == null) Debug.LogError("[MockedModelController] Axis materials are not assigned in the Inspector!");
+        if (referenceCamera == null) Debug.LogError("[MockedModelController] Reference Camera not assigned! Panning will not work.");
     }
 
     void OnEnable()
@@ -54,11 +52,48 @@ public class MockedModelController : MonoBehaviour
         EnsureAxisVisualsAreCreated();
     }
 
+    public void ProcessOrbit(Vector2 screenDelta)
+    {
+        float horizontalInput = -screenDelta.x * orbitSensitivity;
+        transform.Rotate(Vector3.up, horizontalInput, Space.World);
+    }
+
+    public void ProcessPan(Vector2 screenDelta)
+    {
+        if (referenceCamera == null) return;
+        Vector3 right = referenceCamera.transform.right * -screenDelta.x;
+        Vector3 up = referenceCamera.transform.up * -screenDelta.y;
+        Vector3 worldDelta = (right + up) * panSensitivity;
+        transform.Translate(worldDelta, Space.World);
+    }
+
+    public void ProcessZoom(float zoomAmount)
+    {
+        if (zoomAmount == 0) return;
+        float scaleChange = 1.0f + (zoomAmount * zoomSensitivity);
+        Vector3 newScale = transform.localScale * scaleChange;
+        newScale.x = Mathf.Clamp(newScale.x, scaleMin, scaleMax);
+        newScale.y = Mathf.Clamp(newScale.y, scaleMin, scaleMax);
+        newScale.z = Mathf.Clamp(newScale.z, scaleMin, scaleMax);
+        transform.localScale = newScale;
+    }
+
+    public void ResetState()
+    {
+        transform.position = initialPosition;
+        transform.rotation = initialRotation;
+        transform.localScale = initialScale;
+        EnsureAxisVisualsAreCreated();
+    }
+
+    public void CyclePresetView()
+    {
+        transform.Rotate(Vector3.up, presetViewRotationStep, Space.World);
+    }
+
     public void EnsureAxisVisualsAreCreated()
     {
-        // Axes are always parented to this.transform (axesParentTransform)
         if (!this.gameObject.activeInHierarchy) return;
-
         if (!axesCreated && axesParentTransform != null && axesParentTransform.gameObject.activeInHierarchy)
         {
             CreateAxisVisuals();
@@ -70,10 +105,21 @@ public class MockedModelController : MonoBehaviour
         }
     }
 
+    public void ApplyServerModelScale(Vector3 serverModelSize)
+    {
+        if (mockVisualModel == null) return;
+        Vector3 baseUnitSize = Vector3.one;
+        Vector3 scaleFactor = new Vector3(
+            serverModelSize.x / baseUnitSize.x,
+            serverModelSize.y / baseUnitSize.y,
+            serverModelSize.z / baseUnitSize.z
+        );
+        mockVisualModel.transform.localScale = scaleFactor;
+    }
+
     void CreateAxisVisuals()
     {
         ClearAxisVisuals();
-        // Axes are always parented to axesParentTransform (this.transform)
         CreateSingleAxisVisual(axesParentTransform, Vector3.right, axisLength, axisThickness, redAxisMaterial, "X_Axis_Client");
         CreateSingleAxisVisual(axesParentTransform, Vector3.up, axisLength, axisThickness, greenAxisMaterial, "Y_Axis_Client");
         CreateSingleAxisVisual(axesParentTransform, Vector3.forward, axisLength, axisThickness, blueAxisMaterial, "Z_Axis_Client");
@@ -82,32 +128,27 @@ public class MockedModelController : MonoBehaviour
     void CreateSingleAxisVisual(Transform parentForAxes, Vector3 direction, float length, float thickness, Material axisMat, string baseName)
     {
         float capHeight = thickness * arrowheadHeightFactor;
-        float shaftActualLength = length - capHeight;
-        shaftActualLength = Mathf.Max(thickness / 2f, shaftActualLength);
+        float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
 
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentForAxes);
+        shaft.transform.SetParent(parentForAxes, false);
         Destroy(shaft.GetComponent<CapsuleCollider>());
         shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
         shaft.transform.localPosition = axisOriginOffset + direction * (shaftActualLength / 2f);
         shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        Renderer shaftRend = shaft.GetComponent<Renderer>();
-        if (shaftRend != null && axisMat != null) shaftRend.material = axisMat;
+        if (shaft.GetComponent<Renderer>() != null && axisMat != null) shaft.GetComponent<Renderer>().material = axisMat;
         axisVisuals.Add(shaft);
 
         GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentForAxes);
+        arrowheadCap.transform.SetParent(parentForAxes, false);
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-
         float capRadius = thickness * arrowheadRadiusFactor;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
         arrowheadCap.transform.localPosition = axisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
         arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-
-        Renderer headRend = arrowheadCap.GetComponent<Renderer>();
-        if (headRend != null && axisMat != null) headRend.material = axisMat;
+        if (arrowheadCap.GetComponent<Renderer>() != null && axisMat != null) arrowheadCap.GetComponent<Renderer>().material = axisMat;
         axisVisuals.Add(arrowheadCap);
     }
 
@@ -119,49 +160,5 @@ public class MockedModelController : MonoBehaviour
         }
         axisVisuals.Clear();
         axesCreated = false;
-    }
-
-    public void SetInitialState(Vector3 eulerAngles, Vector3 scale)
-    {
-        if (mockVisualModel != null)
-        {
-            mockVisualModel.transform.localEulerAngles = eulerAngles;
-            mockVisualModel.transform.localScale = scale;
-        }
-        else
-        {
-            Debug.LogWarning("[MockedModelController] No mock visual model assigned to set initial state.");
-        }
-    }
-
-    public void ResetState()
-    {
-        SetInitialState(initialLocalEulerAngles, initialLocalScale);
-        EnsureAxisVisualsAreCreated(); // Re-create if cleared
-    }
-
-    public void ApplyServerModelScale(Vector3 serverModelSize)
-    {
-        if (mockVisualModel == null)
-        {
-            Debug.LogWarning("[MockedModelController] No mock visual model assigned to apply server scale.");
-            return;
-        }
-
-        // Assuming a default mock model size of 1 unit in all axes.
-        // Adjust this 'baseUnitSize' if your initial mock cube is not 1x1x1.
-        Vector3 baseUnitSize = Vector3.one; // For a standard Unity Primitive cube/cylinder
-
-        // Calculate the scale factor needed for each axis
-        Vector3 scaleFactor = new Vector3(
-            serverModelSize.x / baseUnitSize.x,
-            serverModelSize.y / baseUnitSize.y,
-            serverModelSize.z / baseUnitSize.z
-        );
-
-        // Apply this scale factor ONLY to the mock visual model, not its parent or axes
-        mockVisualModel.transform.localScale = scaleFactor;
-
-        Debug.Log($"[MockedModelController] Applied server scale: {serverModelSize} leading to localScale of mock visual model: {scaleFactor}");
     }
 }

@@ -7,7 +7,7 @@ public class InputManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField]
-    private CameraController cameraController;
+    private MockedModelController targetModelController;
     [SerializeField]
     private EventSystem eventSystem;
 
@@ -20,7 +20,6 @@ public class InputManager : MonoBehaviour
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
     private float previousZoomDistance;
-    private Vector2 previousZoomCenter;
 
     private bool isPanning = false;
     private bool isOrbiting = false;
@@ -29,11 +28,10 @@ public class InputManager : MonoBehaviour
     private Queue<Vector2> orbitPositionHistory = new Queue<Vector2>();
     private Queue<Vector2> panCentroidHistory = new Queue<Vector2>();
     private Queue<float> zoomDistanceHistory = new Queue<float>();
-    private Queue<Vector2> zoomCenterHistory = new Queue<Vector2>();
 
     void Start()
     {
-        if (cameraController == null) { this.enabled = false; Debug.LogError("InputManager: CameraController not assigned!"); }
+        if (targetModelController == null) { this.enabled = false; Debug.LogError("InputManager: TargetModelController not assigned!"); }
         if (eventSystem == null) { eventSystem = EventSystem.current; }
         if (eventSystem == null) { this.enabled = false; Debug.LogError("InputManager: EventSystem not found!"); }
     }
@@ -109,67 +107,34 @@ public class InputManager : MonoBehaviour
 
     private void ResetGestureStates()
     {
-        if (isPanning && cameraController != null)
-        {
-            cameraController.EndPan();
-        }
         isPanning = false;
         isOrbiting = false;
         isZooming = false;
-
         orbitPositionHistory.Clear();
         panCentroidHistory.Clear();
         zoomDistanceHistory.Clear();
-        zoomCenterHistory.Clear();
     }
 
     private void HandleOrbitGesture()
     {
-        if (cameraController == null) return;
+        if (targetModelController == null) return;
+        Vector2 currentRawPosition = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).position : (Vector2)Input.mousePosition;
+        TouchPhase phase = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).phase : GetMousePhase();
 
-#if UNITY_EDITOR
-        if (GetTouchOrMouseCount() == 1 && Input.touchCount == 0)
-        {
-            Vector2 currentRawMousePosition = (Vector2)Input.mousePosition;
-
-            if (Input.GetMouseButtonDown(0))
-            {
-                isOrbiting = true;
-                orbitPositionHistory.Clear();
-                previousOrbitPosition = currentRawMousePosition;
-            }
-            if (Input.GetMouseButton(0) && isOrbiting)
-            {
-                Vector2 smoothedPosition = GetSmoothedVector2(currentRawMousePosition, orbitPositionHistory);
-                Vector2 orbitDelta = smoothedPosition - previousOrbitPosition;
-                cameraController.ProcessOrbit(orbitDelta);
-                previousOrbitPosition = smoothedPosition;
-            }
-            if (Input.GetMouseButtonUp(0))
-            {
-                isOrbiting = false;
-            }
-            return;
-        }
-#endif
-
-        Touch touch = Input.GetTouch(0);
-        Vector2 currentRawTouchPosition = touch.position;
-
-        if (touch.phase == TouchPhase.Began)
+        if (phase == TouchPhase.Began)
         {
             isOrbiting = true;
             orbitPositionHistory.Clear();
-            previousOrbitPosition = currentRawTouchPosition;
+            previousOrbitPosition = currentRawPosition;
         }
-        else if (touch.phase == TouchPhase.Moved && isOrbiting)
+        else if (phase == TouchPhase.Moved && isOrbiting)
         {
-            Vector2 smoothedPosition = GetSmoothedVector2(currentRawTouchPosition, orbitPositionHistory);
+            Vector2 smoothedPosition = GetSmoothedVector2(currentRawPosition, orbitPositionHistory);
             Vector2 orbitDelta = smoothedPosition - previousOrbitPosition;
-            cameraController.ProcessOrbit(orbitDelta);
+            targetModelController.ProcessOrbit(orbitDelta);
             previousOrbitPosition = smoothedPosition;
         }
-        else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+        else if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
         {
             isOrbiting = false;
         }
@@ -177,29 +142,13 @@ public class InputManager : MonoBehaviour
 
     private void HandlePanGesture()
     {
-        if (cameraController == null || GetTouchOrMouseCount() < minPanTouchCount)
+        if (targetModelController == null || GetTouchOrMouseCount() < minPanTouchCount)
         {
             isPanning = false;
             return;
         }
 
-        Dictionary<int, Vector2> currentActiveTouches = new Dictionary<int, Vector2>();
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            Touch touch = Input.GetTouch(i);
-            if (touch.phase != TouchPhase.Ended && touch.phase != TouchPhase.Canceled)
-            {
-                currentActiveTouches[touch.fingerId] = touch.position;
-            }
-        }
-
-        if (currentActiveTouches.Count < minPanTouchCount)
-        {
-            isPanning = false;
-            return;
-        }
-
-        Vector2 rawCentroid = GetCentroid(currentActiveTouches.Values.ToList());
+        Vector2 rawCentroid = GetCentroid(GetActiveTouchPositions());
         Vector2 smoothedCentroid = GetSmoothedVector2(rawCentroid, panCentroidHistory);
 
         if (!isPanning)
@@ -207,86 +156,80 @@ public class InputManager : MonoBehaviour
             isPanning = true;
             previousPanCentroid = smoothedCentroid;
         }
-        else if (isPanning && (smoothedCentroid - previousPanCentroid).sqrMagnitude > 0.001f)
+        else
         {
-            cameraController.ProcessPanDelta(smoothedCentroid - previousPanCentroid);
-        }
-        previousPanCentroid = smoothedCentroid;
-
-        if (Input.touchCount < minPanTouchCount)
-        {
-            isPanning = false;
+            Vector2 panDelta = smoothedCentroid - previousPanCentroid;
+            if (panDelta.sqrMagnitude > 0.001f)
+            {
+                targetModelController.ProcessPan(panDelta);
+            }
+            previousPanCentroid = smoothedCentroid;
         }
     }
 
     private void HandleZoomGesture()
     {
-        if (cameraController == null || GetTouchOrMouseCount() != zoomTouchCount)
+        if (targetModelController == null || GetTouchOrMouseCount() != zoomTouchCount)
         {
             isZooming = false;
             return;
         }
-
         Touch touchZero = Input.GetTouch(0);
         Touch touchOne = Input.GetTouch(1);
-
-        Vector2 rawPinchCenter = (touchZero.position + touchOne.position) / 2f;
         float rawPinchDistance = Vector2.Distance(touchZero.position, touchOne.position);
-
-        Vector2 smoothedPinchCenter = GetSmoothedVector2(rawPinchCenter, zoomCenterHistory);
         float smoothedPinchDistance = GetSmoothedFloat(rawPinchDistance, zoomDistanceHistory);
 
         if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began)
         {
             isZooming = true;
             zoomDistanceHistory.Clear();
-            zoomCenterHistory.Clear();
             previousZoomDistance = smoothedPinchDistance;
-            previousZoomCenter = smoothedPinchCenter;
         }
         else if ((touchZero.phase == TouchPhase.Moved || touchOne.phase == TouchPhase.Moved) && isZooming)
         {
             float deltaDistance = smoothedPinchDistance - previousZoomDistance;
-            cameraController.ProcessZoom(deltaDistance, smoothedPinchCenter);
+            targetModelController.ProcessZoom(deltaDistance);
             previousZoomDistance = smoothedPinchDistance;
-            previousZoomCenter = smoothedPinchCenter;
         }
+    }
 
-        if (touchZero.phase == TouchPhase.Ended || touchOne.phase == TouchPhase.Ended || Input.touchCount != zoomTouchCount)
+    private List<Vector2> GetActiveTouchPositions()
+    {
+        List<Vector2> positions = new List<Vector2>();
+        for (int i = 0; i < Input.touchCount; i++)
         {
-            isZooming = false;
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase != TouchPhase.Ended && touch.phase != TouchPhase.Canceled)
+            {
+                positions.Add(touch.position);
+            }
         }
+        return positions;
+    }
+
+    private TouchPhase GetMousePhase()
+    {
+        if (Input.GetMouseButtonDown(0)) return TouchPhase.Began;
+        if (Input.GetMouseButton(0)) return TouchPhase.Moved;
+        if (Input.GetMouseButtonUp(0)) return TouchPhase.Ended;
+        return TouchPhase.Canceled;
     }
 
     private Vector2 GetSmoothedVector2(Vector2 newSample, Queue<Vector2> historyQueue)
     {
         historyQueue.Enqueue(newSample);
-        while (historyQueue.Count > smoothSamplesCount)
-        {
-            historyQueue.Dequeue();
-        }
-
+        while (historyQueue.Count > smoothSamplesCount) { historyQueue.Dequeue(); }
         Vector2 sum = Vector2.zero;
-        foreach (Vector2 sample in historyQueue)
-        {
-            sum += sample;
-        }
+        foreach (Vector2 sample in historyQueue) { sum += sample; }
         return sum / Mathf.Max(1, historyQueue.Count);
     }
 
     private float GetSmoothedFloat(float newSample, Queue<float> historyQueue)
     {
         historyQueue.Enqueue(newSample);
-        while (historyQueue.Count > smoothSamplesCount)
-        {
-            historyQueue.Dequeue();
-        }
-
+        while (historyQueue.Count > smoothSamplesCount) { historyQueue.Dequeue(); }
         float sum = 0f;
-        foreach (float sample in historyQueue)
-        {
-            sum += sample;
-        }
+        foreach (float sample in historyQueue) { sum += sample; }
         return sum / Mathf.Max(1, historyQueue.Count);
     }
 
