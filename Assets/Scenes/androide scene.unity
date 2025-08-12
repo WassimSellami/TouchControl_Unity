@@ -1640,7 +1640,6 @@ MonoBehaviour:
   connectionPanel: {fileID: 287029895}
   mainMenuPanel: {fileID: 1196686082}
   modelViewPanel: {fileID: 1499341570}
-  cameraController: {fileID: 0}
   mockedModelController: {fileID: 980018137}
   inputManagerRef: {fileID: 838438839}
   backButtonToMainMenu: {fileID: 1621385748}
@@ -1664,7 +1663,7 @@ MonoBehaviour:
   defaultIpAddress: 192.168.0.35
   serverPort: 8070
   servicePath: /Control
-  modelUpdateRateFPS: 30
+  modelUpdateRateFPS: 60
   connectButton: {fileID: 885532448}
   connectButtonText: {fileID: 488383159}
   statusText: {fileID: 2104096725}

@@ -13,10 +13,10 @@ public class WebSocketClientManager : MonoBehaviour
 
     [Header("Networking")]
     [SerializeField] private TMP_InputField ipAddressInput;
-    [SerializeField] private string defaultIpAddress = "192.168.0.83";
+    [SerializeField] private string defaultIpAddress = "192.168.0.35";
     [SerializeField] private int serverPort = 8070;
     [SerializeField] private string servicePath = "/Control";
-    [SerializeField] private float modelUpdateRateFPS = 30f;
+    [SerializeField] private float modelUpdateRateFPS = 60f;
 
     [Header("UI Elements for Connection & Control")]
     [SerializeField] private Button connectButton;
@@ -85,8 +85,7 @@ public class WebSocketClientManager : MonoBehaviour
 
     public void AttemptConnect()
     {
-        if (IsConnected) return;
-        if (isAttemptingConnection) return;
+        if (IsConnected || isAttemptingConnection) return;
 
         string ip = (ipAddressInput != null && !string.IsNullOrWhiteSpace(ipAddressInput.text)) ? ipAddressInput.text : defaultIpAddress;
         string url = $"ws://{ip}:{serverPort}{servicePath}";
@@ -122,10 +121,7 @@ public class WebSocketClientManager : MonoBehaviour
     {
         UpdateConnectionUI(ConnectionState.Connected);
         isAttemptingConnection = false;
-        if (uiManager != null)
-        {
-            uiManager.ShowMainMenuPanel();
-        }
+        if (uiManager != null) uiManager.ShowMainMenuPanel();
     }
 
     private void OnWebSocketMessage(string data)
@@ -134,15 +130,8 @@ public class WebSocketClientManager : MonoBehaviour
         string command = parts[0].ToUpperInvariant();
         string args = parts.Length > 1 ? parts[1] : null;
 
-        switch (command)
-        {
-            case "MODEL_SIZE_UPDATE":
-                ProcessModelSizeUpdate(args);
-                break;
-            default:
-                Debug.Log($"Received unknown message from server: \"{data}\"");
-                break;
-        }
+        if (command == "MODEL_SIZE_UPDATE") ProcessModelSizeUpdate(args);
+        else Debug.Log($"Received unknown message from server: \"{data}\"");
     }
 
     private void ProcessModelSizeUpdate(string args)
@@ -153,10 +142,7 @@ public class WebSocketClientManager : MonoBehaviour
             ModelBoundsSizeData sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(args);
             mockedModelControllerRef.ApplyServerModelScale(sizeData.size);
         }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error parsing ModelBoundsSizeData: {ex.Message} | Args: {args}");
-        }
+        catch (Exception ex) { Debug.LogError($"Error parsing ModelBoundsSizeData: {ex.Message} | Args: {args}"); }
     }
 
     private void OnWebSocketError(string errorMessage)
@@ -180,20 +166,6 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (!IsConnected) return;
         SendMessageToServer($"LOAD_MODEL:{modelId.ToUpperInvariant()}");
-
-        if (mockedModelControllerRef != null)
-        {
-            Transform modelRootTransform = mockedModelControllerRef.transform;
-            ModelTransformStateData initialState = new ModelTransformStateData
-            {
-                localPosition = modelRootTransform.localPosition,
-                localRotation = modelRootTransform.localRotation,
-                localScale = modelRootTransform.localScale
-            };
-            string transformJson = JsonUtility.ToJson(initialState);
-            SendMessageToServer($"SET_INITIAL_MODEL_TRANSFORM:{transformJson}");
-        }
-
         if (uiManager != null) uiManager.ShowModelViewPanel();
     }
 
@@ -204,9 +176,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void UpdateConnectionUI(ConnectionState state)
     {
-        string message = "";
+        string message = "", buttonText = "";
         Color indicatorColor = Color.gray;
-        string buttonText = "";
         bool buttonInteractable = true;
 
         switch (state)

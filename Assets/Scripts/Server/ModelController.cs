@@ -19,79 +19,16 @@ public class ModelController : MonoBehaviour
     private List<GameObject> currentModelAxisVisuals = new List<GameObject>();
 
     public string CurrentModelID { get; private set; } = null;
+    public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
 
-    // Change from float to Vector3
-    public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one; // Default to Vector3.one
-
-    void ClearCurrentModelAxisVisuals()
+    public void ApplyWorldTransform(Vector3 localPosition, Quaternion localRotation, Vector3 localScale)
     {
-        foreach (GameObject vis in currentModelAxisVisuals)
+        if (currentInstantiatedModel != null)
         {
-            if (vis != null) Destroy(vis);
+            currentInstantiatedModel.transform.localPosition = localPosition;
+            currentInstantiatedModel.transform.localRotation = localRotation;
+            currentInstantiatedModel.transform.localScale = localScale;
         }
-        currentModelAxisVisuals.Clear();
-    }
-
-    void CreateServerAxisVisuals(Transform referencePointTransform)
-    {
-        if (!showServerAxes || referencePointTransform == null) return;
-        ClearCurrentModelAxisVisuals();
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.right, serverAxisLength, serverAxisThickness, Color.red, "X_Axis_Server");
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.up, serverAxisLength, serverAxisThickness, Color.green, "Y_Axis_Server");
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.forward, serverAxisLength, serverAxisThickness, Color.blue, "Z_Axis_Server");
-    }
-
-    void CreateSingleServerAxisVisual(Transform parentRef, Vector3 direction, float length, float thickness, Color color, string baseName)
-    {
-        float capHeight = thickness * serverArrowheadHeightFactor;
-        float shaftActualLength = length - capHeight;
-        shaftActualLength = Mathf.Max(thickness / 2f, shaftActualLength);
-
-        GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentRef);
-        Destroy(shaft.GetComponent<CapsuleCollider>());
-        shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
-        shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
-        shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        ApplyServerMaterial(shaft.GetComponent<Renderer>(), color);
-        currentModelAxisVisuals.Add(shaft);
-
-        GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentRef);
-        Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-        float capRadius = thickness * serverArrowheadRadiusFactor;
-        arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
-        arrowheadCap.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
-        arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        ApplyServerMaterial(arrowheadCap.GetComponent<Renderer>(), color);
-        currentModelAxisVisuals.Add(arrowheadCap);
-    }
-
-    void ApplyServerMaterial(Renderer rend, Color color)
-    {
-        if (rend == null) return;
-        Shader unlitColorShader = Shader.Find("Unlit/Color");
-        if (unlitColorShader != null) rend.material = new Material(unlitColorShader);
-        else rend.material = new Material(Shader.Find("Legacy Shaders/Diffuse"));
-        rend.material.color = color;
-    }
-
-    public void SetInitialTransform(Vector3 clientModelRootLocalPos, Quaternion clientModelRootLocalRot, Vector3 clientModelRootLocalScale)
-    {
-        if (currentInstantiatedModel == null)
-        {
-            Debug.LogWarning("[ModelController] SetInitialTransform called but no model is loaded.");
-            return;
-        }
-        currentInstantiatedModel.transform.localPosition = clientModelRootLocalPos;
-        currentInstantiatedModel.transform.localRotation = clientModelRootLocalRot;
-        currentInstantiatedModel.transform.localScale = clientModelRootLocalScale;
-
-        Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
-        if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
-        else CreateServerAxisVisuals(refChildServer);
     }
 
     public void LoadNewModel(string modelId)
@@ -123,26 +60,75 @@ public class ModelController : MonoBehaviour
             currentInstantiatedModel.transform.localPosition = Vector3.zero;
             currentInstantiatedModel.transform.localRotation = Quaternion.identity;
             currentInstantiatedModel.transform.localScale = Vector3.one;
-
-            // Calculate and store the model bounds size (Vector3) after instantiation
             CurrentModelBoundsSize = CalculateModelBoundsSize(currentInstantiatedModel);
+
+            // Create axes immediately after loading the model
+            Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
+            if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
+            else CreateServerAxisVisuals(refChildServer);
         }
         else { Debug.LogError($"[ModelController] Failed to find prefab for model ID: {modelId}"); CurrentModelID = null; }
     }
 
-    // New method to calculate the Vector3 size of the instantiated model's bounds
     private Vector3 CalculateModelBoundsSize(GameObject model)
     {
         if (model == null) return Vector3.one;
-
         Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return Vector3.one; // Default size if no renderers
-
+        if (renderers.Length == 0) return Vector3.one;
         Bounds bounds = new Bounds(renderers[0].bounds.center, Vector3.zero);
-        foreach (Renderer rend in renderers)
-        {
-            bounds.Encapsulate(rend.bounds);
-        }
+        foreach (Renderer rend in renderers) { bounds.Encapsulate(rend.bounds); }
         return bounds.size;
+    }
+
+    void ClearCurrentModelAxisVisuals()
+    {
+        foreach (GameObject vis in currentModelAxisVisuals) { if (vis != null) Destroy(vis); }
+        currentModelAxisVisuals.Clear();
+    }
+
+
+
+    void CreateServerAxisVisuals(Transform referencePointTransform)
+    {
+        if (!showServerAxes || referencePointTransform == null) return;
+        ClearCurrentModelAxisVisuals();
+        CreateSingleServerAxisVisual(referencePointTransform, Vector3.right, serverAxisLength, serverAxisThickness, Color.red, "X_Axis_Server");
+        CreateSingleServerAxisVisual(referencePointTransform, Vector3.up, serverAxisLength, serverAxisThickness, Color.green, "Y_Axis_Server");
+        CreateSingleServerAxisVisual(referencePointTransform, Vector3.forward, serverAxisLength, serverAxisThickness, Color.blue, "Z_Axis_Server");
+    }
+
+    void CreateSingleServerAxisVisual(Transform parentRef, Vector3 direction, float length, float thickness, Color color, string baseName)
+    {
+        float capHeight = thickness * serverArrowheadHeightFactor;
+        float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
+        GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        shaft.name = baseName + "_Shaft";
+        shaft.transform.SetParent(parentRef);
+        Destroy(shaft.GetComponent<CapsuleCollider>());
+        shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
+        shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
+        shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
+        ApplyServerMaterial(shaft.GetComponent<Renderer>(), color);
+        currentModelAxisVisuals.Add(shaft);
+
+        GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        arrowheadCap.name = baseName + "_HeadCap";
+        arrowheadCap.transform.SetParent(parentRef);
+        Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
+        float capRadius = thickness * serverArrowheadRadiusFactor;
+        arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
+        arrowheadCap.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
+        arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
+        ApplyServerMaterial(arrowheadCap.GetComponent<Renderer>(), color);
+        currentModelAxisVisuals.Add(arrowheadCap);
+    }
+
+    void ApplyServerMaterial(Renderer rend, Color color)
+    {
+        if (rend == null) return;
+        Shader unlitColorShader = Shader.Find("Unlit/Color");
+        if (unlitColorShader != null) rend.material = new Material(unlitColorShader);
+        else rend.material = new Material(Shader.Find("Legacy Shaders/Diffuse"));
+        rend.material.color = color;
     }
 }

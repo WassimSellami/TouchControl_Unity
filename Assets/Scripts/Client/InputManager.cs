@@ -158,7 +158,7 @@ public class InputManager : MonoBehaviour
         }
         else
         {
-            Vector2 panDelta = smoothedCentroid - previousPanCentroid;
+            Vector2 panDelta = previousPanCentroid - smoothedCentroid;
             if (panDelta.sqrMagnitude > 0.001f)
             {
                 targetModelController.ProcessPan(panDelta);
