@@ -17,7 +17,7 @@ public class MockedModelController : MonoBehaviour
 
     [Header("Axis Visuals")]
     [SerializeField] private Vector3 axisOriginOffset = new Vector3(0f, 0f, 0f);
-    [SerializeField] private float axisLength = 10f;
+    [SerializeField] private float axisLength = 10f; // A larger, more visible default length
     [SerializeField] private float axisThickness = 0.03f;
     [SerializeField] private float arrowheadRadiusFactor = 2.5f;
     [SerializeField] private float arrowheadHeightFactor = 3f;
@@ -33,11 +33,13 @@ public class MockedModelController : MonoBehaviour
 
     private List<GameObject> axisVisuals = new List<GameObject>();
     private bool axesCreated = false;
-    private Transform axesParentTransform;
+
+    // FINAL: This container will be a SIBLING to the model, not a child.
+    private GameObject axesContainer;
+    private Transform modelReferencePoint;
 
     void Awake()
     {
-        axesParentTransform = this.transform;
         initialPosition = transform.position;
         initialRotation = transform.rotation;
         initialScale = transform.localScale;
@@ -45,11 +47,22 @@ public class MockedModelController : MonoBehaviour
         if (mockVisualModel == null) Debug.LogWarning("[MockedModelController] Mock Visual Model not assigned.");
         if (redAxisMaterial == null || greenAxisMaterial == null || blueAxisMaterial == null) Debug.LogError("[MockedModelController] Axis materials are not assigned in the Inspector!");
         if (referenceCamera == null) Debug.LogError("[MockedModelController] Reference Camera not assigned! Panning will not work.");
+
+        // Create the container and parent it to this controller. It will live alongside the visual model.
+        axesContainer = new GameObject("Client_Axes_Container");
+        axesContainer.transform.SetParent(this.transform, false);
     }
 
-    void OnEnable()
+    // FINAL: Use LateUpdate to sync the axes' position/rotation to the reference point AFTER all scaling has been calculated for the frame.
+    void LateUpdate()
     {
-        EnsureAxisVisualsAreCreated();
+        if (axesContainer != null && modelReferencePoint != null)
+        {
+            // This ensures the axes origin is always perfectly at the reference point's
+            // world position and rotation, even after the model has been scaled non-uniformly.
+            axesContainer.transform.position = modelReferencePoint.position;
+            axesContainer.transform.rotation = modelReferencePoint.rotation;
+        }
     }
 
     public void ProcessOrbit(Vector2 screenDelta)
@@ -75,6 +88,7 @@ public class MockedModelController : MonoBehaviour
         newScale.x = Mathf.Clamp(newScale.x, scaleMin, scaleMax);
         newScale.y = Mathf.Clamp(newScale.y, scaleMin, scaleMax);
         newScale.z = Mathf.Clamp(newScale.z, scaleMin, scaleMax);
+        // This scale change affects both the model AND the axesContainer, which is correct for zooming.
         transform.localScale = newScale;
     }
 
@@ -93,36 +107,49 @@ public class MockedModelController : MonoBehaviour
 
     public void EnsureAxisVisualsAreCreated()
     {
-        if (!this.gameObject.activeInHierarchy) return;
-        if (!axesCreated && axesParentTransform != null && axesParentTransform.gameObject.activeInHierarchy)
+        if (!this.gameObject.activeInHierarchy || mockVisualModel == null) return;
+
+        modelReferencePoint = mockVisualModel.transform.Find("ref");
+        if (modelReferencePoint == null)
+        {
+            Debug.LogWarning("[MockedModelController] 'ref' child not found on mockVisualModel. Defaulting to model's root transform.");
+            modelReferencePoint = mockVisualModel.transform;
+        }
+
+        if (!axesCreated)
         {
             CreateAxisVisuals();
             axesCreated = true;
         }
-        foreach (GameObject vis in axisVisuals)
-        {
-            if (vis != null) vis.SetActive(true);
-        }
+        axesContainer.SetActive(true);
     }
 
     public void ApplyServerModelScale(Vector3 serverModelSize)
     {
         if (mockVisualModel == null) return;
-        Vector3 baseUnitSize = Vector3.one;
-        Vector3 scaleFactor = new Vector3(
-            serverModelSize.x / baseUnitSize.x,
-            serverModelSize.y / baseUnitSize.y,
-            serverModelSize.z / baseUnitSize.z
-        );
-        mockVisualModel.transform.localScale = scaleFactor;
+        // Apply the initial, non-uniform scale ONLY to the visual model.
+        // The sibling axesContainer is NOT affected by this local scale change.
+        mockVisualModel.transform.localScale = serverModelSize;
+
+        // Ensure axes are created or updated after the model is scaled.
+        EnsureAxisVisualsAreCreated();
     }
 
     void CreateAxisVisuals()
     {
-        ClearAxisVisuals();
-        CreateSingleAxisVisual(axesParentTransform, Vector3.right, axisLength, axisThickness, redAxisMaterial, "X_Axis_Client");
-        CreateSingleAxisVisual(axesParentTransform, Vector3.up, axisLength, axisThickness, greenAxisMaterial, "Y_Axis_Client");
-        CreateSingleAxisVisual(axesParentTransform, Vector3.forward, axisLength, axisThickness, blueAxisMaterial, "Z_Axis_Client");
+        // Clear old visuals from the container first
+        foreach (Transform child in axesContainer.transform)
+        {
+            Destroy(child.gameObject);
+        }
+        axisVisuals.Clear();
+
+        // Parent the new axes to the special container.
+        // This container inherits the uniform zoom scale from the parent controller,
+        // but it does NOT inherit the non-uniform initial scale from the model.
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.right, axisLength, axisThickness, redAxisMaterial, "X_Axis_Client");
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.up, axisLength, axisThickness, greenAxisMaterial, "Y_Axis_Client");
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.forward, axisLength, axisThickness, blueAxisMaterial, "Z_Axis_Client");
     }
 
     void CreateSingleAxisVisual(Transform parentForAxes, Vector3 direction, float length, float thickness, Material axisMat, string baseName)
@@ -150,15 +177,5 @@ public class MockedModelController : MonoBehaviour
         arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
         if (arrowheadCap.GetComponent<Renderer>() != null && axisMat != null) arrowheadCap.GetComponent<Renderer>().material = axisMat;
         axisVisuals.Add(arrowheadCap);
-    }
-
-    void ClearAxisVisuals()
-    {
-        foreach (GameObject vis in axisVisuals)
-        {
-            if (vis != null) Destroy(vis);
-        }
-        axisVisuals.Clear();
-        axesCreated = false;
     }
 }

@@ -9,13 +9,13 @@ public class CAVE2DisplayTest : MonoBehaviour
 
     private void Start()
     {
-        for (int i = 0; i < Display.displays.Length; i++)
-        {
-            if (i < 3)
-            {
-                Display.displays[i].Activate();
-            }
-        }
+        //for (int i = 0; i < Display.displays.Length; i++)
+        //{
+        //    if (i < 3)
+        //    {
+        //        Display.displays[i].Activate();
+        //    }
+        //}
 
         if (frontCamera != null)
         {
