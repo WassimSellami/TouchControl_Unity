@@ -7,18 +7,17 @@ using static JsonUtilityHelper;
 
 public class WebSocketClientManager : MonoBehaviour
 {
-    [Header("UI Manager Reference")]
+    [SerializeField] private bool autoConnectMode = false;
+
     [SerializeField] private UIManager uiManager;
     [SerializeField] private MockedModelController mockedModelControllerRef;
 
-    [Header("Networking")]
     [SerializeField] private TMP_InputField ipAddressInput;
     [SerializeField] private string defaultIpAddress = "192.168.0.35";
     [SerializeField] private int serverPort = 8070;
     [SerializeField] private string servicePath = "/Control";
     [SerializeField] private float modelUpdateRateFPS = 60f;
 
-    [Header("UI Elements for Connection & Control")]
     [SerializeField] private Button connectButton;
     [SerializeField] private TMP_Text connectButtonText;
     [SerializeField] private TMP_Text statusText;
@@ -31,10 +30,11 @@ public class WebSocketClientManager : MonoBehaviour
     private GameObject modelViewPanelCachedRef;
     private WebSocket ws;
     private bool isAttemptingConnection = false;
+    private bool isMockConnected = false;
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
 
-    public bool IsConnected => ws != null && ws.ReadyState == WebSocketState.Open;
+    public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
     public enum ConnectionState
     {
@@ -49,7 +49,6 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (uiManager == null) { Debug.LogError("[WSClientManager] UIManager not assigned!"); return; }
         if (mockedModelControllerRef == null) { Debug.LogError("[WSClientManager] MockedModelControllerRef not assigned!"); return; }
-        if (ipAddressInput == null) { Debug.LogError("[WSClientManager] IP Address InputField not assigned!"); return; }
         if (connectButton == null) { Debug.LogError("[WSClientManager] Connect Button not assigned!"); return; }
         if (connectButtonText == null) { Debug.LogError("[WSClientManager] Connect Button Text not assigned!"); return; }
         if (statusText == null) { Debug.LogError("[WSClientManager] Status Text not assigned!"); return; }
@@ -59,15 +58,37 @@ public class WebSocketClientManager : MonoBehaviour
         if (uiManager.modelViewPanel != null) { modelViewPanelCachedRef = uiManager.modelViewPanel; }
         else { Debug.LogError("[WSClientManager] UIManager's modelViewPanel is null."); }
 
-        if (ipAddressInput != null) ipAddressInput.text = defaultIpAddress;
-        if (connectButton != null) connectButton.onClick.AddListener(AttemptConnect);
+        modelUpdateInterval = 1.0f / Mathf.Max(1f, modelUpdateRateFPS);
+
+        if (autoConnectMode)
+        {
+            Debug.Log("[WSClientManager] Operating in Simulation Mode. Bypassing server connection.");
+
+            uiManager.ShowLoadingScreenOrMinimalStatus();
+            HandleMockConnect();
+        }
+        else
+        {
+            Debug.Log("[WSClientManager] Operating in Manual Connect Mode (Real Server Required).");
+
+            if (ipAddressInput != null)
+            {
+                ipAddressInput.text = defaultIpAddress;
+                connectButton.onClick.AddListener(AttemptConnect);
+            }
+            else
+            {
+                Debug.LogError("[WSClientManager] IP Address InputField required for Manual Mode.");
+                return;
+            }
+
+            uiManager.ShowConnectionPanel();
+            UpdateConnectionUI(ConnectionState.IdleWaiting);
+        }
+
         if (loadCubeButton != null) loadCubeButton.onClick.AddListener(() => OnLoadModelSelected("CUBE"));
         if (loadCylinderButton != null) loadCylinderButton.onClick.AddListener(() => OnLoadModelSelected("CYLINDER"));
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
-
-        modelUpdateInterval = 1.0f / Mathf.Max(1f, modelUpdateRateFPS);
-        uiManager.ShowConnectionPanel();
-        UpdateConnectionUI(ConnectionState.IdleWaiting);
     }
 
     void Update()
@@ -87,7 +108,16 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (IsConnected || isAttemptingConnection) return;
 
-        string ip = (ipAddressInput != null && !string.IsNullOrWhiteSpace(ipAddressInput.text)) ? ipAddressInput.text : defaultIpAddress;
+        if (autoConnectMode)
+        {
+            HandleMockConnect();
+            return;
+        }
+
+        string ip = (ipAddressInput != null && !string.IsNullOrWhiteSpace(ipAddressInput.text))
+            ? ipAddressInput.text
+            : defaultIpAddress;
+
         string url = $"ws://{ip}:{serverPort}{servicePath}";
 
         UpdateConnectionUI(ConnectionState.Connecting);
@@ -103,9 +133,23 @@ public class WebSocketClientManager : MonoBehaviour
         catch (Exception ex) { UnityMainThreadDispatcher.Instance().Enqueue(() => OnWebSocketError($"Failed to initiate connection: {ex.Message}")); }
     }
 
+    private void HandleMockConnect()
+    {
+        isMockConnected = true;
+        isAttemptingConnection = false;
+        Debug.Log("[WSClientManager] Mock connection successful.");
+        OnWebSocketOpen();
+    }
+
     private void SendModelTransformState()
     {
         if (!IsConnected || mockedModelControllerRef == null) return;
+
+        if (autoConnectMode)
+        {
+            return;
+        }
+
         Transform modelTransform = mockedModelControllerRef.transform;
         ModelTransformStateData state = new ModelTransformStateData
         {
@@ -126,6 +170,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnWebSocketMessage(string data)
     {
+        if (autoConnectMode) return;
+
         string[] parts = data.Split(new char[] { ':' }, 2);
         string command = parts[0].ToUpperInvariant();
         string args = parts.Length > 1 ? parts[1] : null;
@@ -165,7 +211,16 @@ public class WebSocketClientManager : MonoBehaviour
     private void OnLoadModelSelected(string modelId)
     {
         if (!IsConnected) return;
-        SendMessageToServer($"LOAD_MODEL:{modelId.ToUpperInvariant()}");
+
+        if (!autoConnectMode)
+        {
+            SendMessageToServer($"LOAD_MODEL:{modelId.ToUpperInvariant()}");
+        }
+        else
+        {
+            Debug.Log($"[MOCK] Simulating model load: {modelId}");
+        }
+
         if (uiManager != null) uiManager.ShowModelViewPanel();
     }
 
@@ -184,19 +239,26 @@ public class WebSocketClientManager : MonoBehaviour
         {
             case ConnectionState.IdleWaiting: message = "Ready to connect"; indicatorColor = Color.gray; buttonText = "Connect"; break;
             case ConnectionState.Connecting: message = $"Connecting..."; indicatorColor = Color.yellow; buttonText = "Connect"; buttonInteractable = false; break;
-            case ConnectionState.Connected: message = "Connected to server"; indicatorColor = Color.green; buttonText = "Connect"; break;
+            case ConnectionState.Connected: message = "Connected (Server Active/Simulated)"; indicatorColor = Color.green; buttonText = "Connect"; break;
             case ConnectionState.Failed: message = "Connection failed. Try again."; indicatorColor = Color.red; buttonText = "Try Again"; break;
             case ConnectionState.Disconnected: message = "Connection closed."; indicatorColor = Color.Lerp(Color.yellow, Color.red, 0.5f); buttonText = "Reconnect"; break;
         }
 
         if (statusText != null) statusText.text = message;
         if (indicatorImage != null) { indicatorImage.sprite = defaultIndicatorSprite; indicatorImage.color = indicatorColor; indicatorImage.enabled = (defaultIndicatorSprite != null); }
+
         if (connectButton != null) connectButton.interactable = buttonInteractable;
         if (connectButtonText != null) connectButtonText.text = buttonText;
     }
 
     public void SendMessageToServer(string message)
     {
+        if (autoConnectMode)
+        {
+            Debug.Log($"[MOCK] Suppressing server message: {message}");
+            return;
+        }
+
         if (IsConnected) ws.Send(message);
     }
 

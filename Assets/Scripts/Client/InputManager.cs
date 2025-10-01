@@ -10,17 +10,28 @@ public class InputManager : MonoBehaviour
     private MockedModelController targetModelController;
     [SerializeField]
     private EventSystem eventSystem;
+    [SerializeField]
+    private CuttingPlaneManager cuttingPlaneManager;
 
+    [Header("Gesture Thresholds")]
     private int orbitTouchCount = 1;
     private int zoomTouchCount = 2;
     private int minPanTouchCount = 3;
-
     private int smoothSamplesCount = 5;
+
+    [Header("Cut Gesture")]
+    [SerializeField] private float longPressThreshold = 0.5f;
+    // Increased default for robust testing. You can adjust this in the Inspector.
+    [SerializeField] private float maxHoldMovementPixels = 500f;
+
+    private bool isHoldingForCut = false;
+    private bool isCutActive = false;
+    private float longPressTimer = 0f;
+    private Vector2 startPressPosition;
 
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
     private float previousZoomDistance;
-
     private bool isPanning = false;
     private bool isOrbiting = false;
     private bool isZooming = false;
@@ -31,28 +42,16 @@ public class InputManager : MonoBehaviour
 
     void Start()
     {
-        if (targetModelController == null) { this.enabled = false; Debug.LogError("InputManager: TargetModelController not assigned!"); }
+        if (targetModelController == null) { this.enabled = false; Debug.LogError("InputManager: TargetModelController not assigned!"); return; }
+        if (cuttingPlaneManager == null) { Debug.LogWarning("InputManager: CuttingPlaneManager not assigned. Cutting feature disabled."); }
+
         if (eventSystem == null) { eventSystem = EventSystem.current; }
         if (eventSystem == null) { this.enabled = false; Debug.LogError("InputManager: EventSystem not found!"); }
     }
 
     void Update()
     {
-        bool pointerOverUI = false;
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
-            {
-                pointerOverUI = true;
-                break;
-            }
-        }
-#if UNITY_EDITOR
-        if (Input.mousePresent && Input.GetMouseButton(0) && eventSystem.IsPointerOverGameObject())
-        {
-            pointerOverUI = true;
-        }
-#endif
+        bool pointerOverUI = IsPointerOverUI();
 
         if (pointerOverUI)
         {
@@ -61,6 +60,7 @@ public class InputManager : MonoBehaviour
         }
 
         int currentTouchCount = GetTouchOrMouseCount();
+
         if (currentTouchCount == 0)
         {
             ResetGestureStates();
@@ -75,21 +75,133 @@ public class InputManager : MonoBehaviour
         {
             HandlePanGesture();
         }
-        else if (!isZooming && !isPanning && currentTouchCount == orbitTouchCount)
+        else if (currentTouchCount == orbitTouchCount)
         {
-            HandleOrbitGesture();
+            HandleSingleTouchInput();
         }
         else
         {
-            if (isPanning || isOrbiting || isZooming)
+            if (isPanning || isOrbiting || isZooming || isCutActive)
             {
                 if ((isZooming && currentTouchCount != zoomTouchCount) ||
                     (isPanning && currentTouchCount < minPanTouchCount) ||
-                    (isOrbiting && currentTouchCount != orbitTouchCount))
+                    ((isOrbiting || isCutActive) && currentTouchCount != orbitTouchCount))
                 {
                     ResetGestureStates();
                 }
             }
+        }
+    }
+
+    private bool IsPointerOverUI()
+    {
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+            {
+                return true;
+            }
+        }
+#if UNITY_EDITOR
+        if (Input.mousePresent && Input.GetMouseButton(0) && eventSystem.IsPointerOverGameObject())
+        {
+            return true;
+        }
+#endif
+        return false;
+    }
+
+    private void HandleSingleTouchInput()
+    {
+        Vector2 currentRawPosition = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).position : (Vector2)Input.mousePosition;
+        TouchPhase phase = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).phase : GetMousePhase();
+
+        if (phase == TouchPhase.Began)
+        {
+            startPressPosition = currentRawPosition;
+            longPressTimer = 0f;
+            isHoldingForCut = true;
+            isCutActive = false;
+            previousOrbitPosition = currentRawPosition;
+            // Debug.Log("INPUT: Touch Began. Starting Hold Check.");
+        }
+
+        if (isHoldingForCut)
+        {
+            longPressTimer += Time.deltaTime;
+
+            if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+            {
+                // Debug.Log("INPUT: Hold failed (Movement too large). Starting Orbit.");
+                isHoldingForCut = false;
+                isOrbiting = true;
+            }
+            else if (longPressTimer >= longPressThreshold)
+            {
+                // Debug.Log("INPUT: Long Press achieved! Starting Cut Drag.");
+                isHoldingForCut = false;
+                isCutActive = true;
+                isOrbiting = false;
+
+                if (cuttingPlaneManager != null)
+                {
+                    cuttingPlaneManager.StartCutDrag(startPressPosition);
+                }
+            }
+        }
+
+        if (phase == TouchPhase.Moved)
+        {
+            if (isCutActive && cuttingPlaneManager != null)
+            {
+                cuttingPlaneManager.UpdateCutDrag(currentRawPosition);
+            }
+            else if (isOrbiting)
+            {
+                HandleOrbitGestureInternal(currentRawPosition, phase);
+            }
+        }
+
+        if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
+        {
+            if (isCutActive)
+            {
+                if (cuttingPlaneManager != null)
+                {
+                    cuttingPlaneManager.EndCutGesture(currentRawPosition);
+                }
+            }
+            else if (isOrbiting || isHoldingForCut)
+            {
+                HandleOrbitGestureInternal(currentRawPosition, phase);
+            }
+
+            isHoldingForCut = false;
+            isCutActive = false;
+            isOrbiting = false;
+        }
+    }
+
+    private void HandleOrbitGestureInternal(Vector2 currentRawPosition, TouchPhase phase)
+    {
+        if (targetModelController == null) return;
+
+        if (phase == TouchPhase.Began)
+        {
+            isOrbiting = true;
+            orbitPositionHistory.Clear();
+            previousOrbitPosition = currentRawPosition;
+        }
+        else if (phase == TouchPhase.Moved && isOrbiting)
+        {
+            Vector2 smoothedPosition = GetSmoothedVector2(currentRawPosition, orbitPositionHistory);
+            Vector2 orbitDelta = smoothedPosition - previousOrbitPosition;
+            targetModelController.ProcessOrbit(orbitDelta);
+            previousOrbitPosition = smoothedPosition;
+        }
+        else if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
+        {
+            isOrbiting = false;
         }
     }
 
@@ -110,34 +222,13 @@ public class InputManager : MonoBehaviour
         isPanning = false;
         isOrbiting = false;
         isZooming = false;
+        isHoldingForCut = false;
+        isCutActive = false;
+        longPressTimer = 0f;
+
         orbitPositionHistory.Clear();
         panCentroidHistory.Clear();
         zoomDistanceHistory.Clear();
-    }
-
-    private void HandleOrbitGesture()
-    {
-        if (targetModelController == null) return;
-        Vector2 currentRawPosition = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).position : (Vector2)Input.mousePosition;
-        TouchPhase phase = (GetTouchOrMouseCount() > 0 && Input.touchCount > 0) ? Input.GetTouch(0).phase : GetMousePhase();
-
-        if (phase == TouchPhase.Began)
-        {
-            isOrbiting = true;
-            orbitPositionHistory.Clear();
-            previousOrbitPosition = currentRawPosition;
-        }
-        else if (phase == TouchPhase.Moved && isOrbiting)
-        {
-            Vector2 smoothedPosition = GetSmoothedVector2(currentRawPosition, orbitPositionHistory);
-            Vector2 orbitDelta = smoothedPosition - previousOrbitPosition;
-            targetModelController.ProcessOrbit(orbitDelta);
-            previousOrbitPosition = smoothedPosition;
-        }
-        else if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
-        {
-            isOrbiting = false;
-        }
     }
 
     private void HandlePanGesture()
@@ -240,4 +331,4 @@ public class InputManager : MonoBehaviour
         foreach (Vector2 p in points) sum += p;
         return sum / points.Count;
     }
-}
+}   

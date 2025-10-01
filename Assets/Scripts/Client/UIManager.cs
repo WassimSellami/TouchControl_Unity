@@ -3,7 +3,6 @@ using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-    [Header("UI Panels")]
     [SerializeField]
     public GameObject connectionPanel;
     [SerializeField]
@@ -11,13 +10,11 @@ public class UIManager : MonoBehaviour
     [SerializeField]
     public GameObject modelViewPanel;
 
-    [Header("Controller References")]
     [SerializeField]
     private MockedModelController mockedModelController;
     [SerializeField]
     private InputManager inputManagerRef;
 
-    [Header("Buttons in ModelViewPanel")]
     [SerializeField]
     private Button backButtonToMainMenu;
     [SerializeField]
@@ -76,7 +73,6 @@ public class UIManager : MonoBehaviour
 
     private void DeactivateInteractionSystems()
     {
-        // This method can be kept for future use if needed.
     }
 
     public void ShowConnectionPanel()
@@ -84,6 +80,13 @@ public class UIManager : MonoBehaviour
         HideAllPanelsAndPopups();
         DeactivateInteractionSystems();
         if (connectionPanel != null) connectionPanel.SetActive(true);
+    }
+
+    public void ShowLoadingScreenOrMinimalStatus()
+    {
+        HideAllPanelsAndPopups();
+        if (connectionPanel != null) connectionPanel.SetActive(true);
+        DeactivateInteractionSystems();
     }
 
     public void ShowMainMenuPanel()
