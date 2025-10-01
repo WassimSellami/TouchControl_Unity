@@ -50,9 +50,6 @@ public class InputManager : MonoBehaviour
 
     void Update()
     {
-        // --- CHANGE #1: The global UI check at the top has been REMOVED from here. ---
-        // It was causing gestures to be cancelled prematurely.
-
         int currentTouchCount = GetTouchOrMouseCount();
 
         if (currentTouchCount == 0)
@@ -87,10 +84,8 @@ public class InputManager : MonoBehaviour
         }
     }
 
-    // --- CHANGE #2: Improved IsPointerOverUI method for reliability. ---
     private bool IsPointerOverUI()
     {
-        // Check for touch input
         if (Input.touchCount > 0)
         {
             for (int i = 0; i < Input.touchCount; i++)
@@ -102,7 +97,6 @@ public class InputManager : MonoBehaviour
             }
         }
 
-        // Check for mouse input
         if (Input.mousePresent)
         {
             if (eventSystem.IsPointerOverGameObject())
@@ -121,12 +115,9 @@ public class InputManager : MonoBehaviour
 
         if (phase == TouchPhase.Began)
         {
-            // --- CHANGE #3: The UI check is now performed ONLY when a gesture BEGINS. ---
-            // This prevents a gesture from starting on the UI, but allows an ongoing gesture
-            // to finish correctly even if the pointer moves over the UI.
             if (IsPointerOverUI())
             {
-                return; // Do not start any gesture if the touch began on a UI element.
+                return;
             }
 
             startPressPosition = currentRawPosition;
@@ -144,7 +135,6 @@ public class InputManager : MonoBehaviour
             {
                 isHoldingForCut = false;
                 isOrbiting = true;
-                // Since orbiting starts here, we need to initialize it properly.
                 HandleOrbitGestureInternal(currentRawPosition, TouchPhase.Began);
             }
             else if (longPressTimer >= longPressThreshold)
@@ -183,11 +173,9 @@ public class InputManager : MonoBehaviour
             }
             else if (isOrbiting)
             {
-                // Let the orbit gesture know it has ended.
                 HandleOrbitGestureInternal(currentRawPosition, phase);
             }
 
-            // Reset flags at the very end of the gesture.
             isHoldingForCut = false;
             isCutActive = false;
             isOrbiting = false;
@@ -242,6 +230,11 @@ public class InputManager : MonoBehaviour
         orbitPositionHistory.Clear();
         panCentroidHistory.Clear();
         zoomDistanceHistory.Clear();
+
+        if (targetModelController != null)
+        {
+            targetModelController.ResetOrbitLock();
+        }
     }
 
     private void HandlePanGesture()
