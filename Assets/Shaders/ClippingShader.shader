@@ -4,8 +4,6 @@ Shader "Custom/ClippingShader"
     {
         _Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Albedo (RGB)", 2D) = "white" {}
-        _Glossiness ("Smoothness", Range(0,1)) = 0.5
-        _Metallic ("Metallic", Range(0,1)) = 0.0
         _PlanePoint ("Plane Point (World)", Vector) = (0,0,0,0)
         _PlaneNormal ("Plane Normal (World)", Vector) = (0,0,0,0)
         _ClippingEnabled ("Clipping Enabled", Float) = 0
@@ -13,47 +11,66 @@ Shader "Custom/ClippingShader"
     SubShader
     {
         Tags { "RenderType" = "Opaque" }
-        LOD 200
+        LOD 100
 
-        CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows
-        #pragma target 3.0
-
-        #include "UnityCG.cginc"
-
-        sampler2D _MainTex;
-
-        struct Input
+        Pass
         {
-            float2 uv_MainTex;
-            float3 worldPos;
-        };
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
+            #include "Lighting.cginc"
 
-        half _Glossiness;
-        half _Metallic;
-        fixed4 _Color;
-
-        float4 _PlanePoint;
-        float4 _PlaneNormal;
-        float _ClippingEnabled;
-
-
-        void surf (Input IN, inout SurfaceOutputStandard o)
-        {
-            if (_ClippingEnabled > 0.5)
+            struct appdata
             {
-                float dist = dot(_PlaneNormal.xyz, IN.worldPos - _PlanePoint.xyz);
-                clip(dist);
+                float4 vertex : POSITION;
+                float3 normal : NORMAL;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct v2f
+            {
+                float4 vertex : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float3 worldPos : TEXCOORD1;
+                float3 worldNormal : TEXCOORD2;
+            };
+
+            sampler2D _MainTex;
+            fixed4 _Color;
+            float4 _PlanePoint;
+            float4 _PlaneNormal;
+            float _ClippingEnabled;
+
+            v2f vert (appdata v)
+            {
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.worldNormal = UnityObjectToWorldNormal(v.normal);
+                o.uv = v.uv;
+                return o;
             }
-            
-            fixed4 c = tex2D (_MainTex, IN.uv_MainTex) * _Color;
-            o.Albedo = c.rgb;
-            
-            o.Metallic = _Metallic;
-            o.Smoothness = _Glossiness;
-            o.Alpha = c.a;
+
+            fixed4 frag (v2f i) : SV_Target
+            {
+                if (_ClippingEnabled > 0.5)
+                {
+                    float dist = dot(_PlaneNormal.xyz, i.worldPos - _PlanePoint.xyz);
+                    clip(dist);
+                }
+                
+                fixed4 col = tex2D(_MainTex, i.uv) * _Color;
+
+                float3 normal = normalize(i.worldNormal);
+                float diffuse = max(0, dot(normal, _WorldSpaceLightPos0.xyz));
+                
+                col.rgb *= diffuse + UNITY_LIGHTMODEL_AMBIENT.xyz;
+                
+                return col;
+            }
+            ENDCG
         }
-        ENDCG
     }
     FallBack "Diffuse"
 }

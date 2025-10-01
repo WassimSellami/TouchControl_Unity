@@ -1,30 +1,30 @@
 using UnityEngine;
+using EzySlice;
 
 public class CuttingPlaneManager : MonoBehaviour
 {
-    [Header("Setup")]
+    [Header("Core Components")]
     public Camera mainCamera;
-    public Renderer targetModelRenderer;
-
-    [Header("Parenting")]
+    public GameObject targetModel;
+    public Material crossSectionMaterial;
     public Transform modelRootTransform;
 
-    [Header("Cutting Logic")]
-    public float planeDepth = 10f;
-
-    [Header("Visualization")]
-    public GameObject lineRendererPrefab;
-    public float lineDuration = 0.5f;
-
-    [Header("Plane Visualization")]
-    public GameObject planeVisualizerPrefab;
+    [Header("Slicing Options")]
+    [Tooltip("Check this to show the plane visualizer after a cut is made.")]
+    public bool showPlaneVisualizer = true;
     public float planeScaleFactor = 50f;
 
-    private Material targetMaterial;
+    [Header("Visuals Prefabs")]
+    public GameObject lineRendererPrefab;
+    public GameObject planeVisualizerPrefab;
+
+    [Header("Interaction Settings")]
+    public float planeDepth = 10f;
+    public float lineDuration = 0.5f;
+
     private GameObject activePlaneVisualizer;
     private LineRenderer activeLineRenderer;
 
-    private bool isClipping = false;
     private Vector3 currentPlaneNormal = Vector3.up;
     private Vector3 currentPlanePoint = Vector3.zero;
     private Vector2 startPointScreen;
@@ -33,6 +33,9 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
 
+    private Mesh originalMesh;
+    private Material[] originalMaterials;
+
     private const float VISUAL_DEPTH_OFFSET = 0.005f;
     private const float MIN_DRAG_DISTANCE_SQUARED = 4f;
 
@@ -40,17 +43,41 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (mainCamera == null) mainCamera = Camera.main;
 
-        if (targetModelRenderer == null) { Debug.LogError("TargetModelController not assigned."); return; }
-        if (modelRootTransform == null) { modelRootTransform = targetModelRenderer.transform; Debug.LogWarning("Model Root not explicitly set, defaulting to Renderer Transform."); }
+        if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
 
-        targetMaterial = targetModelRenderer.material;
+        MeshFilter modelMeshFilter = targetModel.GetComponent<MeshFilter>();
+        if (modelMeshFilter != null && modelMeshFilter.mesh != null)
+        {
+            originalMesh = modelMeshFilter.mesh;
+        }
+        else
+        {
+            Debug.LogError("Target Model must have a MeshFilter with a mesh assigned.");
+            return;
+        }
 
-        modelCenterWorld = targetModelRenderer.bounds.center;
+        Renderer modelRenderer = targetModel.GetComponent<Renderer>();
+        if (modelRenderer != null)
+        {
+            originalMaterials = modelRenderer.materials;
+            modelCenterWorld = modelRenderer.bounds.center;
+        }
+        else
+        {
+            Debug.LogError("Target Model must have a Renderer component.");
+            return;
+        }
+
+        if (modelRootTransform == null)
+        {
+            modelRootTransform = targetModel.transform;
+        }
 
         if (planeVisualizerPrefab != null)
         {
-            activePlaneVisualizer = Instantiate(planeVisualizerPrefab, modelRootTransform);
+            activePlaneVisualizer = Instantiate(planeVisualizerPrefab, transform);
             activePlaneVisualizer.SetActive(false);
+            activePlaneVisualizer.transform.SetParent(modelRootTransform, false);
         }
 
         if (lineRendererPrefab != null)
@@ -76,8 +103,7 @@ public class CuttingPlaneManager : MonoBehaviour
             activePlaneVisualizer.SetActive(false);
         }
 
-        Plane centerPlane = new Plane(-mainCamera.transform.forward, modelCenterWorld);
-
+        UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
         Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
         float enter;
 
@@ -126,19 +152,63 @@ public class CuttingPlaneManager : MonoBehaviour
         if (Vector2.SqrMagnitude(startPointScreen - endPointScreen) > MIN_DRAG_DISTANCE_SQUARED)
         {
             CalculatePlaneNormalByWorldPoints();
-
             ProjectPlaneOriginToModelCenter(startWorldPos);
-
-            isClipping = true;
-
-            ApplyClippingShaderProperties();
-
+            PerformSlice();
             Invoke(nameof(HideLineAndShowPlane), lineDuration);
         }
         else
         {
             ResetDrawing();
         }
+    }
+
+    private void PerformSlice()
+    {
+        if (targetModel == null) return;
+
+        SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal);
+        if (sliceResult != null)
+        {
+            GameObject temporaryHullObject = sliceResult.CreateUpperHull(targetModel, crossSectionMaterial);
+            if (temporaryHullObject != null)
+            {
+                MeshFilter targetFilter = targetModel.GetComponent<MeshFilter>();
+                MeshRenderer targetRenderer = targetModel.GetComponent<MeshRenderer>();
+
+                Mesh newMesh = temporaryHullObject.GetComponent<MeshFilter>().mesh;
+                Material[] newMaterials = temporaryHullObject.GetComponent<MeshRenderer>().materials;
+
+                Destroy(temporaryHullObject);
+                if (targetFilter.mesh != originalMesh)
+                {
+                    Destroy(targetFilter.mesh);
+                }
+
+                targetFilter.mesh = newMesh;
+                targetRenderer.materials = newMaterials;
+                modelCenterWorld = targetRenderer.bounds.center;
+            }
+        }
+    }
+
+    public void ResetCrop()
+    {
+        if (targetModel == null || originalMesh == null) return;
+
+        MeshFilter targetFilter = targetModel.GetComponent<MeshFilter>();
+        MeshRenderer targetRenderer = targetModel.GetComponent<MeshRenderer>();
+
+        if (targetFilter.mesh != originalMesh)
+        {
+            Destroy(targetFilter.mesh);
+        }
+
+        targetFilter.mesh = originalMesh;
+        targetRenderer.materials = originalMaterials;
+
+        modelCenterWorld = targetRenderer.bounds.center;
+
+        ResetClipping();
     }
 
     private void ProjectPlaneOriginToModelCenter(Vector3 planeDefinitionPoint)
@@ -157,38 +227,19 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (activePlaneVisualizer == null) return;
 
-        activePlaneVisualizer.transform.localPosition = modelRootTransform.InverseTransformPoint(currentPlanePoint);
-
-        Quaternion localRotation = Quaternion.Inverse(modelRootTransform.rotation) * Quaternion.LookRotation(currentPlaneNormal);
-        activePlaneVisualizer.transform.localRotation = localRotation;
-
+        Quaternion targetRotation = Quaternion.LookRotation(currentPlaneNormal);
+        activePlaneVisualizer.transform.SetPositionAndRotation(currentPlanePoint, targetRotation);
         activePlaneVisualizer.transform.localScale = Vector3.one * planeScaleFactor;
 
-        activePlaneVisualizer.SetActive(true);
+        activePlaneVisualizer.SetActive(showPlaneVisualizer);
     }
 
     private void CalculatePlaneNormalByWorldPoints()
     {
         Vector3 lineVector = finalEndWorldPosRaw - startWorldPos;
-        Vector3 cameraVector = mainCamera.transform.position - startWorldPos;
-
-        Vector3 normal = Vector3.Cross(lineVector, cameraVector).normalized;
-
+        Vector3 cameraForward = mainCamera.transform.forward;
+        Vector3 normal = Vector3.Cross(lineVector, cameraForward).normalized;
         currentPlaneNormal = normal;
-    }
-
-    private void ApplyClippingShaderProperties()
-    {
-        if (targetMaterial == null) return;
-
-        targetMaterial.SetInt("_ClippingEnabled", isClipping ? 1 : 0);
-
-        if (isClipping)
-        {
-            targetMaterial.SetVector("_PlaneNormal", currentPlaneNormal);
-            // SENDING WORLD SPACE POINT TO SHADER
-            targetMaterial.SetVector("_PlanePoint", currentPlanePoint);
-        }
     }
 
     private void ResetDrawing()
@@ -202,24 +253,10 @@ public class CuttingPlaneManager : MonoBehaviour
 
     public void ResetClipping()
     {
-        isClipping = false;
         ResetDrawing();
-        ApplyClippingShaderProperties();
-
         if (activePlaneVisualizer != null)
         {
             activePlaneVisualizer.SetActive(false);
-        }
-    }
-
-    public void FlipPlaneDirection()
-    {
-        if (isClipping)
-        {
-            currentPlaneNormal *= -1f;
-            ApplyClippingShaderProperties();
-
-            DrawPlaneVisualizer();
         }
     }
 }

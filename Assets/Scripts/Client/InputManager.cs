@@ -21,7 +21,6 @@ public class InputManager : MonoBehaviour
 
     [Header("Cut Gesture")]
     [SerializeField] private float longPressThreshold = 0.5f;
-    // Increased default for robust testing. You can adjust this in the Inspector.
     [SerializeField] private float maxHoldMovementPixels = 500f;
 
     private bool isHoldingForCut = false;
@@ -51,13 +50,8 @@ public class InputManager : MonoBehaviour
 
     void Update()
     {
-        bool pointerOverUI = IsPointerOverUI();
-
-        if (pointerOverUI)
-        {
-            ResetGestureStates();
-            return;
-        }
+        // --- CHANGE #1: The global UI check at the top has been REMOVED from here. ---
+        // It was causing gestures to be cancelled prematurely.
 
         int currentTouchCount = GetTouchOrMouseCount();
 
@@ -93,21 +87,30 @@ public class InputManager : MonoBehaviour
         }
     }
 
+    // --- CHANGE #2: Improved IsPointerOverUI method for reliability. ---
     private bool IsPointerOverUI()
     {
-        for (int i = 0; i < Input.touchCount; i++)
+        // Check for touch input
+        if (Input.touchCount > 0)
         {
-            if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Check for mouse input
+        if (Input.mousePresent)
+        {
+            if (eventSystem.IsPointerOverGameObject())
             {
                 return true;
             }
         }
-#if UNITY_EDITOR
-        if (Input.mousePresent && Input.GetMouseButton(0) && eventSystem.IsPointerOverGameObject())
-        {
-            return true;
-        }
-#endif
+
         return false;
     }
 
@@ -118,12 +121,19 @@ public class InputManager : MonoBehaviour
 
         if (phase == TouchPhase.Began)
         {
+            // --- CHANGE #3: The UI check is now performed ONLY when a gesture BEGINS. ---
+            // This prevents a gesture from starting on the UI, but allows an ongoing gesture
+            // to finish correctly even if the pointer moves over the UI.
+            if (IsPointerOverUI())
+            {
+                return; // Do not start any gesture if the touch began on a UI element.
+            }
+
             startPressPosition = currentRawPosition;
             longPressTimer = 0f;
             isHoldingForCut = true;
             isCutActive = false;
             previousOrbitPosition = currentRawPosition;
-            // Debug.Log("INPUT: Touch Began. Starting Hold Check.");
         }
 
         if (isHoldingForCut)
@@ -132,13 +142,13 @@ public class InputManager : MonoBehaviour
 
             if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
             {
-                // Debug.Log("INPUT: Hold failed (Movement too large). Starting Orbit.");
                 isHoldingForCut = false;
                 isOrbiting = true;
+                // Since orbiting starts here, we need to initialize it properly.
+                HandleOrbitGestureInternal(currentRawPosition, TouchPhase.Began);
             }
             else if (longPressTimer >= longPressThreshold)
             {
-                // Debug.Log("INPUT: Long Press achieved! Starting Cut Drag.");
                 isHoldingForCut = false;
                 isCutActive = true;
                 isOrbiting = false;
@@ -171,11 +181,13 @@ public class InputManager : MonoBehaviour
                     cuttingPlaneManager.EndCutGesture(currentRawPosition);
                 }
             }
-            else if (isOrbiting || isHoldingForCut)
+            else if (isOrbiting)
             {
+                // Let the orbit gesture know it has ended.
                 HandleOrbitGestureInternal(currentRawPosition, phase);
             }
 
+            // Reset flags at the very end of the gesture.
             isHoldingForCut = false;
             isCutActive = false;
             isOrbiting = false;
@@ -207,14 +219,15 @@ public class InputManager : MonoBehaviour
 
     private int GetTouchOrMouseCount()
     {
-#if UNITY_EDITOR
-        if (Input.touchCount == 0 && Input.mousePresent)
+        if (Input.touchCount > 0)
         {
-            if (Input.GetMouseButton(0)) return 1;
-            return 0;
+            return Input.touchCount;
         }
-#endif
-        return Input.touchCount;
+        if (Input.mousePresent && Input.GetMouseButton(0))
+        {
+            return 1;
+        }
+        return 0;
     }
 
     private void ResetGestureStates()
@@ -331,4 +344,4 @@ public class InputManager : MonoBehaviour
         foreach (Vector2 p in points) sum += p;
         return sum / points.Count;
     }
-}   
+}

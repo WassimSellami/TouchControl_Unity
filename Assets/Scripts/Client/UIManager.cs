@@ -3,6 +3,7 @@ using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
+    [Header("UI Panels")]
     [SerializeField]
     public GameObject connectionPanel;
     [SerializeField]
@@ -10,17 +11,23 @@ public class UIManager : MonoBehaviour
     [SerializeField]
     public GameObject modelViewPanel;
 
+    [Header("System References")]
     [SerializeField]
     private MockedModelController mockedModelController;
     [SerializeField]
     private InputManager inputManagerRef;
+    [SerializeField]
+    private CuttingPlaneManager cuttingPlaneManager; // Reference to the cutting manager
 
+    [Header("Buttons")]
     [SerializeField]
     private Button backButtonToMainMenu;
     [SerializeField]
     private Button ResetViewButton;
     [SerializeField]
     private Button CyclePresetViewButton;
+    [SerializeField]
+    private Button ResetCropButton;
 
 
     void Awake()
@@ -29,6 +36,12 @@ public class UIManager : MonoBehaviour
         {
             inputManagerRef = FindObjectOfType<InputManager>();
             if (inputManagerRef == null) Debug.LogError("[UIManager] InputManager not found in scene!");
+        }
+
+        if (cuttingPlaneManager == null)
+        {
+            cuttingPlaneManager = FindObjectOfType<CuttingPlaneManager>();
+            if (cuttingPlaneManager == null) Debug.LogError("[UIManager] CuttingPlaneManager not found in scene!");
         }
 
         HideAllPanelsAndPopups();
@@ -47,7 +60,7 @@ public class UIManager : MonoBehaviour
 
         if (ResetViewButton != null)
         {
-            ResetViewButton.onClick.AddListener(OnResetButtonPressed);
+            ResetViewButton.onClick.AddListener(OnResetViewButtonPressed);
         }
         else
         {
@@ -61,6 +74,28 @@ public class UIManager : MonoBehaviour
         else
         {
             Debug.LogWarning("[UIManager] CyclePresetViewButton is not assigned.");
+        }
+
+        if (ResetCropButton != null)
+        {
+            ResetCropButton.onClick.AddListener(OnResetCropButtonPressed);
+        }
+        else
+        {
+            Debug.LogWarning("[UIManager] ResetCropButton is not assigned.");
+        }
+    }
+
+    private void OnResetCropButtonPressed()
+    {
+        if (cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.ResetCrop();
+            Debug.Log("[UIManager] Model crop has been reset.");
+        }
+        else
+        {
+            Debug.LogWarning("[UIManager] CuttingPlaneManager is null, cannot reset crop.");
         }
     }
 
@@ -112,16 +147,16 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    private void OnResetButtonPressed()
+    private void OnResetViewButtonPressed()
     {
         if (mockedModelController != null)
         {
             mockedModelController.ResetState();
-            Debug.Log("[UIManager] Model state reset.");
+            Debug.Log("[UIManager] Model view state reset.");
         }
         else
         {
-            Debug.LogWarning("[UIManager] MockedModelController is null, cannot reset model state.");
+            Debug.LogWarning("[UIManager] MockedModelController is null, cannot reset model view state.");
         }
     }
 
