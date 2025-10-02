@@ -239,18 +239,27 @@ public class InputManager : MonoBehaviour
 
     private void HandlePanGesture()
     {
-        if (targetModelController == null || GetTouchOrMouseCount() < minPanTouchCount)
+        if (targetModelController == null)
         {
             isPanning = false;
             return;
         }
 
-        Vector2 rawCentroid = GetCentroid(GetActiveTouchPositions());
+        List<Vector2> activeTouches = GetActiveTouchPositions();
+       
+        if (activeTouches.Count < minPanTouchCount)
+        {
+            isPanning = false;
+            return;
+        }
+
+        Vector2 rawCentroid = GetCentroid(activeTouches);
         Vector2 smoothedCentroid = GetSmoothedVector2(rawCentroid, panCentroidHistory);
 
         if (!isPanning)
         {
             isPanning = true;
+            panCentroidHistory.Clear();
             previousPanCentroid = smoothedCentroid;
         }
         else
