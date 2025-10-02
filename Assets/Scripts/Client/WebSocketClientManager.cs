@@ -13,7 +13,7 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private MockedModelController mockedModelControllerRef;
 
     [SerializeField] private TMP_InputField ipAddressInput;
-    [SerializeField] private string defaultIpAddress = "192.168.0.35";
+    [SerializeField] private string defaultIpAddress = "192.168.0.83";
     [SerializeField] private int serverPort = 8070;
     [SerializeField] private string servicePath = "/Control";
     [SerializeField] private float modelUpdateRateFPS = 60f;

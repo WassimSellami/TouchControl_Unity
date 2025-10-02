@@ -4,8 +4,8 @@ using System.Collections.Generic;
 public class ModelController : MonoBehaviour
 {
     [Header("Model Prefabs")]
-    [SerializeField] private GameObject cubePrefab;
-    [SerializeField] private GameObject cylinderPrefab;
+    [SerializeField] private GameObject modelPrefab1;
+    [SerializeField] private GameObject modelPrefab2;
 
     [Header("Axis Visuals (Server)")]
     [SerializeField] private bool showServerAxes = true;
@@ -33,7 +33,7 @@ public class ModelController : MonoBehaviour
 
     public void LoadNewModel(string modelId)
     {
-        if (cubePrefab == null || cylinderPrefab == null)
+        if (modelPrefab1 == null || modelPrefab2 == null)
         {
             Debug.LogError("[ModelController] Model prefabs not set.");
             return;
@@ -50,8 +50,8 @@ public class ModelController : MonoBehaviour
         modelId = modelId.ToUpperInvariant();
         CurrentModelID = modelId;
 
-        if (modelId == "CUBE") prefabToLoad = cubePrefab;
-        else if (modelId == "CYLINDER") prefabToLoad = cylinderPrefab;
+        if (modelId == "CUBE") prefabToLoad = modelPrefab1;
+        else if (modelId == "CYLINDER") prefabToLoad = modelPrefab2;
         else { Debug.LogWarning($"[ModelController] Unknown model ID: {modelId}"); CurrentModelID = null; return; }
 
         if (prefabToLoad != null)

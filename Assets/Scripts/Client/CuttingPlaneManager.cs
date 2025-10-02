@@ -6,11 +6,10 @@ public class CuttingPlaneManager : MonoBehaviour
     [Header("Core Components")]
     public Camera mainCamera;
     public GameObject targetModel;
-    public Material crossSectionMaterial;
     public Transform modelRootTransform;
 
     [Header("Slicing Options")]
-    [Tooltip("Check this to show the plane visualizer after a cut is made.")]
+    public Material crossSectionMaterial;
     public bool showPlaneVisualizer = true;
     public float planeScaleFactor = 50f;
 
@@ -42,7 +41,6 @@ public class CuttingPlaneManager : MonoBehaviour
     void Start()
     {
         if (mainCamera == null) mainCamera = Camera.main;
-
         if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
 
         MeshFilter modelMeshFilter = targetModel.GetComponent<MeshFilter>();
@@ -169,6 +167,12 @@ public class CuttingPlaneManager : MonoBehaviour
         SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal);
         if (sliceResult != null)
         {
+            if (crossSectionMaterial == null)
+            {
+                Debug.LogError("Cross Section Material is not assigned. Please assign it in the Inspector.");
+                return;
+            }
+
             GameObject temporaryHullObject = sliceResult.CreateUpperHull(targetModel, crossSectionMaterial);
             if (temporaryHullObject != null)
             {
