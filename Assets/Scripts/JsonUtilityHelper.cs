@@ -1,23 +1,13 @@
 using UnityEngine;
 
+// This is the static helper class with utility methods.
 public static class JsonUtilityHelper
 {
+    // Wrapper structs for JsonUtility limitations with Vector3/Quaternion
+    // These should be private and nested as they are implementation details of this helper.
     [System.Serializable]
-    public class ModelTransformStateData
-    {
-        public Vector3 localPosition;
-        public Quaternion localRotation;
-        public Vector3 localScale;
-    }
-
-    // New class for model bounds size (Vector3)
-    [System.Serializable]
-    public class ModelBoundsSizeData
-    {
-        public Vector3 size;
-    }
-
     private struct Vector3Wrapper { public float x; public float y; public float z; }
+
     [System.Serializable]
     private struct QuaternionWrapper { public float x; public float y; public float z; public float w; }
 
@@ -46,10 +36,49 @@ public static class JsonUtilityHelper
     }
 }
 
+// --- All Data Transfer Object (DTO) classes are defined below, at the file level ---
+// --- Each class is defined only ONCE. ---
+
+[System.Serializable]
+public class ModelTransformStateData
+{
+    public Vector3 localPosition;
+    public Quaternion localRotation;
+    public Vector3 localScale;
+}
+
+[System.Serializable]
+public class ModelBoundsSizeData
+{
+    public Vector3 size;
+}
+
 [System.Serializable]
 public class CameraStateData
 {
     public Vector3 position;
     public Quaternion rotation;
     public float orthoSize;
+}
+
+[System.Serializable]
+public class VisualCropPlaneData
+{
+    public Vector3 position;
+    public Vector3 normal;
+    public float scale;
+}
+
+[System.Serializable]
+public class ActualCropPlaneData
+{
+    public Vector3 position;
+    public Vector3 normal;
+}
+
+[System.Serializable]
+public class LineData
+{
+    public Vector3 start;
+    public Vector3 end;
 }

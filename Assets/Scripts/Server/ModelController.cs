@@ -1,11 +1,18 @@
 using UnityEngine;
 using System.Collections.Generic;
+using EzySlice;
 
 public class ModelController : MonoBehaviour
 {
     [Header("Model Prefabs")]
     [SerializeField] private GameObject modelPrefab1;
     [SerializeField] private GameObject modelPrefab2;
+
+    [Header("Cutting Components")]
+    [SerializeField] private Material crossSectionMaterial;
+    [SerializeField] private GameObject planeVisualizerPrefab;
+    [SerializeField] private GameObject lineRendererPrefab;
+    [SerializeField] private bool showPlaneVisualizer = true;
 
     [Header("Axis Visuals (Server)")]
     [SerializeField] private bool showServerAxes = true;
@@ -17,6 +24,12 @@ public class ModelController : MonoBehaviour
 
     private GameObject currentInstantiatedModel;
     private List<GameObject> currentModelAxisVisuals = new List<GameObject>();
+
+    private Mesh originalMesh;
+    private Material[] originalMaterials;
+
+    private GameObject activePlaneVisualizer;
+    private LineRenderer activeLineRenderer;
 
     public string CurrentModelID { get; private set; } = null;
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
@@ -46,6 +59,9 @@ public class ModelController : MonoBehaviour
             currentInstantiatedModel = null;
         }
 
+        if (activePlaneVisualizer != null) Destroy(activePlaneVisualizer);
+        if (activeLineRenderer != null) Destroy(activeLineRenderer.gameObject);
+
         GameObject prefabToLoad = null;
         modelId = modelId.ToUpperInvariant();
         CurrentModelID = modelId;
@@ -62,11 +78,93 @@ public class ModelController : MonoBehaviour
             currentInstantiatedModel.transform.localScale = Vector3.one;
             CurrentModelBoundsSize = CalculateModelBoundsSize(currentInstantiatedModel);
 
+            MeshFilter modelMeshFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
+            if (modelMeshFilter != null) originalMesh = modelMeshFilter.mesh;
+            Renderer modelRenderer = currentInstantiatedModel.GetComponent<Renderer>();
+            if (modelRenderer != null) originalMaterials = modelRenderer.materials;
+
+            if (planeVisualizerPrefab != null)
+            {
+                activePlaneVisualizer = Instantiate(planeVisualizerPrefab, currentInstantiatedModel.transform, false);
+                activePlaneVisualizer.SetActive(false);
+            }
+            if (lineRendererPrefab != null)
+            {
+                activeLineRenderer = Instantiate(lineRendererPrefab, currentInstantiatedModel.transform, false).GetComponent<LineRenderer>();
+                activeLineRenderer.enabled = false;
+            }
+
             Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
             if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
             else CreateServerAxisVisuals(refChildServer);
         }
         else { Debug.LogError($"[ModelController] Failed to find prefab for model ID: {modelId}"); CurrentModelID = null; }
+    }
+
+    public void UpdateVisualCropPlane(Vector3 position, Vector3 normal, float scale)
+    {
+        if (activePlaneVisualizer == null) return;
+
+        activePlaneVisualizer.transform.position = position;
+        activePlaneVisualizer.transform.rotation = Quaternion.LookRotation(normal);
+        activePlaneVisualizer.transform.localScale = Vector3.one * scale;
+        activePlaneVisualizer.SetActive(showPlaneVisualizer);
+    }
+
+    public void PerformActualCrop(Vector3 position, Vector3 normal)
+    {
+        if (currentInstantiatedModel == null || crossSectionMaterial == null) return;
+
+        SlicedHull sliceResult = currentInstantiatedModel.Slice(position, normal);
+        if (sliceResult != null)
+        {
+            GameObject upperHull = sliceResult.CreateUpperHull(currentInstantiatedModel, crossSectionMaterial);
+            if (upperHull != null)
+            {
+                MeshFilter targetFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
+                MeshRenderer targetRenderer = currentInstantiatedModel.GetComponent<MeshRenderer>();
+
+                Mesh newMesh = upperHull.GetComponent<MeshFilter>().mesh;
+                Material[] newMaterials = upperHull.GetComponent<MeshRenderer>().materials;
+
+                Destroy(upperHull);
+                if (targetFilter.mesh != originalMesh) Destroy(targetFilter.mesh);
+
+                targetFilter.mesh = newMesh;
+                targetRenderer.materials = newMaterials;
+            }
+        }
+    }
+
+    public void ResetCrop()
+    {
+        if (currentInstantiatedModel == null || originalMesh == null) return;
+
+        MeshFilter targetFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
+        MeshRenderer targetRenderer = currentInstantiatedModel.GetComponent<MeshRenderer>();
+
+        if (targetFilter.mesh != originalMesh) Destroy(targetFilter.mesh);
+
+        targetFilter.mesh = originalMesh;
+        targetRenderer.materials = originalMaterials;
+
+        if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
+    }
+
+    public void UpdateCutLine(Vector3 start, Vector3 end)
+    {
+        if (activeLineRenderer == null) return;
+        activeLineRenderer.enabled = true;
+        activeLineRenderer.positionCount = 2;
+        activeLineRenderer.SetPosition(0, start);
+        activeLineRenderer.SetPosition(1, end);
+    }
+
+    public void HideCutLine()
+    {
+        if (activeLineRenderer == null) return;
+        activeLineRenderer.enabled = false;
+        activeLineRenderer.positionCount = 0;
     }
 
     private Vector3 CalculateModelBoundsSize(GameObject model)

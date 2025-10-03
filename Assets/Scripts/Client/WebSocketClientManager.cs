@@ -8,7 +8,6 @@ using static JsonUtilityHelper;
 public class WebSocketClientManager : MonoBehaviour
 {
     [SerializeField] private bool autoConnectMode = false;
-
     [SerializeField] private UIManager uiManager;
     [SerializeField] private MockedModelController mockedModelControllerRef;
 
@@ -159,6 +158,42 @@ public class WebSocketClientManager : MonoBehaviour
         };
         string jsonData = JsonUtility.ToJson(state);
         SendMessageToServer($"UPDATE_MODEL_TRANSFORM:{jsonData}");
+    }
+
+    public void SendVisualCropPlane(Vector3 position, Vector3 normal, float scale)
+    {
+        if (!IsConnected) return;
+        VisualCropPlaneData data = new VisualCropPlaneData { position = position, normal = normal, scale = scale };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"UPDATE_VISUAL_CROP_PLANE:{jsonData}");
+    }
+
+    public void SendActualCropPlane(Vector3 position, Vector3 normal)
+    {
+        if (!IsConnected) return;
+        ActualCropPlaneData data = new ActualCropPlaneData { position = position, normal = normal };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"EXECUTE_ACTUAL_CROP:{jsonData}");
+    }
+
+    public void SendResetCrop()
+    {
+        if (!IsConnected) return;
+        SendMessageToServer("RESET_CROP");
+    }
+
+    public void SendLineData(Vector3 start, Vector3 end)
+    {
+        if (!IsConnected) return;
+        LineData data = new LineData { start = start, end = end };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"UPDATE_CUT_LINE:{jsonData}");
+    }
+
+    public void SendHideLine()
+    {
+        if (!IsConnected) return;
+        SendMessageToServer("HIDE_CUT_LINE");
     }
 
     private void OnWebSocketOpen()

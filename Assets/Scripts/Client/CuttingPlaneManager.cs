@@ -7,6 +7,7 @@ public class CuttingPlaneManager : MonoBehaviour
     public Camera mainCamera;
     public GameObject targetModel;
     public Transform modelRootTransform;
+    public WebSocketClientManager webSocketClientManager;
 
     [Header("Slicing Options")]
     public Material crossSectionMaterial;
@@ -40,6 +41,11 @@ public class CuttingPlaneManager : MonoBehaviour
 
     void Start()
     {
+        if (webSocketClientManager == null)
+        {
+            webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
+        }
+
         if (mainCamera == null) mainCamera = Camera.main;
         if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
 
@@ -143,6 +149,11 @@ public class CuttingPlaneManager : MonoBehaviour
         activeLineRenderer.positionCount = 2;
         activeLineRenderer.SetPosition(0, startWorld);
         activeLineRenderer.SetPosition(1, endWorld);
+
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendLineData(startWorld, endWorld);
+        }
     }
 
     public void EndCutGesture(Vector2 endPointScreen)
@@ -163,6 +174,11 @@ public class CuttingPlaneManager : MonoBehaviour
     private void PerformSlice()
     {
         if (targetModel == null) return;
+
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendActualCropPlane(currentPlanePoint, currentPlaneNormal);
+        }
 
         SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal);
         if (sliceResult != null)
@@ -199,6 +215,11 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (targetModel == null || originalMesh == null) return;
 
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendResetCrop();
+        }
+
         MeshFilter targetFilter = targetModel.GetComponent<MeshFilter>();
         MeshRenderer targetRenderer = targetModel.GetComponent<MeshRenderer>();
 
@@ -231,6 +252,11 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (activePlaneVisualizer == null) return;
 
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendVisualCropPlane(currentPlanePoint, currentPlaneNormal, planeScaleFactor);
+        }
+
         Quaternion targetRotation = Quaternion.LookRotation(currentPlaneNormal);
         activePlaneVisualizer.transform.SetPositionAndRotation(currentPlanePoint, targetRotation);
         activePlaneVisualizer.transform.localScale = Vector3.one * planeScaleFactor;
@@ -252,6 +278,10 @@ public class CuttingPlaneManager : MonoBehaviour
         {
             activeLineRenderer.positionCount = 0;
             activeLineRenderer.enabled = false;
+        }
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendHideLine();
         }
     }
 

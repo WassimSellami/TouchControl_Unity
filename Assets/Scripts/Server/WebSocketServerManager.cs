@@ -4,7 +4,7 @@ using WebSocketSharp.Server;
 using System;
 using System.Collections.Concurrent;
 using System.Net;
-using static JsonUtilityHelper; // To use ModelBoundsSizeData
+using static JsonUtilityHelper;
 
 public class WebSocketServerManager : MonoBehaviour
 {
@@ -125,7 +125,6 @@ public class WebSocketServerManager : MonoBehaviour
         mainThreadActions.Enqueue(action);
     }
 
-    // Now takes a Vector3 for model size
     public void SendModelSizeUpdate(Vector3 modelSize)
     {
         if (wsServer != null && wsServer.IsListening)
