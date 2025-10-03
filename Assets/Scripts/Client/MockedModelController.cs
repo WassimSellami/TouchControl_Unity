@@ -30,6 +30,8 @@ public class MockedModelController : MonoBehaviour
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     private Vector3 initialScale;
+    private Vector3 initialCameraPosition;
+    private Quaternion initialCameraRotation;
 
     private List<GameObject> axisVisuals = new List<GameObject>();
     private bool axesCreated = false;
@@ -49,9 +51,19 @@ public class MockedModelController : MonoBehaviour
         if (mockVisualModel == null) Debug.LogWarning("[MockedModelController] Mock Visual Model not assigned.");
         if (redAxisMaterial == null || greenAxisMaterial == null || blueAxisMaterial == null) Debug.LogError("[MockedModelController] Axis materials are not assigned in the Inspector!");
         if (referenceCamera == null) Debug.LogError("[MockedModelController] Reference Camera not assigned! Panning will not work.");
+        else
+        {
+            initialCameraPosition = referenceCamera.transform.position;
+            initialCameraRotation = referenceCamera.transform.rotation;
+        }
 
         axesContainer = new GameObject("Client_Axes_Container");
         axesContainer.transform.SetParent(this.transform, false);
+
+        if (mockVisualModel != null)
+        {
+            mockVisualModel.SetActive(false);
+        }
     }
 
     void LateUpdate()
@@ -60,6 +72,14 @@ public class MockedModelController : MonoBehaviour
         {
             axesContainer.transform.position = modelReferencePoint.position;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
+        }
+    }
+
+    public void SetModelVisibility(bool isVisible)
+    {
+        if (mockVisualModel != null)
+        {
+            mockVisualModel.SetActive(isVisible);
         }
     }
 
@@ -122,6 +142,13 @@ public class MockedModelController : MonoBehaviour
         transform.position = initialPosition;
         transform.rotation = initialRotation;
         transform.localScale = initialScale;
+
+        if (referenceCamera != null)
+        {
+            referenceCamera.transform.position = initialCameraPosition;
+            referenceCamera.transform.rotation = initialCameraRotation;
+        }
+
         EnsureAxisVisualsAreCreated();
     }
 

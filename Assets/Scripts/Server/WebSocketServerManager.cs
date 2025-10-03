@@ -15,6 +15,7 @@ public class WebSocketServerManager : MonoBehaviour
     [Header("Object Control")]
     [SerializeField] private ModelController modelController;
     [SerializeField] private CommandInterpreter commandInterpreter;
+    [SerializeField] private Camera serverCamera;
 
     private WebSocketServer wsServer;
     private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
@@ -48,6 +49,7 @@ public class WebSocketServerManager : MonoBehaviour
     void Start()
     {
         if (modelController == null) Debug.LogError("[Server] ModelController reference not set!");
+        if (serverCamera == null) Debug.LogError("[Server] Server Camera reference not set!");
         if (commandInterpreter == null) Debug.LogError("[Server] CommandInterpreter reference not set!");
         else
         {
@@ -69,6 +71,15 @@ public class WebSocketServerManager : MonoBehaviour
     void OnDestroy()
     {
         StopWebSocketServer();
+    }
+
+    public void UpdateServerCameraTransform(Vector3 position, Quaternion rotation)
+    {
+        if (serverCamera != null)
+        {
+            serverCamera.transform.position = position;
+            serverCamera.transform.rotation = rotation;
+        }
     }
 
     private void StartWebSocketServer()
@@ -143,7 +154,6 @@ public class WebSocketServerManager : MonoBehaviour
                     }
                 }
             });
-            LogOnMainThread($"[Server] Broadcasted Model Size Update: {modelSize}", false);
         }
         else
         {

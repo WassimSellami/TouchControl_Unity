@@ -10,6 +10,7 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private bool autoConnectMode = false;
     [SerializeField] private UIManager uiManager;
     [SerializeField] private MockedModelController mockedModelControllerRef;
+    [SerializeField] private Camera referenceCamera;
 
     [SerializeField] private TMP_InputField ipAddressInput;
     [SerializeField] private string defaultIpAddress = "192.168.0.83";
@@ -48,6 +49,7 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (uiManager == null) { Debug.LogError("[WSClientManager] UIManager not assigned!"); return; }
         if (mockedModelControllerRef == null) { Debug.LogError("[WSClientManager] MockedModelControllerRef not assigned!"); return; }
+        if (referenceCamera == null) { Debug.LogError("[WSClientManager] Reference Camera not assigned!"); return; }
         if (connectButton == null) { Debug.LogError("[WSClientManager] Connect Button not assigned!"); return; }
         if (connectButtonText == null) { Debug.LogError("[WSClientManager] Connect Button Text not assigned!"); return; }
         if (statusText == null) { Debug.LogError("[WSClientManager] Status Text not assigned!"); return; }
@@ -61,15 +63,11 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (autoConnectMode)
         {
-            Debug.Log("[WSClientManager] Operating in Simulation Mode. Bypassing server connection.");
-
             uiManager.ShowLoadingScreenOrMinimalStatus();
             HandleMockConnect();
         }
         else
         {
-            Debug.Log("[WSClientManager] Operating in Manual Connect Mode (Real Server Required).");
-
             if (ipAddressInput != null)
             {
                 ipAddressInput.text = defaultIpAddress;
@@ -86,7 +84,7 @@ public class WebSocketClientManager : MonoBehaviour
         }
 
         if (loadModel1Button != null) loadModel1Button.onClick.AddListener(() => OnLoadModelSelected("1"));
-        if (loadModel2Button != null) loadModel1Button.onClick.AddListener(() => OnLoadModelSelected("2"));
+        if (loadModel2Button != null) loadModel2Button.onClick.AddListener(() => OnLoadModelSelected("2"));
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
     }
 
@@ -136,18 +134,13 @@ public class WebSocketClientManager : MonoBehaviour
     {
         isMockConnected = true;
         isAttemptingConnection = false;
-        Debug.Log("[WSClientManager] Mock connection successful.");
         OnWebSocketOpen();
     }
 
     private void SendModelTransformState()
     {
         if (!IsConnected || mockedModelControllerRef == null) return;
-
-        if (autoConnectMode)
-        {
-            return;
-        }
+        if (autoConnectMode) return;
 
         Transform modelTransform = mockedModelControllerRef.transform;
         ModelTransformStateData state = new ModelTransformStateData
@@ -158,6 +151,20 @@ public class WebSocketClientManager : MonoBehaviour
         };
         string jsonData = JsonUtility.ToJson(state);
         SendMessageToServer($"UPDATE_MODEL_TRANSFORM:{jsonData}");
+    }
+
+    private void SendCameraTransformState()
+    {
+        if (!IsConnected || referenceCamera == null) return;
+        if (autoConnectMode) return;
+
+        ClientCameraStateData state = new ClientCameraStateData
+        {
+            position = referenceCamera.transform.position,
+            rotation = referenceCamera.transform.rotation
+        };
+        string jsonData = JsonUtility.ToJson(state);
+        SendMessageToServer($"UPDATE_CAMERA_TRANSFORM:{jsonData}");
     }
 
     public void SendVisualCropPlane(Vector3 position, Vector3 normal, float scale)
@@ -230,6 +237,7 @@ public class WebSocketClientManager : MonoBehaviour
     {
         UpdateConnectionUI(ConnectionState.Failed);
         isAttemptingConnection = false;
+        if (mockedModelControllerRef != null) mockedModelControllerRef.ResetState();
         if (ws != null && ws.ReadyState != WebSocketState.Closed) ws.Close();
         ws = null;
         if (uiManager != null) uiManager.ShowConnectionPanel();
@@ -239,6 +247,7 @@ public class WebSocketClientManager : MonoBehaviour
     {
         UpdateConnectionUI(ConnectionState.Disconnected);
         isAttemptingConnection = false;
+        if (mockedModelControllerRef != null) mockedModelControllerRef.ResetState();
         ws = null;
         if (uiManager != null) uiManager.ShowConnectionPanel();
     }
@@ -250,6 +259,7 @@ public class WebSocketClientManager : MonoBehaviour
         if (!autoConnectMode)
         {
             SendMessageToServer($"LOAD_MODEL:{modelId.ToUpperInvariant()}");
+            SendCameraTransformState();
         }
         else
         {

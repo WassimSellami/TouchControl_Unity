@@ -17,7 +17,7 @@ public class UIManager : MonoBehaviour
     [SerializeField]
     private InputManager inputManagerRef;
     [SerializeField]
-    private CuttingPlaneManager cuttingPlaneManager; // Reference to the cutting manager
+    private CuttingPlaneManager cuttingPlaneManager;
 
     [Header("Buttons")]
     [SerializeField]
@@ -91,7 +91,6 @@ public class UIManager : MonoBehaviour
         if (cuttingPlaneManager != null)
         {
             cuttingPlaneManager.ResetCrop();
-            Debug.Log("[UIManager] Model crop has been reset.");
         }
         else
         {
@@ -108,6 +107,10 @@ public class UIManager : MonoBehaviour
 
     private void DeactivateInteractionSystems()
     {
+        if (mockedModelController != null)
+        {
+            mockedModelController.SetModelVisibility(false);
+        }
     }
 
     public void ShowConnectionPanel()
@@ -139,6 +142,7 @@ public class UIManager : MonoBehaviour
         if (mockedModelController != null)
         {
             mockedModelController.gameObject.SetActive(true);
+            mockedModelController.SetModelVisibility(true);
             mockedModelController.EnsureAxisVisualsAreCreated();
         }
         else
@@ -152,7 +156,6 @@ public class UIManager : MonoBehaviour
         if (mockedModelController != null)
         {
             mockedModelController.ResetState();
-            Debug.Log("[UIManager] Model view state reset.");
         }
         else
         {
@@ -165,7 +168,6 @@ public class UIManager : MonoBehaviour
         if (mockedModelController != null)
         {
             mockedModelController.CyclePresetView();
-            Debug.Log("[UIManager] Model preset view cycled.");
         }
         else
         {

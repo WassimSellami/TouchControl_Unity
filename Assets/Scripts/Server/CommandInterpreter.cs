@@ -25,6 +25,10 @@ public class CommandInterpreter : MonoBehaviour
                 ProcessUpdateModelTransformCommand(args);
                 break;
 
+            case "UPDATE_CAMERA_TRANSFORM":
+                ProcessUpdateCameraTransformCommand(args);
+                break;
+
             case "LOAD_MODEL":
                 ProcessLoadModelCommand(args);
                 break;
@@ -65,7 +69,21 @@ public class CommandInterpreter : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[CommandInterpreter] Error parsing ModelTransformStateData for UPDATE_MODEL_TRANSFORM: {ex.Message} | Args: {args}");
+            Debug.LogError($"[CommandInterpreter] Error parsing ModelTransformStateData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessUpdateCameraTransformCommand(string args)
+    {
+        if (WebSocketServerManager == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            ClientCameraStateData state = JsonUtility.FromJson<ClientCameraStateData>(args);
+            WebSocketServerManager.UpdateServerCameraTransform(state.position, state.rotation);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing ClientCameraStateData: {ex.Message} | Args: {args}");
         }
     }
 

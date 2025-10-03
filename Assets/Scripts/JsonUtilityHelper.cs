@@ -1,10 +1,7 @@
 using UnityEngine;
 
-// This is the static helper class with utility methods.
 public static class JsonUtilityHelper
 {
-    // Wrapper structs for JsonUtility limitations with Vector3/Quaternion
-    // These should be private and nested as they are implementation details of this helper.
     [System.Serializable]
     private struct Vector3Wrapper { public float x; public float y; public float z; }
 
@@ -36,9 +33,6 @@ public static class JsonUtilityHelper
     }
 }
 
-// --- All Data Transfer Object (DTO) classes are defined below, at the file level ---
-// --- Each class is defined only ONCE. ---
-
 [System.Serializable]
 public class ModelTransformStateData
 {
@@ -54,11 +48,10 @@ public class ModelBoundsSizeData
 }
 
 [System.Serializable]
-public class CameraStateData
+public class ClientCameraStateData
 {
     public Vector3 position;
     public Quaternion rotation;
-    public float orthoSize;
 }
 
 [System.Serializable]

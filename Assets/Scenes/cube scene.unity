@@ -205,8 +205,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0.2164396, y: 0, z: 0, w: 0.97629607}
+  m_LocalPosition: {x: 0, y: 2, z: -5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -488,6 +488,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   modelPrefab1: {fileID: 2874911170236052761, guid: 3e3d84072be052d41bbba928b53edddb, type: 3}
   modelPrefab2: {fileID: 3799736142059901398, guid: 95ed355764d404c49b869cab5ae4162d, type: 3}
+  crossSectionMaterial: {fileID: 2100000, guid: c73021a10d2dca34399a569c8e603b60, type: 2}
+  planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
+  lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
+  showPlaneVisualizer: 0
   showServerAxes: 1
   serverAxisOriginOffset: {x: 0, y: 0, z: 0}
   serverAxisLength: 5
@@ -544,6 +548,7 @@ MonoBehaviour:
   servicePath: /Control
   modelController: {fileID: 1971269431}
   commandInterpreter: {fileID: 2029125055}
+  serverCamera: {fileID: 330585545}
 --- !u!4 &2029125054
 Transform:
   m_ObjectHideFlags: 0
