@@ -85,8 +85,6 @@ public class ModelController : MonoBehaviour
         currentModelAxisVisuals.Clear();
     }
 
-
-
     void CreateServerAxisVisuals(Transform referencePointTransform)
     {
         if (!showServerAxes || referencePointTransform == null) return;

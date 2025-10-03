@@ -23,8 +23,8 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private Image indicatorImage;
     [SerializeField] private Sprite defaultIndicatorSprite;
-    [SerializeField] private Button loadCubeButton;
-    [SerializeField] private Button loadCylinderButton;
+    [SerializeField] private Button loadModel1Button;
+    [SerializeField] private Button loadModel2Button;
     [SerializeField] private Button backButtonFromModelView;
 
     private GameObject modelViewPanelCachedRef;
@@ -86,8 +86,8 @@ public class WebSocketClientManager : MonoBehaviour
             UpdateConnectionUI(ConnectionState.IdleWaiting);
         }
 
-        if (loadCubeButton != null) loadCubeButton.onClick.AddListener(() => OnLoadModelSelected("CUBE"));
-        if (loadCylinderButton != null) loadCylinderButton.onClick.AddListener(() => OnLoadModelSelected("CYLINDER"));
+        if (loadModel1Button != null) loadModel1Button.onClick.AddListener(() => OnLoadModelSelected("1"));
+        if (loadModel2Button != null) loadModel1Button.onClick.AddListener(() => OnLoadModelSelected("2"));
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
     }
 
