@@ -50,8 +50,8 @@ public class ModelController : MonoBehaviour
         modelId = modelId.ToUpperInvariant();
         CurrentModelID = modelId;
 
-        if (modelId == "CUBE") prefabToLoad = modelPrefab1;
-        else if (modelId == "CYLINDER") prefabToLoad = modelPrefab2;
+        if (modelId == "1") prefabToLoad = modelPrefab1;
+        else if (modelId == "2") prefabToLoad = modelPrefab2;
         else { Debug.LogWarning($"[ModelController] Unknown model ID: {modelId}"); CurrentModelID = null; return; }
 
         if (prefabToLoad != null)
@@ -62,7 +62,6 @@ public class ModelController : MonoBehaviour
             currentInstantiatedModel.transform.localScale = Vector3.one;
             CurrentModelBoundsSize = CalculateModelBoundsSize(currentInstantiatedModel);
 
-            // Create axes immediately after loading the model
             Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
             if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
             else CreateServerAxisVisuals(refChildServer);

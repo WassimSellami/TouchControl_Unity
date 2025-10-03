@@ -486,8 +486,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6521105644d11aa4aac7ddf1d3242b10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cubePrefab: {fileID: 4705982514410621352, guid: bdc4f44b13ded674a8929f0406c61118, type: 3}
-  cylinderPrefab: {fileID: 4415871053514501766, guid: 383826f60922b5a4bb0a82738a55979e, type: 3}
+  modelPrefab1: {fileID: 2874911170236052761, guid: 3e3d84072be052d41bbba928b53edddb, type: 3}
+  modelPrefab2: {fileID: 3799736142059901398, guid: 95ed355764d404c49b869cab5ae4162d, type: 3}
   showServerAxes: 1
   serverAxisOriginOffset: {x: 0, y: 0, z: 0}
   serverAxisLength: 5
