@@ -1,5 +1,6 @@
 using UnityEngine;
 using EzySlice;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -16,6 +17,8 @@ public class CuttingPlaneManager : MonoBehaviour
     public bool showPlaneVisualizer = true;
     public float planeScaleFactor = 50f;
     public float separationFactor = 0.1f;
+    [Tooltip("How long the separation animation takes in seconds.")]
+    public float separationAnimationDuration = 0.3f;
 
     [Header("Visuals Prefabs")]
     public GameObject lineRendererPrefab;
@@ -37,7 +40,6 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 modelCenterWorld;
 
     private List<GameObject> activeModelParts = new List<GameObject>();
-    private GameObject objectToSlice;
 
     private const float VISUAL_DEPTH_OFFSET = 0.005f;
     private const float MIN_DRAG_DISTANCE_SQUARED = 4f;
@@ -83,12 +85,9 @@ public class CuttingPlaneManager : MonoBehaviour
         ResetCrop();
     }
 
-    public void StartCutDrag(GameObject target, Vector2 screenPoint)
+    public void StartCutDrag(Vector2 screenPoint)
     {
-        if (target == null) return;
-        objectToSlice = target;
-        modelCenterWorld = objectToSlice.GetComponent<Renderer>().bounds.center;
-
+        modelCenterWorld = GetCollectiveBounds().center;
         startPointScreen = screenPoint;
 
         if (activePlaneVisualizer != null)
@@ -159,10 +158,37 @@ public class CuttingPlaneManager : MonoBehaviour
         }
     }
 
+    private bool DoesPlaneIntersectBounds(UnityEngine.Plane plane, Bounds bounds)
+    {
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+
+        Vector3[] corners = new Vector3[8]
+        {
+            center + new Vector3(extents.x, extents.y, extents.z),
+            center + new Vector3(extents.x, extents.y, -extents.z),
+            center + new Vector3(extents.x, -extents.y, extents.z),
+            center + new Vector3(extents.x, -extents.y, -extents.z),
+            center + new Vector3(-extents.x, extents.y, extents.z),
+            center + new Vector3(-extents.x, extents.y, -extents.z),
+            center + new Vector3(-extents.x, -extents.y, extents.z),
+            center + new Vector3(-extents.x, -extents.y, -extents.z)
+        };
+
+        bool firstSide = plane.GetSide(corners[0]);
+
+        for (int i = 1; i < corners.Length; i++)
+        {
+            if (plane.GetSide(corners[i]) != firstSide)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void PerformSlice()
     {
-        if (objectToSlice == null) return;
-
         if (webSocketClientManager != null)
         {
             webSocketClientManager.SendActualCropPlane(currentPlanePoint, currentPlaneNormal);
@@ -174,40 +200,84 @@ public class CuttingPlaneManager : MonoBehaviour
             return;
         }
 
-        SlicedHull sliceResult = objectToSlice.Slice(currentPlanePoint, currentPlaneNormal, crossSectionMaterial);
-        if (sliceResult != null)
+        UnityEngine.Plane slicePlane = new UnityEngine.Plane(currentPlaneNormal, currentPlanePoint);
+
+        List<GameObject> partsToSlice = new List<GameObject>();
+        foreach (GameObject part in activeModelParts)
         {
-            GameObject newUpperHull = sliceResult.CreateUpperHull(objectToSlice, crossSectionMaterial);
-            GameObject newLowerHull = sliceResult.CreateLowerHull(objectToSlice, crossSectionMaterial);
-
-            if (newUpperHull != null && newLowerHull != null)
+            Renderer partRenderer = part.GetComponent<Renderer>();
+            if (part != null && partRenderer != null && DoesPlaneIntersectBounds(slicePlane, partRenderer.bounds))
             {
-                newUpperHull.transform.SetParent(modelRootTransform, false);
-                newLowerHull.transform.SetParent(modelRootTransform, false);
-
-                MeshCollider upperCollider = newUpperHull.AddComponent<MeshCollider>();
-                upperCollider.convex = true;
-                MeshCollider lowerCollider = newLowerHull.AddComponent<MeshCollider>();
-                lowerCollider.convex = true;
-
-                Bounds originalBounds = objectToSlice.GetComponent<Renderer>().bounds;
-                float separationDistance = originalBounds.size.magnitude * separationFactor;
-                Vector3 separationVector = currentPlaneNormal * (separationDistance * 0.5f);
-
-                newUpperHull.transform.position += separationVector;
-                newLowerHull.transform.position -= separationVector;
-
-                activeModelParts.Add(newUpperHull);
-                activeModelParts.Add(newLowerHull);
-
-                DestroyModelPart(objectToSlice);
-            }
-            else
-            {
-                Debug.LogWarning("Slicing failed to produce two valid hull objects.");
+                partsToSlice.Add(part);
             }
         }
-        objectToSlice = null;
+
+        if (partsToSlice.Count == 0) return;
+
+        List<GameObject> newPartsCreated = new List<GameObject>();
+
+        foreach (GameObject originalPart in partsToSlice)
+        {
+            SlicedHull sliceResult = originalPart.Slice(currentPlanePoint, currentPlaneNormal, crossSectionMaterial);
+            if (sliceResult != null)
+            {
+                GameObject newUpperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
+                GameObject newLowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
+
+                if (newUpperHull != null && newLowerHull != null)
+                {
+                    newUpperHull.transform.SetParent(modelRootTransform, false);
+                    newLowerHull.transform.SetParent(modelRootTransform, false);
+
+                    MeshCollider upperCollider = newUpperHull.AddComponent<MeshCollider>();
+                    upperCollider.convex = true;
+                    MeshCollider lowerCollider = newLowerHull.AddComponent<MeshCollider>();
+                    lowerCollider.convex = true;
+
+                    Bounds originalBounds = originalPart.GetComponent<Renderer>().bounds;
+                    float separationDistance = originalBounds.size.magnitude * separationFactor;
+                    Vector3 separationVector = currentPlaneNormal * (separationDistance * 0.5f);
+
+                    StartCoroutine(AnimateSeparation(newUpperHull, newLowerHull, separationVector, separationAnimationDuration));
+
+                    newPartsCreated.Add(newUpperHull);
+                    newPartsCreated.Add(newLowerHull);
+
+                    DestroyModelPart(originalPart);
+                }
+            }
+        }
+        activeModelParts.AddRange(newPartsCreated);
+    }
+
+    private IEnumerator AnimateSeparation(GameObject upperHull, GameObject lowerHull, Vector3 separationVector, float duration)
+    {
+        if (upperHull == null || lowerHull == null) yield break;
+
+        Vector3 upperStartPos = upperHull.transform.position;
+        Vector3 lowerStartPos = lowerHull.transform.position;
+
+        Vector3 upperEndPos = upperStartPos + separationVector;
+        Vector3 lowerEndPos = lowerStartPos - separationVector;
+
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            if (upperHull == null || lowerHull == null) yield break;
+
+            float t = elapsedTime / duration;
+            float easedT = Mathf.SmoothStep(0.0f, 1.0f, t);
+
+            upperHull.transform.position = Vector3.Lerp(upperStartPos, upperEndPos, easedT);
+            lowerHull.transform.position = Vector3.Lerp(lowerStartPos, lowerEndPos, easedT);
+
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        if (upperHull != null) upperHull.transform.position = upperEndPos;
+        if (lowerHull != null) lowerHull.transform.position = lowerEndPos;
     }
 
     public void ResetCrop()
@@ -331,8 +401,32 @@ public class CuttingPlaneManager : MonoBehaviour
         }
     }
 
-    public GameObject GetDefaultSliceTarget()
+    private Bounds GetCollectiveBounds()
     {
-        return activeModelParts.FirstOrDefault(part => part != null && part.activeInHierarchy);
+        if (activeModelParts.Count == 0) return new Bounds(transform.position, Vector3.zero);
+
+        Bounds collectiveBounds = new Bounds();
+        bool first = true;
+
+        foreach (var part in activeModelParts)
+        {
+            if (part != null && part.activeInHierarchy)
+            {
+                Renderer r = part.GetComponent<Renderer>();
+                if (r != null)
+                {
+                    if (first)
+                    {
+                        collectiveBounds = r.bounds;
+                        first = false;
+                    }
+                    else
+                    {
+                        collectiveBounds.Encapsulate(r.bounds);
+                    }
+                }
+            }
+        }
+        return collectiveBounds;
     }
 }

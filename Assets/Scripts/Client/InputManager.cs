@@ -156,12 +156,9 @@ public class InputManager : MonoBehaviour
                 {
                     isHolding = false;
                     isCutActive = true;
-
-                    GameObject targetForSlice = cuttingPlaneManager.GetDefaultSliceTarget();
-
-                    if (cuttingPlaneManager != null && targetForSlice != null)
+                    if (cuttingPlaneManager != null)
                     {
-                        cuttingPlaneManager.StartCutDrag(targetForSlice, startPressPosition);
+                        cuttingPlaneManager.StartCutDrag(startPressPosition);
                     }
                 }
             }
