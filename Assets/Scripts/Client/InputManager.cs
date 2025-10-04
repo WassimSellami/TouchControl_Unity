@@ -23,10 +23,12 @@ public class InputManager : MonoBehaviour
     [SerializeField] private float longPressThreshold = 0.5f;
     [SerializeField] private float maxHoldMovementPixels = 500f;
 
-    private bool isHoldingForCut = false;
+    private bool isHolding = false;
+    private bool longPressAchieved = false;
     private bool isCutActive = false;
     private float longPressTimer = 0f;
     private Vector2 startPressPosition;
+    private GameObject potentialInteractionTarget = null;
 
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
@@ -119,40 +121,55 @@ public class InputManager : MonoBehaviour
             {
                 return;
             }
+            ResetGestureStates();
 
             startPressPosition = currentRawPosition;
-            longPressTimer = 0f;
-            isHoldingForCut = true;
-            isCutActive = false;
             previousOrbitPosition = currentRawPosition;
+            isHolding = true;
+
+            if (cuttingPlaneManager != null)
+            {
+                potentialInteractionTarget = cuttingPlaneManager.GetModelPartAtScreenPoint(currentRawPosition);
+            }
         }
 
-        if (isHoldingForCut)
+        if (isHolding)
         {
             longPressTimer += Time.deltaTime;
 
-            if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+            if (!longPressAchieved)
             {
-                isHoldingForCut = false;
-                isOrbiting = true;
-                HandleOrbitGestureInternal(currentRawPosition, TouchPhase.Began);
-            }
-            else if (longPressTimer >= longPressThreshold)
-            {
-                isHoldingForCut = false;
-                isCutActive = true;
-                isOrbiting = false;
-
-                if (cuttingPlaneManager != null)
+                if (longPressTimer >= longPressThreshold)
                 {
-                    cuttingPlaneManager.StartCutDrag(startPressPosition);
+                    longPressAchieved = true;
+                }
+                else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+                {
+                    isHolding = false;
+                    isOrbiting = true;
+                    HandleOrbitGestureInternal(currentRawPosition, TouchPhase.Began);
+                }
+            }
+            else
+            {
+                if (potentialInteractionTarget == null && !isCutActive && Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+                {
+                    isHolding = false;
+                    isCutActive = true;
+
+                    GameObject targetForSlice = cuttingPlaneManager.GetDefaultSliceTarget();
+
+                    if (cuttingPlaneManager != null && targetForSlice != null)
+                    {
+                        cuttingPlaneManager.StartCutDrag(targetForSlice, startPressPosition);
+                    }
                 }
             }
         }
 
         if (phase == TouchPhase.Moved)
         {
-            if (isCutActive && cuttingPlaneManager != null)
+            if (isCutActive)
             {
                 cuttingPlaneManager.UpdateCutDrag(currentRawPosition);
             }
@@ -164,21 +181,19 @@ public class InputManager : MonoBehaviour
 
         if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
         {
-            if (isCutActive)
+            if (isHolding && longPressAchieved && potentialInteractionTarget != null)
             {
-                if (cuttingPlaneManager != null)
-                {
-                    cuttingPlaneManager.EndCutGesture(currentRawPosition);
-                }
+                cuttingPlaneManager.DestroyModelPart(potentialInteractionTarget);
+            }
+            else if (isCutActive)
+            {
+                cuttingPlaneManager.EndCutGesture(currentRawPosition);
             }
             else if (isOrbiting)
             {
                 HandleOrbitGestureInternal(currentRawPosition, phase);
             }
-
-            isHoldingForCut = false;
-            isCutActive = false;
-            isOrbiting = false;
+            ResetGestureStates();
         }
     }
 
@@ -223,9 +238,11 @@ public class InputManager : MonoBehaviour
         isPanning = false;
         isOrbiting = false;
         isZooming = false;
-        isHoldingForCut = false;
+        isHolding = false;
         isCutActive = false;
+        longPressAchieved = false;
         longPressTimer = 0f;
+        potentialInteractionTarget = null;
 
         orbitPositionHistory.Clear();
         panCentroidHistory.Clear();
@@ -246,7 +263,7 @@ public class InputManager : MonoBehaviour
         }
 
         List<Vector2> activeTouches = GetActiveTouchPositions();
-       
+
         if (activeTouches.Count < minPanTouchCount)
         {
             isPanning = false;

@@ -1,5 +1,7 @@
 using UnityEngine;
 using EzySlice;
+using System.Collections.Generic;
+using System.Linq;
 
 public class CuttingPlaneManager : MonoBehaviour
 {
@@ -34,8 +36,8 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
 
-    private GameObject upperHullObject;
-    private GameObject lowerHullObject;
+    private List<GameObject> activeModelParts = new List<GameObject>();
+    private GameObject objectToSlice;
 
     private const float VISUAL_DEPTH_OFFSET = 0.005f;
     private const float MIN_DRAG_DISTANCE_SQUARED = 4f;
@@ -50,22 +52,9 @@ public class CuttingPlaneManager : MonoBehaviour
         if (mainCamera == null) mainCamera = Camera.main;
         if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
 
-        MeshFilter modelMeshFilter = targetModel.GetComponent<MeshFilter>();
-        if (modelMeshFilter == null || modelMeshFilter.mesh == null)
+        if (targetModel.GetComponent<Collider>() == null)
         {
-            Debug.LogError("Target Model must have a MeshFilter with a mesh assigned.");
-            return;
-        }
-
-        Renderer modelRenderer = targetModel.GetComponent<Renderer>();
-        if (modelRenderer != null)
-        {
-            modelCenterWorld = modelRenderer.bounds.center;
-        }
-        else
-        {
-            Debug.LogError("Target Model must have a Renderer component.");
-            return;
+            targetModel.AddComponent<MeshCollider>();
         }
 
         if (modelRootTransform == null)
@@ -91,12 +80,15 @@ public class CuttingPlaneManager : MonoBehaviour
             }
         }
 
-        targetModel.SetActive(true);
-        ResetClipping();
+        ResetCrop();
     }
 
-    public void StartCutDrag(Vector2 screenPoint)
+    public void StartCutDrag(GameObject target, Vector2 screenPoint)
     {
+        if (target == null) return;
+        objectToSlice = target;
+        modelCenterWorld = objectToSlice.GetComponent<Renderer>().bounds.center;
+
         startPointScreen = screenPoint;
 
         if (activePlaneVisualizer != null)
@@ -169,9 +161,7 @@ public class CuttingPlaneManager : MonoBehaviour
 
     private void PerformSlice()
     {
-        if (targetModel == null) return;
-
-        ClearPreviousSlice();
+        if (objectToSlice == null) return;
 
         if (webSocketClientManager != null)
         {
@@ -184,77 +174,62 @@ public class CuttingPlaneManager : MonoBehaviour
             return;
         }
 
-        SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal, crossSectionMaterial);
+        SlicedHull sliceResult = objectToSlice.Slice(currentPlanePoint, currentPlaneNormal, crossSectionMaterial);
         if (sliceResult != null)
         {
-            targetModel.SetActive(false);
+            GameObject newUpperHull = sliceResult.CreateUpperHull(objectToSlice, crossSectionMaterial);
+            GameObject newLowerHull = sliceResult.CreateLowerHull(objectToSlice, crossSectionMaterial);
 
-            upperHullObject = sliceResult.CreateUpperHull(targetModel, crossSectionMaterial);
-            lowerHullObject = sliceResult.CreateLowerHull(targetModel, crossSectionMaterial);
-
-            if (upperHullObject != null && lowerHullObject != null)
+            if (newUpperHull != null && newLowerHull != null)
             {
-                // ** THE FIX IS HERE **
-                // 1. Parent the new objects to the root transform first.
-                upperHullObject.transform.SetParent(modelRootTransform, false);
-                lowerHullObject.transform.SetParent(modelRootTransform, false);
+                newUpperHull.transform.SetParent(modelRootTransform, false);
+                newLowerHull.transform.SetParent(modelRootTransform, false);
 
-                // 2. Now that they are parented, copy the LOCAL transform properties from the original model.
-                // This ensures they correctly inherit the parent's scale (from zooming).
-                upperHullObject.transform.localPosition = targetModel.transform.localPosition;
-                upperHullObject.transform.localRotation = targetModel.transform.localRotation;
-                upperHullObject.transform.localScale = targetModel.transform.localScale;
+                MeshCollider upperCollider = newUpperHull.AddComponent<MeshCollider>();
+                upperCollider.convex = true;
+                MeshCollider lowerCollider = newLowerHull.AddComponent<MeshCollider>();
+                lowerCollider.convex = true;
 
-                lowerHullObject.transform.localPosition = targetModel.transform.localPosition;
-                lowerHullObject.transform.localRotation = targetModel.transform.localRotation;
-                lowerHullObject.transform.localScale = targetModel.transform.localScale;
-
-                // 3. Now apply the separation in world space.
-                // The bounds are in world space, so this calculation remains correct.
-                Bounds originalBounds = targetModel.GetComponent<Renderer>().bounds;
+                Bounds originalBounds = objectToSlice.GetComponent<Renderer>().bounds;
                 float separationDistance = originalBounds.size.magnitude * separationFactor;
                 Vector3 separationVector = currentPlaneNormal * (separationDistance * 0.5f);
 
-                upperHullObject.transform.position += separationVector;
-                lowerHullObject.transform.position -= separationVector;
+                newUpperHull.transform.position += separationVector;
+                newLowerHull.transform.position -= separationVector;
+
+                activeModelParts.Add(newUpperHull);
+                activeModelParts.Add(newLowerHull);
+
+                DestroyModelPart(objectToSlice);
             }
             else
             {
-                ClearPreviousSlice();
-                targetModel.SetActive(true);
                 Debug.LogWarning("Slicing failed to produce two valid hull objects.");
             }
         }
-    }
-
-    private void ClearPreviousSlice()
-    {
-        if (upperHullObject != null)
-        {
-            Destroy(upperHullObject);
-            upperHullObject = null;
-        }
-        if (lowerHullObject != null)
-        {
-            Destroy(lowerHullObject);
-            lowerHullObject = null;
-        }
+        objectToSlice = null;
     }
 
     public void ResetCrop()
     {
-        if (targetModel == null) return;
-
         if (webSocketClientManager != null)
         {
             webSocketClientManager.SendResetCrop();
         }
 
-        ClearPreviousSlice();
+        foreach (GameObject part in activeModelParts.ToList())
+        {
+            DestroyModelPart(part);
+        }
+        activeModelParts.Clear();
 
         targetModel.SetActive(true);
+        activeModelParts.Add(targetModel);
 
-        modelCenterWorld = targetModel.GetComponent<Renderer>().bounds.center;
+        if (targetModel.GetComponent<Renderer>() != null)
+        {
+            modelCenterWorld = targetModel.GetComponent<Renderer>().bounds.center;
+        }
 
         ResetClipping();
     }
@@ -315,5 +290,49 @@ public class CuttingPlaneManager : MonoBehaviour
         {
             activePlaneVisualizer.SetActive(false);
         }
+    }
+
+    public GameObject GetModelPartAtScreenPoint(Vector2 screenPoint)
+    {
+        if (mainCamera == null) return null;
+
+        Ray ray = mainCamera.ScreenPointToRay(screenPoint);
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            if (activeModelParts.Contains(hit.collider.gameObject))
+            {
+                return hit.collider.gameObject;
+            }
+        }
+        return null;
+    }
+
+    public void DestroyModelPart(GameObject partToDestroy)
+    {
+        if (partToDestroy == null) return;
+
+        if (activeModelParts.Contains(partToDestroy))
+        {
+            activeModelParts.Remove(partToDestroy);
+        }
+
+        if (partToDestroy == targetModel)
+        {
+            partToDestroy.SetActive(false);
+        }
+        else
+        {
+            Destroy(partToDestroy);
+        }
+
+        if (activePlaneVisualizer != null)
+        {
+            activePlaneVisualizer.SetActive(false);
+        }
+    }
+
+    public GameObject GetDefaultSliceTarget()
+    {
+        return activeModelParts.FirstOrDefault(part => part != null && part.activeInHierarchy);
     }
 }
