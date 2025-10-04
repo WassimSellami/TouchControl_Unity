@@ -1730,7 +1730,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 0
+  autoConnectMode: 1
   uiManager: {fileID: 838438840}
   mockedModelControllerRef: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
@@ -2053,6 +2053,7 @@ MonoBehaviour:
   crossSectionMaterial: {fileID: 2100000, guid: c73021a10d2dca34399a569c8e603b60, type: 2}
   showPlaneVisualizer: 0
   planeScaleFactor: 3
+  separationFactor: 0.1
   lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
   planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
   planeDepth: 10

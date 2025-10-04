@@ -13,6 +13,7 @@ public class CuttingPlaneManager : MonoBehaviour
     public Material crossSectionMaterial;
     public bool showPlaneVisualizer = true;
     public float planeScaleFactor = 50f;
+    public float separationFactor = 0.1f;
 
     [Header("Visuals Prefabs")]
     public GameObject lineRendererPrefab;
@@ -33,8 +34,8 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
 
-    private Mesh originalMesh;
-    private Material[] originalMaterials;
+    private GameObject upperHullObject;
+    private GameObject lowerHullObject;
 
     private const float VISUAL_DEPTH_OFFSET = 0.005f;
     private const float MIN_DRAG_DISTANCE_SQUARED = 4f;
@@ -50,11 +51,7 @@ public class CuttingPlaneManager : MonoBehaviour
         if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
 
         MeshFilter modelMeshFilter = targetModel.GetComponent<MeshFilter>();
-        if (modelMeshFilter != null && modelMeshFilter.mesh != null)
-        {
-            originalMesh = modelMeshFilter.mesh;
-        }
-        else
+        if (modelMeshFilter == null || modelMeshFilter.mesh == null)
         {
             Debug.LogError("Target Model must have a MeshFilter with a mesh assigned.");
             return;
@@ -63,7 +60,6 @@ public class CuttingPlaneManager : MonoBehaviour
         Renderer modelRenderer = targetModel.GetComponent<Renderer>();
         if (modelRenderer != null)
         {
-            originalMaterials = modelRenderer.materials;
             modelCenterWorld = modelRenderer.bounds.center;
         }
         else
@@ -74,7 +70,7 @@ public class CuttingPlaneManager : MonoBehaviour
 
         if (modelRootTransform == null)
         {
-            modelRootTransform = targetModel.transform;
+            modelRootTransform = targetModel.transform.parent ?? new GameObject("ModelRoot").transform;
         }
 
         if (planeVisualizerPrefab != null)
@@ -95,6 +91,7 @@ public class CuttingPlaneManager : MonoBehaviour
             }
         }
 
+        targetModel.SetActive(true);
         ResetClipping();
     }
 
@@ -109,9 +106,8 @@ public class CuttingPlaneManager : MonoBehaviour
 
         UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
         Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
-        float enter;
 
-        if (centerPlane.Raycast(rayOrigin, out enter))
+        if (centerPlane.Raycast(rayOrigin, out float enter))
         {
             initialPlanePointForDepth = rayOrigin.GetPoint(enter);
         }
@@ -175,63 +171,90 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (targetModel == null) return;
 
+        ClearPreviousSlice();
+
         if (webSocketClientManager != null)
         {
             webSocketClientManager.SendActualCropPlane(currentPlanePoint, currentPlaneNormal);
         }
 
-        SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal);
+        if (crossSectionMaterial == null)
+        {
+            Debug.LogError("Cross Section Material is not assigned. Please assign it in the Inspector.");
+            return;
+        }
+
+        SlicedHull sliceResult = targetModel.Slice(currentPlanePoint, currentPlaneNormal, crossSectionMaterial);
         if (sliceResult != null)
         {
-            if (crossSectionMaterial == null)
+            targetModel.SetActive(false);
+
+            upperHullObject = sliceResult.CreateUpperHull(targetModel, crossSectionMaterial);
+            lowerHullObject = sliceResult.CreateLowerHull(targetModel, crossSectionMaterial);
+
+            if (upperHullObject != null && lowerHullObject != null)
             {
-                Debug.LogError("Cross Section Material is not assigned. Please assign it in the Inspector.");
-                return;
-            }
+                // ** THE FIX IS HERE **
+                // 1. Parent the new objects to the root transform first.
+                upperHullObject.transform.SetParent(modelRootTransform, false);
+                lowerHullObject.transform.SetParent(modelRootTransform, false);
 
-            GameObject temporaryHullObject = sliceResult.CreateUpperHull(targetModel, crossSectionMaterial);
-            if (temporaryHullObject != null)
+                // 2. Now that they are parented, copy the LOCAL transform properties from the original model.
+                // This ensures they correctly inherit the parent's scale (from zooming).
+                upperHullObject.transform.localPosition = targetModel.transform.localPosition;
+                upperHullObject.transform.localRotation = targetModel.transform.localRotation;
+                upperHullObject.transform.localScale = targetModel.transform.localScale;
+
+                lowerHullObject.transform.localPosition = targetModel.transform.localPosition;
+                lowerHullObject.transform.localRotation = targetModel.transform.localRotation;
+                lowerHullObject.transform.localScale = targetModel.transform.localScale;
+
+                // 3. Now apply the separation in world space.
+                // The bounds are in world space, so this calculation remains correct.
+                Bounds originalBounds = targetModel.GetComponent<Renderer>().bounds;
+                float separationDistance = originalBounds.size.magnitude * separationFactor;
+                Vector3 separationVector = currentPlaneNormal * (separationDistance * 0.5f);
+
+                upperHullObject.transform.position += separationVector;
+                lowerHullObject.transform.position -= separationVector;
+            }
+            else
             {
-                MeshFilter targetFilter = targetModel.GetComponent<MeshFilter>();
-                MeshRenderer targetRenderer = targetModel.GetComponent<MeshRenderer>();
-
-                Mesh newMesh = temporaryHullObject.GetComponent<MeshFilter>().mesh;
-                Material[] newMaterials = temporaryHullObject.GetComponent<MeshRenderer>().materials;
-
-                Destroy(temporaryHullObject);
-                if (targetFilter.mesh != originalMesh)
-                {
-                    Destroy(targetFilter.mesh);
-                }
-
-                targetFilter.mesh = newMesh;
-                targetRenderer.materials = newMaterials;
-                modelCenterWorld = targetRenderer.bounds.center;
+                ClearPreviousSlice();
+                targetModel.SetActive(true);
+                Debug.LogWarning("Slicing failed to produce two valid hull objects.");
             }
+        }
+    }
+
+    private void ClearPreviousSlice()
+    {
+        if (upperHullObject != null)
+        {
+            Destroy(upperHullObject);
+            upperHullObject = null;
+        }
+        if (lowerHullObject != null)
+        {
+            Destroy(lowerHullObject);
+            lowerHullObject = null;
         }
     }
 
     public void ResetCrop()
     {
-        if (targetModel == null || originalMesh == null) return;
+        if (targetModel == null) return;
 
         if (webSocketClientManager != null)
         {
             webSocketClientManager.SendResetCrop();
         }
 
-        MeshFilter targetFilter = targetModel.GetComponent<MeshFilter>();
-        MeshRenderer targetRenderer = targetModel.GetComponent<MeshRenderer>();
+        ClearPreviousSlice();
 
-        if (targetFilter.mesh != originalMesh)
-        {
-            Destroy(targetFilter.mesh);
-        }
+        targetModel.SetActive(true);
 
-        targetFilter.mesh = originalMesh;
-        targetRenderer.materials = originalMaterials;
-
-        modelCenterWorld = targetRenderer.bounds.center;
+        modelCenterWorld = targetModel.GetComponent<Renderer>().bounds.center;
 
         ResetClipping();
     }
