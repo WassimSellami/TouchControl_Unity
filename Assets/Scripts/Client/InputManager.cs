@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine.EventSystems;
 
 public class InputManager : MonoBehaviour
@@ -45,7 +44,6 @@ public class InputManager : MonoBehaviour
     {
         if (targetModelController == null) { this.enabled = false; Debug.LogError("InputManager: TargetModelController not assigned!"); return; }
         if (cuttingPlaneManager == null) { Debug.LogWarning("InputManager: CuttingPlaneManager not assigned. Cutting feature disabled."); }
-
         if (eventSystem == null) { eventSystem = EventSystem.current; }
         if (eventSystem == null) { this.enabled = false; Debug.LogError("InputManager: EventSystem not found!"); }
     }
@@ -60,18 +58,9 @@ public class InputManager : MonoBehaviour
             return;
         }
 
-        if (currentTouchCount == zoomTouchCount)
-        {
-            HandleZoomGesture();
-        }
-        else if (!isZooming && currentTouchCount >= minPanTouchCount)
-        {
-            HandlePanGesture();
-        }
-        else if (currentTouchCount == orbitTouchCount)
-        {
-            HandleSingleTouchInput();
-        }
+        if (currentTouchCount == zoomTouchCount) HandleZoomGesture();
+        else if (!isZooming && currentTouchCount >= minPanTouchCount) HandlePanGesture();
+        else if (currentTouchCount == orbitTouchCount) HandleSingleTouchInput();
         else
         {
             if (isPanning || isOrbiting || isZooming || isCutActive)
@@ -92,21 +81,10 @@ public class InputManager : MonoBehaviour
         {
             for (int i = 0; i < Input.touchCount; i++)
             {
-                if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
-                {
-                    return true;
-                }
+                if (eventSystem.IsPointerOverGameObject(Input.GetTouch(i).fingerId)) return true;
             }
         }
-
-        if (Input.mousePresent)
-        {
-            if (eventSystem.IsPointerOverGameObject())
-            {
-                return true;
-            }
-        }
-
+        if (Input.mousePresent && eventSystem.IsPointerOverGameObject()) return true;
         return false;
     }
 
@@ -117,12 +95,9 @@ public class InputManager : MonoBehaviour
 
         if (phase == TouchPhase.Began)
         {
-            if (IsPointerOverUI())
-            {
-                return;
-            }
-            ResetGestureStates();
+            if (IsPointerOverUI()) return;
 
+            ResetGestureStates();
             startPressPosition = currentRawPosition;
             previousOrbitPosition = currentRawPosition;
             isHolding = true;
@@ -139,10 +114,7 @@ public class InputManager : MonoBehaviour
 
             if (!longPressAchieved)
             {
-                if (longPressTimer >= longPressThreshold)
-                {
-                    longPressAchieved = true;
-                }
+                if (longPressTimer >= longPressThreshold) longPressAchieved = true;
                 else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
                 {
                     isHolding = false;
@@ -156,24 +128,15 @@ public class InputManager : MonoBehaviour
                 {
                     isHolding = false;
                     isCutActive = true;
-                    if (cuttingPlaneManager != null)
-                    {
-                        cuttingPlaneManager.StartCutDrag(startPressPosition);
-                    }
+                    if (cuttingPlaneManager != null) cuttingPlaneManager.StartCutDrag(startPressPosition);
                 }
             }
         }
 
         if (phase == TouchPhase.Moved)
         {
-            if (isCutActive)
-            {
-                cuttingPlaneManager.UpdateCutDrag(currentRawPosition);
-            }
-            else if (isOrbiting)
-            {
-                HandleOrbitGestureInternal(currentRawPosition, phase);
-            }
+            if (isCutActive) cuttingPlaneManager.UpdateCutDrag(currentRawPosition);
+            else if (isOrbiting) HandleOrbitGestureInternal(currentRawPosition, phase);
         }
 
         if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
@@ -182,14 +145,9 @@ public class InputManager : MonoBehaviour
             {
                 cuttingPlaneManager.DestroyModelPart(potentialInteractionTarget);
             }
-            else if (isCutActive)
-            {
-                cuttingPlaneManager.EndCutGesture(currentRawPosition);
-            }
-            else if (isOrbiting)
-            {
-                HandleOrbitGestureInternal(currentRawPosition, phase);
-            }
+            else if (isCutActive) cuttingPlaneManager.EndCutGesture(currentRawPosition);
+            else if (isOrbiting) HandleOrbitGestureInternal(currentRawPosition, phase);
+
             ResetGestureStates();
         }
     }
@@ -211,65 +169,34 @@ public class InputManager : MonoBehaviour
             targetModelController.ProcessOrbit(orbitDelta);
             previousOrbitPosition = smoothedPosition;
         }
-        else if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
-        {
-            isOrbiting = false;
-        }
+        else if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled) isOrbiting = false;
     }
 
     private int GetTouchOrMouseCount()
     {
-        if (Input.touchCount > 0)
-        {
-            return Input.touchCount;
-        }
-        if (Input.mousePresent && Input.GetMouseButton(0))
-        {
-            return 1;
-        }
+        if (Input.touchCount > 0) return Input.touchCount;
+        if (Input.mousePresent && Input.GetMouseButton(0)) return 1;
         return 0;
     }
 
     private void ResetGestureStates()
     {
-        isPanning = false;
-        isOrbiting = false;
-        isZooming = false;
-        isHolding = false;
-        isCutActive = false;
-        longPressAchieved = false;
-        longPressTimer = 0f;
+        isPanning = false; isOrbiting = false; isZooming = false; isHolding = false;
+        isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
         potentialInteractionTarget = null;
 
-        orbitPositionHistory.Clear();
-        panCentroidHistory.Clear();
-        zoomDistanceHistory.Clear();
+        orbitPositionHistory.Clear(); panCentroidHistory.Clear(); zoomDistanceHistory.Clear();
 
-        if (targetModelController != null)
-        {
-            targetModelController.ResetOrbitLock();
-        }
+        if (targetModelController != null) targetModelController.ResetOrbitLock();
     }
 
     private void HandlePanGesture()
     {
-        if (targetModelController == null)
-        {
-            isPanning = false;
-            return;
-        }
-
+        if (targetModelController == null) { isPanning = false; return; }
         List<Vector2> activeTouches = GetActiveTouchPositions();
+        if (activeTouches.Count < minPanTouchCount) { isPanning = false; return; }
 
-        if (activeTouches.Count < minPanTouchCount)
-        {
-            isPanning = false;
-            return;
-        }
-
-        Vector2 rawCentroid = GetCentroid(activeTouches);
-        Vector2 smoothedCentroid = GetSmoothedVector2(rawCentroid, panCentroidHistory);
-
+        Vector2 smoothedCentroid = GetSmoothedVector2(GetCentroid(activeTouches), panCentroidHistory);
         if (!isPanning)
         {
             isPanning = true;
@@ -279,25 +206,18 @@ public class InputManager : MonoBehaviour
         else
         {
             Vector2 panDelta = previousPanCentroid - smoothedCentroid;
-            if (panDelta.sqrMagnitude > 0.001f)
-            {
-                targetModelController.ProcessPan(panDelta);
-            }
+            if (panDelta.sqrMagnitude > 0.001f) targetModelController.ProcessPan(panDelta);
             previousPanCentroid = smoothedCentroid;
         }
     }
 
     private void HandleZoomGesture()
     {
-        if (targetModelController == null || GetTouchOrMouseCount() != zoomTouchCount)
-        {
-            isZooming = false;
-            return;
-        }
+        if (targetModelController == null || GetTouchOrMouseCount() != zoomTouchCount) { isZooming = false; return; }
+
         Touch touchZero = Input.GetTouch(0);
         Touch touchOne = Input.GetTouch(1);
-        float rawPinchDistance = Vector2.Distance(touchZero.position, touchOne.position);
-        float smoothedPinchDistance = GetSmoothedFloat(rawPinchDistance, zoomDistanceHistory);
+        float smoothedPinchDistance = GetSmoothedFloat(Vector2.Distance(touchZero.position, touchOne.position), zoomDistanceHistory);
 
         if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began)
         {
@@ -319,10 +239,7 @@ public class InputManager : MonoBehaviour
         for (int i = 0; i < Input.touchCount; i++)
         {
             Touch touch = Input.GetTouch(i);
-            if (touch.phase != TouchPhase.Ended && touch.phase != TouchPhase.Canceled)
-            {
-                positions.Add(touch.position);
-            }
+            if (touch.phase != TouchPhase.Ended && touch.phase != TouchPhase.Canceled) positions.Add(touch.position);
         }
         return positions;
     }
