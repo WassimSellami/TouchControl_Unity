@@ -1,9 +1,6 @@
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Input;
-using Unity.VisualScripting.Dependencies.Sqlite;
 
 public class CuttingPlaneManager : MonoBehaviour
 {

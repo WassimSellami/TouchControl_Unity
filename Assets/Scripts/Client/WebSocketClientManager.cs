@@ -3,8 +3,6 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using WebSocketSharp;
-using static JsonUtilityHelper;
-
 public class WebSocketClientManager : MonoBehaviour
 {
     [SerializeField] private bool autoConnectMode = false;
