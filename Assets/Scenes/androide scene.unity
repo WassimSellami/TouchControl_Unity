@@ -1101,8 +1101,11 @@ MonoBehaviour:
   targetModelController: {fileID: 980018137}
   eventSystem: {fileID: 1616439627}
   cuttingPlaneManager: {fileID: 966730136}
+  swipeThresholdPixels: 100
+  pinchRegisterThreshold: 20
   longPressThreshold: 0.5
   maxHoldMovementPixels: 15
+  doubleTapTimeThreshold: 0.3
 --- !u!4 &504893849
 Transform:
   m_ObjectHideFlags: 0
@@ -1112,7 +1115,7 @@ Transform:
   m_GameObject: {fileID: 504893847}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.0027699172, y: 0.09182606, z: -13.407229}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1627,7 +1630,6 @@ MonoBehaviour:
   historyManager: {fileID: 1160161199}
   backButtonToMainMenu: {fileID: 1621385748}
   ResetViewButton: {fileID: 2139064991}
-  CyclePresetViewButton: {fileID: 302304324}
   ResetCropButton: {fileID: 1782640182}
   undoButton: {fileID: 2027068772}
   redoButton: {fileID: 2140618428}
@@ -1640,7 +1642,7 @@ Transform:
   m_GameObject: {fileID: 751785402}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.0027699172, y: 0.09182606, z: -13.407229}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2324,9 +2326,36 @@ MonoBehaviour:
   panSensitivity: 0.01
   orbitSensitivity: 0.1
   zoomSensitivity: 0.005
+  rollSensitivity: 0.5
   scaleMin: 0.1
   scaleMax: 10
   presetViewRotationStep: 45
+  presetViewAnimationDuration: 1
+  autoRotationSpeed: 40
+  presetViewEaseCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   mockVisualModel: {fileID: 1579986874}
   referenceCamera: {fileID: 961739752}
   axisOriginOffset: {x: 0, y: 0, z: 0}
@@ -2459,7 +2488,7 @@ Transform:
   m_GameObject: {fileID: 1160161198}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.0027699172, y: 0.09182606, z: -13.407229}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
