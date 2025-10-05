@@ -141,7 +141,7 @@ public class CuttingPlaneManager : MonoBehaviour
 
         if (partsToSlice.Count > 0)
         {
-            ICommand sliceCommand = new SliceCommand(partsToSlice, currentPlanePoint, currentPlaneNormal, this);
+            ICommand sliceCommand = new SliceCommand(partsToSlice, currentPlanePoint, currentPlaneNormal, this, webSocketClientManager);
             HistoryManager.Instance.ExecuteCommand(sliceCommand);
         }
     }
@@ -158,11 +158,13 @@ public class CuttingPlaneManager : MonoBehaviour
         activeModelParts.Clear();
 
         targetModel.SetActive(true);
+        targetModel.name = "RootModel";
         activeModelParts.Add(targetModel);
 
         if (targetModel.GetComponent<Renderer>() != null) modelCenterWorld = targetModel.GetComponent<Renderer>().bounds.center;
 
         if (HistoryManager.Instance != null) HistoryManager.Instance.ClearHistory();
+        if (webSocketClientManager != null) webSocketClientManager.SendResetAll();
 
         ResetClipping();
     }
@@ -170,7 +172,7 @@ public class CuttingPlaneManager : MonoBehaviour
     public void DestroyModelPart(GameObject partToDestroy)
     {
         if (partToDestroy == null) return;
-        ICommand destroyCommand = new DestroyCommand(partToDestroy, activeModelParts);
+        ICommand destroyCommand = new DestroyCommand(partToDestroy, activeModelParts, webSocketClientManager);
         HistoryManager.Instance.ExecuteCommand(destroyCommand);
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
@@ -217,6 +219,8 @@ public class CuttingPlaneManager : MonoBehaviour
         Vector3 lineVector = finalEndWorldPosRaw - startWorldPos;
         currentPlaneNormal = Vector3.Cross(lineVector, mainCamera.transform.forward).normalized;
     }
+
+
 
     private void ResetDrawing()
     {

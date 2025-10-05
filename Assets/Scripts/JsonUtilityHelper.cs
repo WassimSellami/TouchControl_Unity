@@ -75,3 +75,26 @@ public class LineData
     public Vector3 start;
     public Vector3 end;
 }
+
+[System.Serializable]
+public class SliceActionData
+{
+    public string actionID;
+    public Vector3 planePoint;
+    public Vector3 planeNormal;
+    public float separationFactor;
+    public string[] targetPartIDs;
+}
+
+[System.Serializable]
+public class DestroyActionData
+{
+    public string actionID;
+    public string targetPartID; // Corrected: Simplified to only what's needed
+}
+
+[System.Serializable]
+public class UndoRedoActionData
+{
+    public string actionID;
+}

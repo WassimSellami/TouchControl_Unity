@@ -12,6 +12,7 @@ public class HistoryManager : MonoBehaviour
 
     private Stack<ICommand> undoStack = new Stack<ICommand>();
     private Stack<ICommand> redoStack = new Stack<ICommand>();
+    private WebSocketClientManager webSocketClientManager;
 
     void Awake()
     {
@@ -27,6 +28,7 @@ public class HistoryManager : MonoBehaviour
 
     void Start()
     {
+        webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
         UpdateButtons();
     }
 
@@ -35,8 +37,6 @@ public class HistoryManager : MonoBehaviour
         command.Execute();
         undoStack.Push(command);
 
-        // A new action clears the redo history.
-        // We must permanently clean up any objects created by the old redo commands.
         foreach (var redoCommand in redoStack)
         {
             redoCommand.CleanUp();
@@ -53,6 +53,11 @@ public class HistoryManager : MonoBehaviour
             ICommand command = undoStack.Pop();
             command.Undo();
             redoStack.Push(command);
+
+            if (webSocketClientManager != null)
+            {
+                webSocketClientManager.SendUndoAction(command.ActionID);
+            }
             UpdateButtons();
         }
     }
@@ -64,6 +69,11 @@ public class HistoryManager : MonoBehaviour
             ICommand command = redoStack.Pop();
             command.Execute();
             undoStack.Push(command);
+
+            if (webSocketClientManager != null)
+            {
+                webSocketClientManager.SendRedoAction(command.ActionID);
+            }
             UpdateButtons();
         }
     }

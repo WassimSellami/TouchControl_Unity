@@ -1,15 +1,27 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 public class DestroyCommand : ICommand
 {
+    public string ActionID { get; private set; }
     private GameObject objectToDestroy;
     private List<GameObject> activePartsList;
+    private WebSocketClientManager webSocketClientManager;
+    private string targetPartID;
 
-    public DestroyCommand(GameObject target, List<GameObject> activeParts)
+    public DestroyCommand(GameObject target, List<GameObject> activeParts, WebSocketClientManager wsManager)
     {
+        ActionID = Guid.NewGuid().ToString();
         objectToDestroy = target;
         activePartsList = activeParts;
+        webSocketClientManager = wsManager;
+
+        // Simplified and made robust: Always use the object's name as its unique ID.
+        if (target != null)
+        {
+            this.targetPartID = target.name;
+        }
     }
 
     public void Execute()
@@ -18,6 +30,16 @@ public class DestroyCommand : ICommand
         {
             objectToDestroy.SetActive(false);
             activePartsList.Remove(objectToDestroy);
+
+            if (webSocketClientManager != null && !string.IsNullOrEmpty(targetPartID))
+            {
+                var destroyData = new DestroyActionData
+                {
+                    actionID = this.ActionID,
+                    targetPartID = this.targetPartID
+                };
+                webSocketClientManager.SendExecuteDestroy(destroyData);
+            }
         }
     }
 
@@ -33,6 +55,5 @@ public class DestroyCommand : ICommand
         }
     }
 
-    // Destroy commands don't create new objects, so cleanup is not needed.
     public void CleanUp() { }
 }

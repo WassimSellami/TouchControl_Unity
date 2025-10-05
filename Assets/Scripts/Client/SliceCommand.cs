@@ -2,29 +2,34 @@ using UnityEngine;
 using EzySlice;
 using System.Collections;
 using System.Collections.Generic;
+using System;
+using System.Linq;
 
 public class SliceCommand : ICommand
 {
+    public string ActionID { get; private set; }
     private List<GameObject> originals;
     private List<GameObject> newHulls = new List<GameObject>();
     private Vector3 planePoint;
     private Vector3 planeNormal;
     private CuttingPlaneManager sliceManager;
+    private WebSocketClientManager webSocketClientManager;
     private bool hasBeenExecuted = false;
 
-    public SliceCommand(List<GameObject> objectsToSlice, Vector3 point, Vector3 normal, CuttingPlaneManager manager)
+    public SliceCommand(List<GameObject> objectsToSlice, Vector3 point, Vector3 normal, CuttingPlaneManager manager, WebSocketClientManager wsManager)
     {
+        ActionID = Guid.NewGuid().ToString();
         originals = objectsToSlice;
         planePoint = point;
         planeNormal = normal;
         sliceManager = manager;
+        webSocketClientManager = wsManager;
     }
 
     public void Execute()
     {
         if (hasBeenExecuted)
         {
-            // This is a Redo: reactivate existing hulls
             foreach (var hull in newHulls)
             {
                 if (hull != null)
@@ -39,7 +44,7 @@ public class SliceCommand : ICommand
         }
         else
         {
-            // This is the first execution: create new hulls
+            List<string> originalPartIDs = originals.Select(o => o.name).ToList();
             foreach (var originalPart in originals)
             {
                 if (originalPart == null) continue;
@@ -52,6 +57,18 @@ public class SliceCommand : ICommand
 
                     if (upperHull != null && lowerHull != null)
                     {
+                        // Corrected: Naming convention now matches the server's convention
+                        upperHull.name = originalPart.name + "_U";
+                        lowerHull.name = originalPart.name + "_L";
+
+                        var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
+                        upperInfo.sourceActionID = ActionID;
+                        upperInfo.side = "Upper";
+
+                        var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
+                        lowerInfo.sourceActionID = ActionID;
+                        lowerInfo.side = "Lower";
+
                         SetupHull(upperHull, originalPart);
                         SetupHull(lowerHull, originalPart);
 
@@ -64,6 +81,20 @@ public class SliceCommand : ICommand
                     }
                 }
             }
+
+            if (webSocketClientManager != null && originalPartIDs.Count > 0)
+            {
+                var sliceData = new SliceActionData
+                {
+                    actionID = this.ActionID,
+                    planePoint = this.planePoint,
+                    planeNormal = this.planeNormal,
+                    separationFactor = sliceManager.separationFactor,
+                    targetPartIDs = originalPartIDs.ToArray()
+                };
+                webSocketClientManager.SendExecuteSlice(sliceData);
+            }
+
             hasBeenExecuted = true;
         }
 
@@ -79,7 +110,6 @@ public class SliceCommand : ICommand
 
     public void Undo()
     {
-        // Deactivate new hulls instead of destroying them
         foreach (var hull in newHulls)
         {
             if (hull != null)
@@ -89,7 +119,6 @@ public class SliceCommand : ICommand
             }
         }
 
-        // Reactivate the original pieces
         foreach (var original in originals)
         {
             if (original != null)
@@ -103,14 +132,13 @@ public class SliceCommand : ICommand
         }
     }
 
-    // This is called only when the redo history is cleared
     public void CleanUp()
     {
         foreach (var hull in newHulls)
         {
             if (hull != null)
             {
-                Object.Destroy(hull);
+                UnityEngine.Object.Destroy(hull);
             }
         }
     }

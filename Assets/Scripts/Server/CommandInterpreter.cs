@@ -24,35 +24,36 @@ public class CommandInterpreter : MonoBehaviour
             case "UPDATE_MODEL_TRANSFORM":
                 ProcessUpdateModelTransformCommand(args);
                 break;
-
             case "UPDATE_CAMERA_TRANSFORM":
                 ProcessUpdateCameraTransformCommand(args);
                 break;
-
             case "LOAD_MODEL":
                 ProcessLoadModelCommand(args);
                 break;
-
             case "UPDATE_VISUAL_CROP_PLANE":
                 ProcessVisualCropPlaneCommand(args);
                 break;
-
-            case "EXECUTE_ACTUAL_CROP":
-                ProcessActualCropCommand(args);
+            case "EXECUTE_SLICE_ACTION":
+                ProcessExecuteSliceActionCommand(args);
                 break;
-
-            case "RESET_CROP":
-                ProcessResetCropCommand();
+            case "EXECUTE_DESTROY_ACTION":
+                ProcessExecuteDestroyActionCommand(args);
                 break;
-
+            case "UNDO_ACTION":
+                ProcessUndoActionCommand(args);
+                break;
+            case "REDO_ACTION":
+                ProcessRedoActionCommand(args);
+                break;
+            case "RESET_ALL":
+                ProcessResetAllCommand();
+                break;
             case "UPDATE_CUT_LINE":
                 ProcessUpdateCutLineCommand(args);
                 break;
-
             case "HIDE_CUT_LINE":
                 ProcessHideCutLineCommand();
                 break;
-
             default:
                 Debug.LogWarning($"[CommandInterpreter] Unknown command received: {commandData}");
                 break;
@@ -90,16 +91,10 @@ public class CommandInterpreter : MonoBehaviour
     private void ProcessLoadModelCommand(string args)
     {
         if (ModelController == null || string.IsNullOrEmpty(args)) return;
-
         ModelController.LoadNewModel(args);
-
         if (WebSocketServerManager != null)
         {
             WebSocketServerManager.SendModelSizeUpdate(ModelController.CurrentModelBoundsSize);
-        }
-        else
-        {
-            Debug.LogWarning("[CommandInterpreter] WebSocketServerManager not assigned, cannot send model size update.");
         }
     }
 
@@ -117,24 +112,65 @@ public class CommandInterpreter : MonoBehaviour
         }
     }
 
-    private void ProcessActualCropCommand(string args)
+    private void ProcessExecuteSliceActionCommand(string args)
     {
         if (ModelController == null || string.IsNullOrEmpty(args)) return;
         try
         {
-            ActualCropPlaneData data = JsonUtility.FromJson<ActualCropPlaneData>(args);
-            ModelController.PerformActualCrop(data.position, data.normal);
+            SliceActionData data = JsonUtility.FromJson<SliceActionData>(args);
+            ModelController.ExecuteSlice(data);
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[CommandInterpreter] Error parsing ActualCropPlaneData: {ex.Message} | Args: {args}");
+            Debug.LogError($"[CommandInterpreter] Error parsing SliceActionData: {ex.Message} | Args: {args}");
         }
     }
 
-    private void ProcessResetCropCommand()
+    private void ProcessExecuteDestroyActionCommand(string args)
     {
-        if (ModelController == null) return;
-        ModelController.ResetCrop();
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            DestroyActionData data = JsonUtility.FromJson<DestroyActionData>(args);
+            ModelController.ExecuteDestroy(data);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing DestroyActionData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessUndoActionCommand(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            UndoRedoActionData data = JsonUtility.FromJson<UndoRedoActionData>(args);
+            ModelController.UndoAction(data.actionID);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing UndoRedoActionData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessRedoActionCommand(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            UndoRedoActionData data = JsonUtility.FromJson<UndoRedoActionData>(args);
+            ModelController.RedoAction(data.actionID);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing UndoRedoActionData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessResetAllCommand()
+    {
+        if (ModelController != null) ModelController.ResetCrop();
     }
 
     private void ProcessUpdateCutLineCommand(string args)

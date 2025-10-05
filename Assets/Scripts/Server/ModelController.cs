@@ -1,9 +1,21 @@
 using UnityEngine;
 using System.Collections.Generic;
 using EzySlice;
+using System.Linq;
+using System.Collections;
 
 public class ModelController : MonoBehaviour
 {
+    private enum ActionType { Slice, Destroy }
+    private class ActionRecord
+    {
+        public ActionType Type;
+        public string ActionID;
+        public List<GameObject> Originals;
+        public List<GameObject> NewHulls;
+        public GameObject DestroyedPart;
+    }
+
     [Header("Model Prefabs")]
     [SerializeField] private GameObject modelPrefab1;
     [SerializeField] private GameObject modelPrefab2;
@@ -22,45 +34,57 @@ public class ModelController : MonoBehaviour
     [SerializeField] private float serverArrowheadRadiusFactor = 2.5f;
     [SerializeField] private float serverArrowheadHeightFactor = 3f;
 
-    private GameObject currentInstantiatedModel;
+    private GameObject worldContainer;
+    private GameObject modelContainer;
+    private GameObject axesContainer; // Dedicated container for axes
+    private Transform modelReferencePoint; // The 'ref' point to track
+    private GameObject rootModel;
     private List<GameObject> currentModelAxisVisuals = new List<GameObject>();
-
-    private Mesh originalMesh;
-    private Material[] originalMaterials;
-
     private GameObject activePlaneVisualizer;
     private LineRenderer activeLineRenderer;
+
+    private Dictionary<string, ActionRecord> history = new Dictionary<string, ActionRecord>();
+    private Dictionary<string, GameObject> allParts = new Dictionary<string, GameObject>();
 
     public string CurrentModelID { get; private set; } = null;
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
 
+    void LateUpdate()
+    {
+        // This ensures the axes always follow the reference point
+        if (axesContainer != null && modelReferencePoint != null)
+        {
+            axesContainer.transform.position = modelReferencePoint.position;
+            axesContainer.transform.rotation = modelReferencePoint.rotation;
+        }
+    }
+
     public void ApplyWorldTransform(Vector3 localPosition, Quaternion localRotation, Vector3 localScale)
     {
-        if (currentInstantiatedModel != null)
+        if (worldContainer != null)
         {
-            currentInstantiatedModel.transform.localPosition = localPosition;
-            currentInstantiatedModel.transform.localRotation = localRotation;
-            currentInstantiatedModel.transform.localScale = localScale;
+            worldContainer.transform.localPosition = localPosition;
+            worldContainer.transform.localRotation = localRotation;
+            worldContainer.transform.localScale = localScale;
         }
     }
 
     public void LoadNewModel(string modelId)
     {
-        if (modelPrefab1 == null || modelPrefab2 == null)
-        {
-            Debug.LogError("[ModelController] Model prefabs not set.");
-            return;
-        }
+        if (worldContainer != null) Destroy(worldContainer);
+        allParts.Clear();
+        history.Clear();
+        currentModelAxisVisuals.Clear();
+        modelReferencePoint = null;
 
-        if (currentInstantiatedModel != null)
-        {
-            ClearCurrentModelAxisVisuals();
-            Destroy(currentInstantiatedModel);
-            currentInstantiatedModel = null;
-        }
+        worldContainer = new GameObject("WorldContainer");
+        worldContainer.transform.SetParent(this.transform, false);
 
-        if (activePlaneVisualizer != null) Destroy(activePlaneVisualizer);
-        if (activeLineRenderer != null) Destroy(activeLineRenderer.gameObject);
+        modelContainer = new GameObject("ModelContainer");
+        modelContainer.transform.SetParent(worldContainer.transform, false);
+
+        axesContainer = new GameObject("AxesContainer");
+        axesContainer.transform.SetParent(worldContainer.transform, false);
 
         GameObject prefabToLoad = null;
         modelId = modelId.ToUpperInvariant();
@@ -68,85 +92,160 @@ public class ModelController : MonoBehaviour
 
         if (modelId == "1") prefabToLoad = modelPrefab1;
         else if (modelId == "2") prefabToLoad = modelPrefab2;
-        else { Debug.LogWarning($"[ModelController] Unknown model ID: {modelId}"); CurrentModelID = null; return; }
+        else { CurrentModelID = null; return; }
 
         if (prefabToLoad != null)
         {
-            currentInstantiatedModel = Instantiate(prefabToLoad, this.transform);
-            currentInstantiatedModel.transform.localPosition = Vector3.zero;
-            currentInstantiatedModel.transform.localRotation = Quaternion.identity;
-            currentInstantiatedModel.transform.localScale = Vector3.one;
-            CurrentModelBoundsSize = CalculateModelBoundsSize(currentInstantiatedModel);
+            rootModel = Instantiate(prefabToLoad, modelContainer.transform);
+            rootModel.name = "RootModel";
+            allParts.Add(rootModel.name, rootModel);
+            CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
 
-            MeshFilter modelMeshFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
-            if (modelMeshFilter != null) originalMesh = modelMeshFilter.mesh;
-            Renderer modelRenderer = currentInstantiatedModel.GetComponent<Renderer>();
-            if (modelRenderer != null) originalMaterials = modelRenderer.materials;
+            // Find the reference point for the axes
+            modelReferencePoint = rootModel.transform.Find("ref");
+            if (modelReferencePoint == null)
+            {
+                modelReferencePoint = rootModel.transform; // Fallback to the model's root
+            }
 
             if (planeVisualizerPrefab != null)
             {
-                activePlaneVisualizer = Instantiate(planeVisualizerPrefab, currentInstantiatedModel.transform, false);
+                activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
                 activePlaneVisualizer.SetActive(false);
             }
             if (lineRendererPrefab != null)
             {
-                activeLineRenderer = Instantiate(lineRendererPrefab, currentInstantiatedModel.transform, false).GetComponent<LineRenderer>();
+                activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
                 activeLineRenderer.enabled = false;
             }
 
-            Transform refChildServer = currentInstantiatedModel.transform.Find("ref");
-            if (refChildServer == null) CreateServerAxisVisuals(currentInstantiatedModel.transform);
-            else CreateServerAxisVisuals(refChildServer);
+            CreateServerAxisVisuals(axesContainer.transform);
         }
-        else { Debug.LogError($"[ModelController] Failed to find prefab for model ID: {modelId}"); CurrentModelID = null; }
+        else { CurrentModelID = null; }
+    }
+
+    public void ExecuteSlice(SliceActionData data)
+    {
+        var record = new ActionRecord
+        {
+            Type = ActionType.Slice,
+            ActionID = data.actionID,
+            Originals = new List<GameObject>(),
+            NewHulls = new List<GameObject>()
+        };
+
+        foreach (string partID in data.targetPartIDs)
+        {
+            if (allParts.TryGetValue(partID, out GameObject originalPart) && originalPart.activeInHierarchy)
+            {
+                SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
+                if (sliceResult != null)
+                {
+                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
+                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
+
+                    if (upperHull != null && lowerHull != null)
+                    {
+                        upperHull.name = partID + "_U";
+                        lowerHull.name = partID + "_L";
+
+                        allParts.Add(upperHull.name, upperHull);
+                        allParts.Add(lowerHull.name, lowerHull);
+
+                        SetupHull(upperHull, originalPart);
+                        SetupHull(lowerHull, originalPart);
+
+                        StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
+
+                        record.Originals.Add(originalPart);
+                        record.NewHulls.Add(upperHull);
+                        record.NewHulls.Add(lowerHull);
+
+                        originalPart.SetActive(false);
+                    }
+                }
+            }
+        }
+        if (record.Originals.Count > 0)
+        {
+            history[data.actionID] = record;
+        }
+    }
+
+    public void ExecuteDestroy(DestroyActionData data)
+    {
+        if (allParts.TryGetValue(data.targetPartID, out GameObject partToDestroy))
+        {
+            partToDestroy.SetActive(false);
+            var record = new ActionRecord
+            {
+                Type = ActionType.Destroy,
+                ActionID = data.actionID,
+                DestroyedPart = partToDestroy
+            };
+            history[data.actionID] = record;
+        }
+    }
+
+    public void UndoAction(string actionID)
+    {
+        if (history.TryGetValue(actionID, out ActionRecord record))
+        {
+            if (record.Type == ActionType.Slice)
+            {
+                foreach (var hull in record.NewHulls) hull.SetActive(false);
+                foreach (var part in record.Originals) part.SetActive(true);
+            }
+            else if (record.Type == ActionType.Destroy)
+            {
+                if (record.DestroyedPart != null) record.DestroyedPart.SetActive(true);
+            }
+        }
+    }
+
+    public void RedoAction(string actionID)
+    {
+        if (history.TryGetValue(actionID, out ActionRecord record))
+        {
+            if (record.Type == ActionType.Slice)
+            {
+                foreach (var hull in record.NewHulls) hull.SetActive(true);
+                foreach (var part in record.Originals) part.SetActive(false);
+            }
+            else if (record.Type == ActionType.Destroy)
+            {
+                if (record.DestroyedPart != null) record.DestroyedPart.SetActive(false);
+            }
+        }
     }
 
     public void UpdateVisualCropPlane(Vector3 position, Vector3 normal, float scale)
     {
         if (activePlaneVisualizer == null) return;
-
         activePlaneVisualizer.transform.position = position;
         activePlaneVisualizer.transform.rotation = Quaternion.LookRotation(normal);
         activePlaneVisualizer.transform.localScale = Vector3.one * scale;
         activePlaneVisualizer.SetActive(showPlaneVisualizer);
     }
 
-    public void PerformActualCrop(Vector3 position, Vector3 normal)
-    {
-        if (currentInstantiatedModel == null || crossSectionMaterial == null) return;
-
-        SlicedHull sliceResult = currentInstantiatedModel.Slice(position, normal);
-        if (sliceResult != null)
-        {
-            GameObject upperHull = sliceResult.CreateUpperHull(currentInstantiatedModel, crossSectionMaterial);
-            if (upperHull != null)
-            {
-                MeshFilter targetFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
-                MeshRenderer targetRenderer = currentInstantiatedModel.GetComponent<MeshRenderer>();
-
-                Mesh newMesh = upperHull.GetComponent<MeshFilter>().mesh;
-                Material[] newMaterials = upperHull.GetComponent<MeshRenderer>().materials;
-
-                Destroy(upperHull);
-                if (targetFilter.mesh != originalMesh) Destroy(targetFilter.mesh);
-
-                targetFilter.mesh = newMesh;
-                targetRenderer.materials = newMaterials;
-            }
-        }
-    }
-
     public void ResetCrop()
     {
-        if (currentInstantiatedModel == null || originalMesh == null) return;
+        foreach (var part in allParts.Values)
+        {
+            if (part != null && part != rootModel)
+            {
+                Destroy(part);
+            }
+        }
 
-        MeshFilter targetFilter = currentInstantiatedModel.GetComponent<MeshFilter>();
-        MeshRenderer targetRenderer = currentInstantiatedModel.GetComponent<MeshRenderer>();
+        allParts.Clear();
+        history.Clear();
 
-        if (targetFilter.mesh != originalMesh) Destroy(targetFilter.mesh);
-
-        targetFilter.mesh = originalMesh;
-        targetRenderer.materials = originalMaterials;
+        if (rootModel != null)
+        {
+            rootModel.SetActive(true);
+            allParts.Add(rootModel.name, rootModel);
+        }
 
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
@@ -167,6 +266,41 @@ public class ModelController : MonoBehaviour
         activeLineRenderer.positionCount = 0;
     }
 
+    private void SetupHull(GameObject hull, GameObject original)
+    {
+        hull.transform.SetParent(original.transform.parent, false);
+        hull.AddComponent<MeshCollider>().convex = true;
+    }
+
+    private IEnumerator AnimateSeparation(GameObject upperHull, GameObject lowerHull, GameObject original, Vector3 planeNormal, float separationFactor)
+    {
+        float duration = 0.3f;
+        Bounds originalBounds = original.GetComponent<Renderer>().bounds;
+        float separationDistance = originalBounds.size.magnitude * separationFactor;
+        Vector3 separationVector = planeNormal * (separationDistance * 0.5f);
+
+        Vector3 upperStartPos = upperHull.transform.position;
+        Vector3 lowerStartPos = lowerHull.transform.position;
+        Vector3 upperEndPos = upperStartPos + separationVector;
+        Vector3 lowerEndPos = lowerStartPos - separationVector;
+
+        float elapsedTime = 0f;
+        while (elapsedTime < duration)
+        {
+            if (upperHull == null || lowerHull == null) yield break;
+
+            float t = Mathf.SmoothStep(0.0f, 1.0f, elapsedTime / duration);
+            upperHull.transform.position = Vector3.Lerp(upperStartPos, upperEndPos, t);
+            lowerHull.transform.position = Vector3.Lerp(lowerStartPos, lowerEndPos, t);
+
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        if (upperHull != null) upperHull.transform.position = upperEndPos;
+        if (lowerHull != null) lowerHull.transform.position = lowerEndPos;
+    }
+
     private Vector3 CalculateModelBoundsSize(GameObject model)
     {
         if (model == null) return Vector3.one;
@@ -183,13 +317,13 @@ public class ModelController : MonoBehaviour
         currentModelAxisVisuals.Clear();
     }
 
-    void CreateServerAxisVisuals(Transform referencePointTransform)
+    void CreateServerAxisVisuals(Transform axesParentTransform)
     {
-        if (!showServerAxes || referencePointTransform == null) return;
+        if (!showServerAxes || axesParentTransform == null) return;
         ClearCurrentModelAxisVisuals();
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.right, serverAxisLength, serverAxisThickness, Color.red, "X_Axis_Server");
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.up, serverAxisLength, serverAxisThickness, Color.green, "Y_Axis_Server");
-        CreateSingleServerAxisVisual(referencePointTransform, Vector3.forward, serverAxisLength, serverAxisThickness, Color.blue, "Z_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.right, serverAxisLength, serverAxisThickness, Color.red, "X_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.up, serverAxisLength, serverAxisThickness, Color.green, "Y_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.forward, serverAxisLength, serverAxisThickness, Color.blue, "Z_Axis_Server");
     }
 
     void CreateSingleServerAxisVisual(Transform parentRef, Vector3 direction, float length, float thickness, Color color, string baseName)
@@ -198,7 +332,7 @@ public class ModelController : MonoBehaviour
         float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentRef);
+        shaft.transform.SetParent(parentRef, false); // Set parent without affecting world position
         Destroy(shaft.GetComponent<CapsuleCollider>());
         shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
         shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
@@ -208,7 +342,7 @@ public class ModelController : MonoBehaviour
 
         GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentRef);
+        arrowheadCap.transform.SetParent(parentRef, false); // Set parent without affecting world position
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
         float capRadius = thickness * serverArrowheadRadiusFactor;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);

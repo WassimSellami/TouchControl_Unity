@@ -173,18 +173,40 @@ public class WebSocketClientManager : MonoBehaviour
         SendMessageToServer($"UPDATE_VISUAL_CROP_PLANE:{jsonData}");
     }
 
-    public void SendActualCropPlane(Vector3 position, Vector3 normal)
+    public void SendExecuteSlice(SliceActionData data)
     {
         if (!IsConnected) return;
-        ActualCropPlaneData data = new ActualCropPlaneData { position = position, normal = normal };
         string jsonData = JsonUtility.ToJson(data);
-        SendMessageToServer($"EXECUTE_ACTUAL_CROP:{jsonData}");
+        SendMessageToServer($"EXECUTE_SLICE_ACTION:{jsonData}");
     }
 
-    public void SendResetCrop()
+    public void SendExecuteDestroy(DestroyActionData data)
     {
         if (!IsConnected) return;
-        SendMessageToServer("RESET_CROP");
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"EXECUTE_DESTROY_ACTION:{jsonData}");
+    }
+
+    public void SendUndoAction(string actionID)
+    {
+        if (!IsConnected) return;
+        var data = new UndoRedoActionData { actionID = actionID };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"UNDO_ACTION:{jsonData}");
+    }
+
+    public void SendRedoAction(string actionID)
+    {
+        if (!IsConnected) return;
+        var data = new UndoRedoActionData { actionID = actionID };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"REDO_ACTION:{jsonData}");
+    }
+
+    public void SendResetAll()
+    {
+        if (!IsConnected) return;
+        SendMessageToServer("RESET_ALL");
     }
 
     public void SendLineData(Vector3 start, Vector3 end)
