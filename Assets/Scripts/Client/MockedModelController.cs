@@ -7,6 +7,7 @@ public class MockedModelController : MonoBehaviour
     [SerializeField] private float panSensitivity = 0.01f;
     [SerializeField] private float orbitSensitivity = 0.5f;
     [SerializeField] private float zoomSensitivity = 0.1f;
+    [SerializeField] private float rollSensitivity = 0.5f;
     [SerializeField] private float scaleMin = 0.1f;
     [SerializeField] private float scaleMax = 10.0f;
     [SerializeField] private float presetViewRotationStep = 45f;
@@ -135,6 +136,13 @@ public class MockedModelController : MonoBehaviour
         newScale.y = Mathf.Clamp(newScale.y, scaleMin, scaleMax);
         newScale.z = Mathf.Clamp(newScale.z, scaleMin, scaleMax);
         transform.localScale = newScale;
+    }
+
+    public void ProcessRoll(float angleDelta)
+    {
+        if (referenceCamera == null) return;
+        Vector3 rotationAxis = referenceCamera.transform.forward;
+        transform.Rotate(rotationAxis, angleDelta * rollSensitivity, Space.World);
     }
 
     public void ResetState()

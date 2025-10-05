@@ -16,6 +16,7 @@ public class InputManager : MonoBehaviour
     private int orbitTouchCount = 1;
     private int zoomTouchCount = 2;
     private int minPanTouchCount = 3;
+    private int rotateTouchCount = 5;
     private int smoothSamplesCount = 5;
 
     [Header("Cut Gesture")]
@@ -32,13 +33,16 @@ public class InputManager : MonoBehaviour
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
     private float previousZoomDistance;
+    private float previousRotationAngle;
     private bool isPanning = false;
     private bool isOrbiting = false;
     private bool isZooming = false;
+    private bool isRotating = false;
 
     private Queue<Vector2> orbitPositionHistory = new Queue<Vector2>();
     private Queue<Vector2> panCentroidHistory = new Queue<Vector2>();
     private Queue<float> zoomDistanceHistory = new Queue<float>();
+    private Queue<float> rotationAngleHistory = new Queue<float>();
 
     void Start()
     {
@@ -58,14 +62,16 @@ public class InputManager : MonoBehaviour
             return;
         }
 
-        if (currentTouchCount == zoomTouchCount) HandleZoomGesture();
-        else if (!isZooming && currentTouchCount >= minPanTouchCount) HandlePanGesture();
+        if (currentTouchCount == rotateTouchCount) HandleRotateGesture();
+        else if (currentTouchCount == zoomTouchCount) HandleZoomGesture();
+        else if (!isZooming && !isRotating && currentTouchCount >= minPanTouchCount) HandlePanGesture();
         else if (currentTouchCount == orbitTouchCount) HandleSingleTouchInput();
         else
         {
-            if (isPanning || isOrbiting || isZooming || isCutActive)
+            if (isPanning || isOrbiting || isZooming || isCutActive || isRotating)
             {
-                if ((isZooming && currentTouchCount != zoomTouchCount) ||
+                if ((isRotating && currentTouchCount != rotateTouchCount) ||
+                    (isZooming && currentTouchCount != zoomTouchCount) ||
                     (isPanning && currentTouchCount < minPanTouchCount) ||
                     ((isOrbiting || isCutActive) && currentTouchCount != orbitTouchCount))
                 {
@@ -183,9 +189,11 @@ public class InputManager : MonoBehaviour
     {
         isPanning = false; isOrbiting = false; isZooming = false; isHolding = false;
         isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
+        isRotating = false;
         potentialInteractionTarget = null;
 
         orbitPositionHistory.Clear(); panCentroidHistory.Clear(); zoomDistanceHistory.Clear();
+        rotationAngleHistory.Clear();
 
         if (targetModelController != null) targetModelController.ResetOrbitLock();
     }
@@ -230,6 +238,45 @@ public class InputManager : MonoBehaviour
             float deltaDistance = smoothedPinchDistance - previousZoomDistance;
             targetModelController.ProcessZoom(deltaDistance);
             previousZoomDistance = smoothedPinchDistance;
+        }
+    }
+
+    private void HandleRotateGesture()
+    {
+        if (targetModelController == null || GetTouchOrMouseCount() != rotateTouchCount) { isRotating = false; return; }
+
+        List<Vector2> activeTouches = GetActiveTouchPositions();
+        if (activeTouches.Count < rotateTouchCount) { isRotating = false; return; }
+
+        Vector2 centroid = GetCentroid(activeTouches);
+        Vector2 referenceVector = activeTouches[0] - centroid;
+        float currentAngle = Mathf.Atan2(referenceVector.y, referenceVector.x) * Mathf.Rad2Deg;
+        float smoothedAngle = GetSmoothedFloat(currentAngle, rotationAngleHistory);
+
+        bool isNewGesture = false;
+        for (int i = 0; i < rotateTouchCount; i++)
+        {
+            if (Input.GetTouch(i).phase == TouchPhase.Began)
+            {
+                isNewGesture = true;
+                break;
+            }
+        }
+
+        if (!isRotating || isNewGesture)
+        {
+            isRotating = true;
+            rotationAngleHistory.Clear();
+            previousRotationAngle = smoothedAngle;
+        }
+        else
+        {
+            float angleDelta = Mathf.DeltaAngle(previousRotationAngle, smoothedAngle);
+            if (Mathf.Abs(angleDelta) > 0.01f)
+            {
+                targetModelController.ProcessRoll(angleDelta);
+            }
+            previousRotationAngle = smoothedAngle;
         }
     }
 
