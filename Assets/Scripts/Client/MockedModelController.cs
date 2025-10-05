@@ -13,6 +13,8 @@ public class MockedModelController : MonoBehaviour
     [SerializeField] private float scaleMax = 10.0f;
     [SerializeField] private float presetViewRotationStep = 45f;
     [SerializeField] private float presetViewAnimationDuration = 0.4f;
+    [SerializeField] private float autoRotationSpeed = 20f;
+    [SerializeField] private AnimationCurve presetViewEaseCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
     [Header("References")]
     [SerializeField] private GameObject mockVisualModel;
@@ -46,6 +48,10 @@ public class MockedModelController : MonoBehaviour
     private OrbitAxis lockedOrbitAxis = OrbitAxis.None;
 
     private bool isAnimatingPresetView = false;
+    private bool isAutoRotating = false;
+    private float autoRotationDirection = 0f;
+
+    public bool IsAutoRotating => isAutoRotating;
 
     void Awake()
     {
@@ -71,6 +77,15 @@ public class MockedModelController : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        if (isAutoRotating)
+        {
+            float rotationAmount = autoRotationSpeed * autoRotationDirection * Time.deltaTime;
+            transform.Rotate(Vector3.up, rotationAmount, Space.World);
+        }
+    }
+
     void LateUpdate()
     {
         if (axesContainer != null && modelReferencePoint != null)
@@ -78,6 +93,18 @@ public class MockedModelController : MonoBehaviour
             axesContainer.transform.position = modelReferencePoint.position;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
+    }
+
+    public void StartContinuousRotation(float direction)
+    {
+        isAutoRotating = true;
+        autoRotationDirection = direction;
+    }
+
+    public void StopContinuousRotation()
+    {
+        isAutoRotating = false;
+        autoRotationDirection = 0f;
     }
 
     public void SetModelVisibility(bool isVisible)
@@ -90,29 +117,22 @@ public class MockedModelController : MonoBehaviour
 
     public void ProcessOrbit(Vector2 screenDelta)
     {
+        StopContinuousRotation();
         if (referenceCamera == null || isAnimatingPresetView) return;
 
         if (lockedOrbitAxis == OrbitAxis.None && screenDelta.sqrMagnitude > 0.01f)
         {
-            if (Mathf.Abs(screenDelta.x) > Mathf.Abs(screenDelta.y))
-            {
-                lockedOrbitAxis = OrbitAxis.Horizontal;
-            }
-            else
-            {
-                lockedOrbitAxis = OrbitAxis.Vertical;
-            }
+            if (Mathf.Abs(screenDelta.x) > Mathf.Abs(screenDelta.y)) lockedOrbitAxis = OrbitAxis.Horizontal;
+            else lockedOrbitAxis = OrbitAxis.Vertical;
         }
 
         switch (lockedOrbitAxis)
         {
             case OrbitAxis.Horizontal:
-                float horizontalInput = -screenDelta.x * orbitSensitivity;
-                transform.Rotate(Vector3.up, horizontalInput, Space.World);
+                transform.Rotate(Vector3.up, -screenDelta.x * orbitSensitivity, Space.World);
                 break;
             case OrbitAxis.Vertical:
-                float verticalInput = screenDelta.y * orbitSensitivity;
-                transform.Rotate(referenceCamera.transform.right, verticalInput, Space.World);
+                transform.Rotate(referenceCamera.transform.right, screenDelta.y * orbitSensitivity, Space.World);
                 break;
         }
     }
@@ -124,6 +144,7 @@ public class MockedModelController : MonoBehaviour
 
     public void ProcessPan(Vector2 screenDelta)
     {
+        StopContinuousRotation();
         if (referenceCamera == null || isAnimatingPresetView) return;
         Vector3 right = referenceCamera.transform.right * -screenDelta.x;
         Vector3 up = referenceCamera.transform.up * -screenDelta.y;
@@ -133,6 +154,7 @@ public class MockedModelController : MonoBehaviour
 
     public void ProcessZoom(float zoomAmount)
     {
+        StopContinuousRotation();
         if (isAnimatingPresetView || zoomAmount == 0) return;
         float scaleChange = 1.0f + (zoomAmount * zoomSensitivity);
         Vector3 newScale = transform.localScale * scaleChange;
@@ -144,6 +166,7 @@ public class MockedModelController : MonoBehaviour
 
     public void ProcessRoll(float angleDelta)
     {
+        StopContinuousRotation();
         if (referenceCamera == null || isAnimatingPresetView) return;
         Vector3 rotationAxis = referenceCamera.transform.forward;
         transform.Rotate(rotationAxis, angleDelta * rollSensitivity, Space.World);
@@ -151,6 +174,7 @@ public class MockedModelController : MonoBehaviour
 
     public void ResetState()
     {
+        StopContinuousRotation();
         if (isAnimatingPresetView) StopAllCoroutines();
         isAnimatingPresetView = false;
 
@@ -169,6 +193,7 @@ public class MockedModelController : MonoBehaviour
 
     public void TriggerPresetViewRotation(float direction)
     {
+        StopContinuousRotation();
         if (isAnimatingPresetView) return;
         StartCoroutine(AnimatePresetViewRotation(direction));
     }
@@ -186,7 +211,8 @@ public class MockedModelController : MonoBehaviour
         {
             elapsedTime += Time.deltaTime;
             float progress = Mathf.Clamp01(elapsedTime / presetViewAnimationDuration);
-            transform.rotation = Quaternion.Slerp(startRotation, targetRotation, progress);
+            float easedProgress = presetViewEaseCurve.Evaluate(progress);
+            transform.rotation = Quaternion.Slerp(startRotation, targetRotation, easedProgress);
             yield return null;
         }
 
@@ -222,10 +248,7 @@ public class MockedModelController : MonoBehaviour
 
     void CreateAxisVisuals()
     {
-        foreach (Transform child in axesContainer.transform)
-        {
-            Destroy(child.gameObject);
-        }
+        foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
         axisVisuals.Clear();
 
         CreateSingleAxisVisual(axesContainer.transform, Vector3.right, axisLength, axisThickness, redAxisMaterial, "X_Axis_Client");
