@@ -27,8 +27,6 @@ public class UIManager : MonoBehaviour
     [SerializeField]
     private Button ResetViewButton;
     [SerializeField]
-    private Button CyclePresetViewButton;
-    [SerializeField]
     private Button ResetCropButton;
     [SerializeField]
     private Button undoButton;
@@ -37,10 +35,6 @@ public class UIManager : MonoBehaviour
 
     void Awake()
     {
-        if (inputManagerRef == null) inputManagerRef = FindObjectOfType<InputManager>();
-        if (cuttingPlaneManager == null) cuttingPlaneManager = FindObjectOfType<CuttingPlaneManager>();
-        if (historyManager == null) historyManager = FindObjectOfType<HistoryManager>();
-
         if (inputManagerRef == null) Debug.LogError("[UIManager] InputManager not found in scene!");
         if (cuttingPlaneManager == null) Debug.LogError("[UIManager] CuttingPlaneManager not found in scene!");
         if (historyManager == null) Debug.LogError("[UIManager] HistoryManager not found in scene!");
@@ -55,9 +49,6 @@ public class UIManager : MonoBehaviour
 
         if (ResetViewButton != null) ResetViewButton.onClick.AddListener(OnResetViewButtonPressed);
         else Debug.LogWarning("[UIManager] ResetViewButton is not assigned.");
-
-        if (CyclePresetViewButton != null) CyclePresetViewButton.onClick.AddListener(OnCycleViewButtonPressed);
-        else Debug.LogWarning("[UIManager] CyclePresetViewButton is not assigned.");
 
         if (ResetCropButton != null) ResetCropButton.onClick.AddListener(OnResetCropButtonPressed);
         else Debug.LogWarning("[UIManager] ResetCropButton is not assigned.");
@@ -136,11 +127,5 @@ public class UIManager : MonoBehaviour
     {
         if (mockedModelController != null) mockedModelController.ResetState();
         else Debug.LogWarning("[UIManager] MockedModelController is null, cannot reset model view state.");
-    }
-
-    private void OnCycleViewButtonPressed()
-    {
-        if (mockedModelController != null) mockedModelController.CyclePresetView();
-        else Debug.LogWarning("[UIManager] MockedModelController is null, cannot cycle preset view.");
     }
 }

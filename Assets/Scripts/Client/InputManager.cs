@@ -23,6 +23,9 @@ public class InputManager : MonoBehaviour
     [SerializeField] private float longPressThreshold = 0.5f;
     [SerializeField] private float maxHoldMovementPixels = 500f;
 
+    [Header("Double Tap Gesture")]
+    [SerializeField] private float doubleTapTimeThreshold = 0.3f;
+
     private bool isHolding = false;
     private bool longPressAchieved = false;
     private bool isCutActive = false;
@@ -38,6 +41,10 @@ public class InputManager : MonoBehaviour
     private bool isOrbiting = false;
     private bool isZooming = false;
     private bool isRotating = false;
+
+    private float lastTapTime = -1f;
+    private int tapCount = 0;
+    private Vector2 firstTapPosition;
 
     private Queue<Vector2> orbitPositionHistory = new Queue<Vector2>();
     private Queue<Vector2> panCentroidHistory = new Queue<Vector2>();
@@ -103,10 +110,11 @@ public class InputManager : MonoBehaviour
         {
             if (IsPointerOverUI()) return;
 
-            ResetGestureStates();
+            isPanning = false; isOrbiting = false; isZooming = false; isHolding = true;
+            isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
+
             startPressPosition = currentRawPosition;
             previousOrbitPosition = currentRawPosition;
-            isHolding = true;
 
             if (cuttingPlaneManager != null)
             {
@@ -120,7 +128,10 @@ public class InputManager : MonoBehaviour
 
             if (!longPressAchieved)
             {
-                if (longPressTimer >= longPressThreshold) longPressAchieved = true;
+                if (longPressTimer >= longPressThreshold)
+                {
+                    longPressAchieved = true;
+                }
                 else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
                 {
                     isHolding = false;
@@ -147,7 +158,11 @@ public class InputManager : MonoBehaviour
 
         if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
         {
-            if (isHolding && longPressAchieved && potentialInteractionTarget != null)
+            if (isHolding && !longPressAchieved && !isOrbiting)
+            {
+                HandleTap(startPressPosition);
+            }
+            else if (isHolding && longPressAchieved && potentialInteractionTarget != null)
             {
                 cuttingPlaneManager.DestroyModelPart(potentialInteractionTarget);
             }
@@ -155,6 +170,32 @@ public class InputManager : MonoBehaviour
             else if (isOrbiting) HandleOrbitGestureInternal(currentRawPosition, phase);
 
             ResetGestureStates();
+        }
+    }
+
+    private void HandleTap(Vector2 tapPosition)
+    {
+        if (Time.time > lastTapTime + doubleTapTimeThreshold)
+        {
+            tapCount = 0;
+        }
+
+        tapCount++;
+        lastTapTime = Time.time;
+
+        if (tapCount == 1)
+        {
+            firstTapPosition = tapPosition;
+        }
+        else if (tapCount >= 2)
+        {
+            if (targetModelController != null)
+            {
+                // REVERSED LOGIC: Left tap rotates right (1f), right tap rotates left (-1f)
+                float direction = (firstTapPosition.x < Screen.width / 2f) ? 1f : -1f;
+                targetModelController.TriggerPresetViewRotation(direction);
+            }
+            tapCount = 0;
         }
     }
 
