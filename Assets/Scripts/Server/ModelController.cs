@@ -36,14 +36,15 @@ public class ModelController : MonoBehaviour
 
     private GameObject worldContainer;
     private GameObject modelContainer;
-    private GameObject axesContainer; // Dedicated container for axes
-    private Transform modelReferencePoint; // The 'ref' point to track
+    private GameObject axesContainer;
+    private Transform modelReferencePoint;
     private GameObject rootModel;
     private List<GameObject> currentModelAxisVisuals = new List<GameObject>();
     private GameObject activePlaneVisualizer;
     private LineRenderer activeLineRenderer;
 
-    private Dictionary<string, ActionRecord> history = new Dictionary<string, ActionRecord>();
+    private Stack<ActionRecord> undoStack = new Stack<ActionRecord>();
+    private Stack<ActionRecord> redoStack = new Stack<ActionRecord>();
     private Dictionary<string, GameObject> allParts = new Dictionary<string, GameObject>();
 
     public string CurrentModelID { get; private set; } = null;
@@ -51,7 +52,6 @@ public class ModelController : MonoBehaviour
 
     void LateUpdate()
     {
-        // This ensures the axes always follow the reference point
         if (axesContainer != null && modelReferencePoint != null)
         {
             axesContainer.transform.position = modelReferencePoint.position;
@@ -71,12 +71,22 @@ public class ModelController : MonoBehaviour
 
     public void LoadNewModel(string modelId)
     {
-        if (worldContainer != null) Destroy(worldContainer);
-        allParts.Clear();
-        history.Clear();
-        currentModelAxisVisuals.Clear();
-        modelReferencePoint = null;
+        // --- CORRECTED TEARDOWN LOGIC ---
+        // 1. Destroy the old GameObjects first.
+        if (worldContainer != null)
+        {
+            Destroy(worldContainer);
+        }
 
+        // 2. Clear all data structures that held references to the old objects.
+        allParts.Clear();
+        undoStack.Clear();
+        redoStack.Clear();
+        currentModelAxisVisuals.Clear(); // Already cleared by Destroy, but good practice.
+        modelReferencePoint = null;
+        rootModel = null;
+
+        // --- PROCEED WITH CREATING THE NEW MODEL ---
         worldContainer = new GameObject("WorldContainer");
         worldContainer.transform.SetParent(this.transform, false);
 
@@ -101,11 +111,10 @@ public class ModelController : MonoBehaviour
             allParts.Add(rootModel.name, rootModel);
             CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
 
-            // Find the reference point for the axes
             modelReferencePoint = rootModel.transform.Find("ref");
             if (modelReferencePoint == null)
             {
-                modelReferencePoint = rootModel.transform; // Fallback to the model's root
+                modelReferencePoint = rootModel.transform;
             }
 
             if (planeVisualizerPrefab != null)
@@ -124,8 +133,42 @@ public class ModelController : MonoBehaviour
         else { CurrentModelID = null; }
     }
 
+    private void ClearRedoStack()
+    {
+        while (redoStack.Count > 0)
+        {
+            ActionRecord undoneAction = redoStack.Pop();
+            CleanUpAction(undoneAction);
+        }
+    }
+
+    private void CleanUpAction(ActionRecord record)
+    {
+        if (record.Type == ActionType.Slice)
+        {
+            foreach (var hull in record.NewHulls)
+            {
+                if (hull != null)
+                {
+                    allParts.Remove(hull.name);
+                    Destroy(hull);
+                }
+            }
+        }
+        else if (record.Type == ActionType.Destroy)
+        {
+            if (record.DestroyedPart != null)
+            {
+                allParts.Remove(record.DestroyedPart.name);
+                Destroy(record.DestroyedPart);
+            }
+        }
+    }
+
     public void ExecuteSlice(SliceActionData data)
     {
+        ClearRedoStack();
+
         var record = new ActionRecord
         {
             Type = ActionType.Slice,
@@ -149,6 +192,14 @@ public class ModelController : MonoBehaviour
                         upperHull.name = partID + "_U";
                         lowerHull.name = partID + "_L";
 
+                        if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
+                        {
+                            Debug.LogError($"CRITICAL ERROR: Attempted to create a part that already exists. Upper: {upperHull.name}, Lower: {lowerHull.name}");
+                            Destroy(upperHull);
+                            Destroy(lowerHull);
+                            continue;
+                        }
+
                         allParts.Add(upperHull.name, upperHull);
                         allParts.Add(lowerHull.name, lowerHull);
 
@@ -168,12 +219,14 @@ public class ModelController : MonoBehaviour
         }
         if (record.Originals.Count > 0)
         {
-            history[data.actionID] = record;
+            undoStack.Push(record);
         }
     }
 
     public void ExecuteDestroy(DestroyActionData data)
     {
+        ClearRedoStack();
+
         if (allParts.TryGetValue(data.targetPartID, out GameObject partToDestroy))
         {
             partToDestroy.SetActive(false);
@@ -183,40 +236,66 @@ public class ModelController : MonoBehaviour
                 ActionID = data.actionID,
                 DestroyedPart = partToDestroy
             };
-            history[data.actionID] = record;
+            undoStack.Push(record);
         }
     }
 
-    public void UndoAction(string actionID)
+    public void UndoLastAction()
     {
-        if (history.TryGetValue(actionID, out ActionRecord record))
+        if (undoStack.Count > 0)
         {
+            ActionRecord record = undoStack.Pop();
+
             if (record.Type == ActionType.Slice)
             {
-                foreach (var hull in record.NewHulls) hull.SetActive(false);
-                foreach (var part in record.Originals) part.SetActive(true);
+                foreach (var hull in record.NewHulls)
+                {
+                    if (hull != null) hull.SetActive(false);
+                }
+                foreach (var part in record.Originals)
+                {
+                    if (part != null) part.SetActive(true);
+                }
             }
             else if (record.Type == ActionType.Destroy)
             {
                 if (record.DestroyedPart != null) record.DestroyedPart.SetActive(true);
             }
+
+            redoStack.Push(record);
         }
     }
 
-    public void RedoAction(string actionID)
+    public void RedoLastAction()
     {
-        if (history.TryGetValue(actionID, out ActionRecord record))
+        if (redoStack.Count > 0)
         {
+            ActionRecord record = redoStack.Pop();
+
             if (record.Type == ActionType.Slice)
             {
-                foreach (var hull in record.NewHulls) hull.SetActive(true);
-                foreach (var part in record.Originals) part.SetActive(false);
+                foreach (var hull in record.NewHulls)
+                {
+                    if (hull != null) hull.SetActive(true);
+                }
+                foreach (var part in record.Originals)
+                {
+                    if (part != null) part.SetActive(false);
+                }
             }
             else if (record.Type == ActionType.Destroy)
             {
                 if (record.DestroyedPart != null) record.DestroyedPart.SetActive(false);
             }
+
+            undoStack.Push(record);
         }
+    }
+
+    private void ClearHistory()
+    {
+        while (undoStack.Count > 0) CleanUpAction(undoStack.Pop());
+        while (redoStack.Count > 0) CleanUpAction(redoStack.Pop());
     }
 
     public void UpdateVisualCropPlane(Vector3 position, Vector3 normal, float scale)
@@ -230,21 +309,25 @@ public class ModelController : MonoBehaviour
 
     public void ResetCrop()
     {
-        foreach (var part in allParts.Values)
+        ClearHistory();
+
+        var partsToRemove = allParts.Keys.Where(key => key != rootModel.name).ToList();
+        foreach (var key in partsToRemove)
         {
-            if (part != null && part != rootModel)
+            if (allParts.TryGetValue(key, out GameObject part))
             {
                 Destroy(part);
             }
+            allParts.Remove(key);
         }
-
-        allParts.Clear();
-        history.Clear();
 
         if (rootModel != null)
         {
             rootModel.SetActive(true);
-            allParts.Add(rootModel.name, rootModel);
+            if (!allParts.ContainsKey(rootModel.name))
+            {
+                allParts.Add(rootModel.name, rootModel);
+            }
         }
 
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
@@ -332,7 +415,7 @@ public class ModelController : MonoBehaviour
         float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentRef, false); // Set parent without affecting world position
+        shaft.transform.SetParent(parentRef, false);
         Destroy(shaft.GetComponent<CapsuleCollider>());
         shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
         shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
@@ -342,7 +425,7 @@ public class ModelController : MonoBehaviour
 
         GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentRef, false); // Set parent without affecting world position
+        arrowheadCap.transform.SetParent(parentRef, false);
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
         float capRadius = thickness * serverArrowheadRadiusFactor;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);

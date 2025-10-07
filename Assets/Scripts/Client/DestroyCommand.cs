@@ -17,7 +17,6 @@ public class DestroyCommand : ICommand
         activePartsList = activeParts;
         webSocketClientManager = wsManager;
 
-        // Simplified and made robust: Always use the object's name as its unique ID.
         if (target != null)
         {
             this.targetPartID = target.name;

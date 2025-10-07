@@ -11,11 +11,27 @@ public class UnityMainThreadDispatcher : MonoBehaviour
     {
         if (_instance == null)
         {
-            GameObject go = new GameObject("UnityMainThreadDispatcher");
-            _instance = go.AddComponent<UnityMainThreadDispatcher>();
-            DontDestroyOnLoad(go);
+            _instance = FindObjectOfType<UnityMainThreadDispatcher>();
+            if (_instance == null)
+            {
+                GameObject go = new GameObject("UnityMainThreadDispatcher");
+                _instance = go.AddComponent<UnityMainThreadDispatcher>();
+            }
         }
         return _instance;
+    }
+
+    void Awake()
+    {
+        if (_instance == null)
+        {
+            _instance = this;
+            DontDestroyOnLoad(this.gameObject);
+        }
+        else if (_instance != this)
+        {
+            Destroy(gameObject);
+        }
     }
 
     void Update()

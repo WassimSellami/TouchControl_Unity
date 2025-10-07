@@ -41,10 +41,20 @@ public class SliceCommand : ICommand
                     }
                 }
             }
+            foreach (var original in originals)
+            {
+                if (original != null)
+                {
+                    original.SetActive(false);
+                    sliceManager.activeModelParts.Remove(original);
+                }
+            }
         }
         else
         {
-            List<string> originalPartIDs = originals.Select(o => o.name).ToList();
+            List<string> originalPartIDs = new List<string>();
+            List<GameObject> successfullySlicedOriginals = new List<GameObject>();
+
             foreach (var originalPart in originals)
             {
                 if (originalPart == null) continue;
@@ -57,7 +67,6 @@ public class SliceCommand : ICommand
 
                     if (upperHull != null && lowerHull != null)
                     {
-                        // Corrected: Naming convention now matches the server's convention
                         upperHull.name = originalPart.name + "_U";
                         lowerHull.name = originalPart.name + "_L";
 
@@ -78,7 +87,19 @@ public class SliceCommand : ICommand
                         newHulls.Add(lowerHull);
                         sliceManager.activeModelParts.Add(upperHull);
                         sliceManager.activeModelParts.Add(lowerHull);
+
+                        originalPartIDs.Add(originalPart.name);
+                        successfullySlicedOriginals.Add(originalPart);
                     }
+                }
+            }
+
+            foreach (var successfulOriginal in successfullySlicedOriginals)
+            {
+                if (successfulOriginal != null)
+                {
+                    successfulOriginal.SetActive(false);
+                    sliceManager.activeModelParts.Remove(successfulOriginal);
                 }
             }
 
@@ -96,15 +117,6 @@ public class SliceCommand : ICommand
             }
 
             hasBeenExecuted = true;
-        }
-
-        foreach (var original in originals)
-        {
-            if (original != null)
-            {
-                original.SetActive(false);
-                sliceManager.activeModelParts.Remove(original);
-            }
         }
     }
 

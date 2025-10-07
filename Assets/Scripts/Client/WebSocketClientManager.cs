@@ -94,6 +94,7 @@ public class WebSocketClientManager : MonoBehaviour
             if (timeSinceLastModelUpdate >= modelUpdateInterval)
             {
                 SendModelTransformState();
+                SendCameraTransformState();
                 timeSinceLastModelUpdate = 0f;
             }
         }
@@ -190,17 +191,13 @@ public class WebSocketClientManager : MonoBehaviour
     public void SendUndoAction(string actionID)
     {
         if (!IsConnected) return;
-        var data = new UndoRedoActionData { actionID = actionID };
-        string jsonData = JsonUtility.ToJson(data);
-        SendMessageToServer($"UNDO_ACTION:{jsonData}");
+        SendMessageToServer($"UNDO_ACTION");
     }
 
     public void SendRedoAction(string actionID)
     {
         if (!IsConnected) return;
-        var data = new UndoRedoActionData { actionID = actionID };
-        string jsonData = JsonUtility.ToJson(data);
-        SendMessageToServer($"REDO_ACTION:{jsonData}");
+        SendMessageToServer($"REDO_ACTION");
     }
 
     public void SendResetAll()
@@ -291,6 +288,17 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnBackToMainMenuPressed()
     {
+        if (mockedModelControllerRef != null)
+        {
+            mockedModelControllerRef.ResetState();
+        }
+
+        CuttingPlaneManager cuttingPlaneManager = FindObjectOfType<CuttingPlaneManager>();
+        if (cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.ResetCrop();
+        }
+
         if (uiManager != null) uiManager.ShowMainMenuPanel();
     }
 

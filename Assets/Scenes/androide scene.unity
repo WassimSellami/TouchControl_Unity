@@ -1802,7 +1802,7 @@ MonoBehaviour:
   mockedModelControllerRef: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
   ipAddressInput: {fileID: 698393692}
-  defaultIpAddress: 192.168.0.83
+  defaultIpAddress: 192.168.0.36
   serverPort: 8070
   servicePath: /Control
   modelUpdateRateFPS: 60

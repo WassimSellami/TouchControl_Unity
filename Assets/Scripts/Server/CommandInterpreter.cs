@@ -40,10 +40,10 @@ public class CommandInterpreter : MonoBehaviour
                 ProcessExecuteDestroyActionCommand(args);
                 break;
             case "UNDO_ACTION":
-                ProcessUndoActionCommand(args);
+                ProcessUndoActionCommand();
                 break;
             case "REDO_ACTION":
-                ProcessRedoActionCommand(args);
+                ProcessRedoActionCommand();
                 break;
             case "RESET_ALL":
                 ProcessResetAllCommand();
@@ -140,32 +140,14 @@ public class CommandInterpreter : MonoBehaviour
         }
     }
 
-    private void ProcessUndoActionCommand(string args)
+    private void ProcessUndoActionCommand()
     {
-        if (ModelController == null || string.IsNullOrEmpty(args)) return;
-        try
-        {
-            UndoRedoActionData data = JsonUtility.FromJson<UndoRedoActionData>(args);
-            ModelController.UndoAction(data.actionID);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[CommandInterpreter] Error parsing UndoRedoActionData: {ex.Message} | Args: {args}");
-        }
+        if (ModelController != null) ModelController.UndoLastAction();
     }
 
-    private void ProcessRedoActionCommand(string args)
+    private void ProcessRedoActionCommand()
     {
-        if (ModelController == null || string.IsNullOrEmpty(args)) return;
-        try
-        {
-            UndoRedoActionData data = JsonUtility.FromJson<UndoRedoActionData>(args);
-            ModelController.RedoAction(data.actionID);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[CommandInterpreter] Error parsing UndoRedoActionData: {ex.Message} | Args: {args}");
-        }
+        if (ModelController != null) ModelController.RedoLastAction();
     }
 
     private void ProcessResetAllCommand()

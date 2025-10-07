@@ -2,7 +2,6 @@ using UnityEngine;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using System;
-using System.Collections.Concurrent;
 using System.Net;
 using static JsonUtilityHelper;
 
@@ -18,7 +17,6 @@ public class WebSocketServerManager : MonoBehaviour
     [SerializeField] private Camera serverCamera;
 
     private WebSocketServer wsServer;
-    private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
 
     public class ModelControlService : WebSocketBehavior
     {
@@ -57,15 +55,9 @@ public class WebSocketServerManager : MonoBehaviour
             commandInterpreter.ModelController = modelController;
         }
 
-        StartWebSocketServer();
-    }
+        UnityMainThreadDispatcher.Instance();
 
-    void Update()
-    {
-        while (mainThreadActions.TryDequeue(out Action action))
-        {
-            action?.Invoke();
-        }
+        StartWebSocketServer();
     }
 
     void OnDestroy()
@@ -120,20 +112,15 @@ public class WebSocketServerManager : MonoBehaviour
     private void ProcessReceivedCommand(string command)
     {
         if (commandInterpreter == null) return;
-        QueueMainThreadAction(() => commandInterpreter.InterpretAndExecute(command));
+        UnityMainThreadDispatcher.Instance().Enqueue(() => commandInterpreter.InterpretAndExecute(command));
     }
 
     private void LogOnMainThread(string message, bool isError = false)
     {
-        QueueMainThreadAction(() => {
+        UnityMainThreadDispatcher.Instance().Enqueue(() => {
             if (isError) Debug.LogError(message);
             else Debug.Log(message);
         });
-    }
-
-    private void QueueMainThreadAction(Action action)
-    {
-        mainThreadActions.Enqueue(action);
     }
 
     public void SendModelSizeUpdate(Vector3 modelSize)
@@ -144,7 +131,7 @@ public class WebSocketServerManager : MonoBehaviour
             string jsonData = JsonUtility.ToJson(sizeData);
             string message = $"MODEL_SIZE_UPDATE:{jsonData}";
 
-            QueueMainThreadAction(() =>
+            UnityMainThreadDispatcher.Instance().Enqueue(() =>
             {
                 foreach (var serviceHost in wsServer.WebSocketServices.Hosts)
                 {
