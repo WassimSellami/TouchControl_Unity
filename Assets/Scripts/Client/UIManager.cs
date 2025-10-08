@@ -85,7 +85,12 @@ public class UIManager : MonoBehaviour
 
     private void DeactivateInteractionSystems()
     {
-        if (mockedModelController != null) mockedModelController.SetModelVisibility(false);
+        if (mockedModelController != null)
+        {
+            mockedModelController.SetModelVisibility(false);
+            mockedModelController.gameObject.SetActive(false);
+        }
+        if (inputManagerRef != null) inputManagerRef.enabled = false;
     }
 
     public void ShowConnectionPanel()
@@ -121,6 +126,8 @@ public class UIManager : MonoBehaviour
             mockedModelController.EnsureAxisVisualsAreCreated();
         }
         else Debug.LogWarning("[UIManager] MockedModelController is null, cannot activate model visuals.");
+
+        if (inputManagerRef != null) inputManagerRef.enabled = true;
     }
 
     private void OnResetViewButtonPressed()

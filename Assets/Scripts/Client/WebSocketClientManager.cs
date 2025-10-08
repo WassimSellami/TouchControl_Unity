@@ -254,18 +254,30 @@ public class WebSocketClientManager : MonoBehaviour
     {
         UpdateConnectionUI(ConnectionState.Failed);
         isAttemptingConnection = false;
-        if (mockedModelControllerRef != null) mockedModelControllerRef.ResetState();
-        if (ws != null && ws.ReadyState != WebSocketState.Closed) ws.Close();
-        ws = null;
-        if (uiManager != null) uiManager.ShowConnectionPanel();
+        PerformDisconnectionCleanup();
     }
 
     private void OnWebSocketClose(string reason, ushort code)
     {
         UpdateConnectionUI(ConnectionState.Disconnected);
         isAttemptingConnection = false;
+        PerformDisconnectionCleanup();
+    }
+
+    private void PerformDisconnectionCleanup()
+    {
         if (mockedModelControllerRef != null) mockedModelControllerRef.ResetState();
+
+        if (ws != null && ws.ReadyState != WebSocketState.Closed) ws.Close();
         ws = null;
+        isMockConnected = false;
+
+        CuttingPlaneManager cuttingPlaneManager = FindObjectOfType<CuttingPlaneManager>();
+        if (cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.ResetCrop();
+        }
+
         if (uiManager != null) uiManager.ShowConnectionPanel();
     }
 
@@ -297,6 +309,11 @@ public class WebSocketClientManager : MonoBehaviour
         if (cuttingPlaneManager != null)
         {
             cuttingPlaneManager.ResetCrop();
+        }
+
+        if (IsConnected && !autoConnectMode)
+        {
+            if (ws != null) ws.CloseAsync();
         }
 
         if (uiManager != null) uiManager.ShowMainMenuPanel();
