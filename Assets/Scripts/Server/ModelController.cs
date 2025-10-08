@@ -36,7 +36,7 @@ public class ModelController : MonoBehaviour
     [SerializeField] private float serverArrowheadHeightFactor = 3f;
 
     [Header("Shaking Effect")]
-    [SerializeField] private float wiggleAngle = 5f;
+    [SerializeField] private float wiggleAngle = 7f;
     [SerializeField] private float wiggleSpeed = 10f;
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
 
@@ -61,6 +61,9 @@ public class ModelController : MonoBehaviour
     private Dictionary<GameObject, Coroutine> shakingCoroutines = new Dictionary<GameObject, Coroutine>();
     private Dictionary<GameObject, Quaternion> originalLocalRotations = new Dictionary<GameObject, Quaternion>();
 
+    private Vector3 refPointLocalPosition;
+    private Quaternion refPointLocalRotation;
+
     public string CurrentModelID { get; private set; } = null;
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
 
@@ -82,10 +85,10 @@ public class ModelController : MonoBehaviour
 
     void LateUpdate()
     {
-        if (axesContainer != null && modelReferencePoint != null)
+        if (axesContainer != null && worldContainer != null && modelReferencePoint != null)
         {
-            axesContainer.transform.position = modelReferencePoint.position;
-            axesContainer.transform.rotation = modelReferencePoint.rotation;
+            axesContainer.transform.position = worldContainer.transform.TransformPoint(refPointLocalPosition);
+            axesContainer.transform.rotation = worldContainer.transform.rotation * refPointLocalRotation;
         }
     }
 
@@ -129,6 +132,9 @@ public class ModelController : MonoBehaviour
         modelContainer = null;
         axesContainer = null;
         CurrentModelID = null;
+
+        refPointLocalPosition = Vector3.zero;
+        refPointLocalRotation = Quaternion.identity;
     }
 
     public void LoadNewModel(string modelId)
@@ -164,6 +170,9 @@ public class ModelController : MonoBehaviour
             {
                 modelReferencePoint = rootModel.transform;
             }
+
+            refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
+            refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
 
             if (planeVisualizerPrefab != null)
             {
@@ -265,7 +274,7 @@ public class ModelController : MonoBehaviour
 
     public void ExecuteDestroy(DestroyActionData data)
     {
-        StopShaking(data.targetPartID, false);
+        StopShaking(data.targetPartID, true);
         ClearRedoStack();
 
         if (allParts.TryGetValue(data.targetPartID, out GameObject partToDestroy))
