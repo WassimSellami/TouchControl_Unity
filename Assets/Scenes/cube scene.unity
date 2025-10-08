@@ -648,8 +648,9 @@ MonoBehaviour:
   serverAxisThickness: 0.03
   serverArrowheadRadiusFactor: 2.5
   serverArrowheadHeightFactor: 12
-  shakeMagnitude: 0.01
-  shakeRoughness: 5
+  wiggleAngle: 1
+  wiggleSpeed: 40
+  wiggleAxis: {x: 1, y: 1, z: 1}
   serverCamera: {fileID: 330585545}
   uiCanvasRectTransform: {fileID: 809842792}
   destroyIconImage: {fileID: 2011722529}
