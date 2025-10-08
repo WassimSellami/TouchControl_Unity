@@ -210,10 +210,24 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (partToShake != null && webSocketClientManager != null)
         {
+            modelCenterWorld = GetCollectiveBounds().center;
+            UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
+            Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
+            Vector3 worldPoint;
+
+            if (centerPlane.Raycast(rayOrigin, out float enter))
+            {
+                worldPoint = rayOrigin.GetPoint(enter);
+            }
+            else
+            {
+                worldPoint = rayOrigin.GetPoint(planeDepth);
+            }
+
             var shakeData = new DestroyActionData
             {
                 targetPartID = partToShake.name,
-                localPosition = partToShake.transform.localPosition
+                worldPosition = worldPoint
             };
             webSocketClientManager.SendStartShake(shakeData);
         }

@@ -91,7 +91,7 @@ public class DestroyActionData
 {
     public string actionID;
     public string targetPartID;
-    public Vector3 localPosition;
+    public Vector3 worldPosition;
 }
 
 [System.Serializable]

@@ -43,9 +43,8 @@ public class ModelController : MonoBehaviour
     [Header("UI Feedback")]
     [SerializeField] private Camera serverCamera;
     [SerializeField] private RectTransform uiCanvasRectTransform;
-    [SerializeField] private Image destroyIconImage;
+    [SerializeField] private Image feedbackIconImage;
     [SerializeField] private Sprite destroyIconSprite;
-    [SerializeField] private Image sliceIconImage;
     [SerializeField] private Sprite sliceIconSprite;
 
     private GameObject worldContainer;
@@ -71,13 +70,9 @@ public class ModelController : MonoBehaviour
 
     void Awake()
     {
-        if (destroyIconImage != null)
+        if (feedbackIconImage != null)
         {
-            destroyIconImage.gameObject.SetActive(false);
-        }
-        if (sliceIconImage != null)
-        {
-            sliceIconImage.gameObject.SetActive(false);
+            feedbackIconImage.gameObject.SetActive(false);
         }
         if (serverCamera == null)
         {
@@ -120,13 +115,9 @@ public class ModelController : MonoBehaviour
             if (coroutine != null) StopCoroutine(coroutine);
         }
 
-        if (destroyIconImage != null)
+        if (feedbackIconImage != null)
         {
-            destroyIconImage.gameObject.SetActive(false);
-        }
-        if (sliceIconImage != null)
-        {
-            sliceIconImage.gameObject.SetActive(false);
+            feedbackIconImage.gameObject.SetActive(false);
         }
 
         shakingCoroutines.Clear();
@@ -415,7 +406,7 @@ public class ModelController : MonoBehaviour
 
     public void ShowSliceIcon(Vector3 worldPosition)
     {
-        if (sliceIconImage != null && sliceIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
+        if (feedbackIconImage != null && sliceIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
         {
             Vector2 screenPoint = serverCamera.WorldToScreenPoint(worldPosition);
 
@@ -425,21 +416,21 @@ public class ModelController : MonoBehaviour
                 null,
                 out Vector2 localPoint);
 
-            sliceIconImage.sprite = sliceIconSprite;
-            sliceIconImage.rectTransform.anchoredPosition = localPoint;
-            sliceIconImage.gameObject.SetActive(true);
+            feedbackIconImage.sprite = sliceIconSprite;
+            feedbackIconImage.rectTransform.anchoredPosition = localPoint;
+            feedbackIconImage.gameObject.SetActive(true);
         }
     }
 
     public void HideSliceIcon()
     {
-        if (sliceIconImage != null)
+        if (feedbackIconImage != null && feedbackIconImage.sprite == sliceIconSprite)
         {
-            sliceIconImage.gameObject.SetActive(false);
+            feedbackIconImage.gameObject.SetActive(false);
         }
     }
 
-    public void StartShaking(string partID, Vector3 receivedLocalPosition)
+    public void StartShaking(string partID, Vector3 receivedWorldPosition)
     {
         if (allParts.TryGetValue(partID, out GameObject serverPartToShake))
         {
@@ -449,10 +440,9 @@ public class ModelController : MonoBehaviour
                 Coroutine shakeCoroutine = StartCoroutine(ShakeCoroutine(serverPartToShake));
                 shakingCoroutines[serverPartToShake] = shakeCoroutine;
 
-                if (destroyIconImage != null && destroyIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
+                if (feedbackIconImage != null && destroyIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
                 {
-                    Vector3 serverWorldPosition = serverPartToShake.transform.position;
-                    Vector2 screenPoint = serverCamera.WorldToScreenPoint(serverWorldPosition);
+                    Vector2 screenPoint = serverCamera.WorldToScreenPoint(receivedWorldPosition);
 
                     RectTransformUtility.ScreenPointToLocalPointInRectangle(
                         uiCanvasRectTransform,
@@ -460,9 +450,9 @@ public class ModelController : MonoBehaviour
                         null,
                         out Vector2 localPoint);
 
-                    destroyIconImage.sprite = destroyIconSprite;
-                    destroyIconImage.rectTransform.anchoredPosition = localPoint;
-                    destroyIconImage.gameObject.SetActive(true);
+                    feedbackIconImage.sprite = destroyIconSprite;
+                    feedbackIconImage.rectTransform.anchoredPosition = localPoint;
+                    feedbackIconImage.gameObject.SetActive(true);
                 }
             }
         }
@@ -470,9 +460,9 @@ public class ModelController : MonoBehaviour
 
     public void StopShaking(string partID, bool resetPosition = true)
     {
-        if (destroyIconImage != null)
+        if (feedbackIconImage != null && feedbackIconImage.sprite == destroyIconSprite)
         {
-            destroyIconImage.gameObject.SetActive(false);
+            feedbackIconImage.gameObject.SetActive(false);
         }
 
         if (allParts.TryGetValue(partID, out GameObject partToStop))
