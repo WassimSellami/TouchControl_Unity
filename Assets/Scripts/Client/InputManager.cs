@@ -35,6 +35,7 @@ public class InputManager : MonoBehaviour
     private float longPressTimer = 0f;
     private Vector2 startPressPosition;
     private GameObject potentialInteractionTarget = null;
+    private bool isShakingSent = false;
 
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
@@ -118,6 +119,7 @@ public class InputManager : MonoBehaviour
             if (IsPointerOverUI()) return;
             isPanning = false; isOrbiting = false; isZooming = false; isHolding = true;
             isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
+            isShakingSent = false;
             startPressPosition = currentRawPosition;
             previousOrbitPosition = currentRawPosition;
             if (cuttingPlaneManager != null) potentialInteractionTarget = cuttingPlaneManager.GetModelPartAtScreenPoint(currentRawPosition);
@@ -129,7 +131,15 @@ public class InputManager : MonoBehaviour
 
             if (!longPressAchieved)
             {
-                if (longPressTimer >= longPressThreshold) longPressAchieved = true;
+                if (longPressTimer >= longPressThreshold)
+                {
+                    longPressAchieved = true;
+                    if (potentialInteractionTarget != null && cuttingPlaneManager != null)
+                    {
+                        cuttingPlaneManager.StartShake(potentialInteractionTarget);
+                        isShakingSent = true;
+                    }
+                }
                 else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
                 {
                     isHolding = false;
@@ -161,7 +171,7 @@ public class InputManager : MonoBehaviour
                 if (targetModelController != null && targetModelController.IsAutoRotating)
                 {
                     targetModelController.StopContinuousRotation();
-                    tapCount = 0; // Reset tap count to prevent a double-tap after stopping
+                    tapCount = 0;
                 }
                 else
                 {
@@ -273,6 +283,12 @@ public class InputManager : MonoBehaviour
 
     private void ResetGestureStates()
     {
+        if (isShakingSent && potentialInteractionTarget != null && cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.StopShake(potentialInteractionTarget);
+        }
+
+        isShakingSent = false;
         isPanning = false; isOrbiting = false; isZooming = false; isHolding = false;
         isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
         isRotating = false; isEvaluatingTwoFingerGesture = false;

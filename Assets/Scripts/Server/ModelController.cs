@@ -34,6 +34,10 @@ public class ModelController : MonoBehaviour
     [SerializeField] private float serverArrowheadRadiusFactor = 2.5f;
     [SerializeField] private float serverArrowheadHeightFactor = 3f;
 
+    [Header("Shaking Effect")]
+    [SerializeField] private float shakeMagnitude = 0.01f;
+    [SerializeField] private float shakeRoughness = 5f;
+
     private GameObject worldContainer;
     private GameObject modelContainer;
     private GameObject axesContainer;
@@ -46,6 +50,9 @@ public class ModelController : MonoBehaviour
     private Stack<ActionRecord> undoStack = new Stack<ActionRecord>();
     private Stack<ActionRecord> redoStack = new Stack<ActionRecord>();
     private Dictionary<string, GameObject> allParts = new Dictionary<string, GameObject>();
+    private Dictionary<GameObject, Coroutine> shakingCoroutines = new Dictionary<GameObject, Coroutine>();
+    private Dictionary<GameObject, Vector3> originalLocalPositions = new Dictionary<GameObject, Vector3>();
+    private Dictionary<GameObject, Vector3> shakeOffsets = new Dictionary<GameObject, Vector3>();
 
     public string CurrentModelID { get; private set; } = null;
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
@@ -54,7 +61,20 @@ public class ModelController : MonoBehaviour
     {
         if (axesContainer != null && modelReferencePoint != null)
         {
-            axesContainer.transform.position = modelReferencePoint.position;
+            Vector3 worldShakeOffset = Vector3.zero;
+            if (rootModel != null && shakeOffsets.TryGetValue(rootModel, out Vector3 localOffset))
+            {
+                if (rootModel.transform.parent != null)
+                {
+                    worldShakeOffset = rootModel.transform.parent.TransformVector(localOffset);
+                }
+                else
+                {
+                    worldShakeOffset = localOffset;
+                }
+            }
+
+            axesContainer.transform.position = modelReferencePoint.position - worldShakeOffset;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
     }
@@ -69,24 +89,38 @@ public class ModelController : MonoBehaviour
         }
     }
 
-    public void LoadNewModel(string modelId)
+    public void UnloadCurrentModel()
     {
-        // --- CORRECTED TEARDOWN LOGIC ---
-        // 1. Destroy the old GameObjects first.
         if (worldContainer != null)
         {
             Destroy(worldContainer);
         }
 
-        // 2. Clear all data structures that held references to the old objects.
+        foreach (var coroutine in shakingCoroutines.Values)
+        {
+            if (coroutine != null) StopCoroutine(coroutine);
+        }
+
+        shakingCoroutines.Clear();
+        originalLocalPositions.Clear();
+        shakeOffsets.Clear();
         allParts.Clear();
         undoStack.Clear();
         redoStack.Clear();
-        currentModelAxisVisuals.Clear(); // Already cleared by Destroy, but good practice.
+        currentModelAxisVisuals.Clear();
+
         modelReferencePoint = null;
         rootModel = null;
+        worldContainer = null;
+        modelContainer = null;
+        axesContainer = null;
+        CurrentModelID = null;
+    }
 
-        // --- PROCEED WITH CREATING THE NEW MODEL ---
+    public void LoadNewModel(string modelId)
+    {
+        UnloadCurrentModel();
+
         worldContainer = new GameObject("WorldContainer");
         worldContainer.transform.SetParent(this.transform, false);
 
@@ -129,6 +163,7 @@ public class ModelController : MonoBehaviour
             }
 
             CreateServerAxisVisuals(axesContainer.transform);
+            if (axesContainer != null) axesContainer.SetActive(true);
         }
         else { CurrentModelID = null; }
     }
@@ -153,14 +188,6 @@ public class ModelController : MonoBehaviour
                     allParts.Remove(hull.name);
                     Destroy(hull);
                 }
-            }
-        }
-        else if (record.Type == ActionType.Destroy)
-        {
-            if (record.DestroyedPart != null)
-            {
-                allParts.Remove(record.DestroyedPart.name);
-                Destroy(record.DestroyedPart);
             }
         }
     }
@@ -194,7 +221,6 @@ public class ModelController : MonoBehaviour
 
                         if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
                         {
-                            Debug.LogError($"CRITICAL ERROR: Attempted to create a part that already exists. Upper: {upperHull.name}, Lower: {lowerHull.name}");
                             Destroy(upperHull);
                             Destroy(lowerHull);
                             continue;
@@ -225,6 +251,7 @@ public class ModelController : MonoBehaviour
 
     public void ExecuteDestroy(DestroyActionData data)
     {
+        StopShaking(data.targetPartID, false);
         ClearRedoStack();
 
         if (allParts.TryGetValue(data.targetPartID, out GameObject partToDestroy))
@@ -259,7 +286,11 @@ public class ModelController : MonoBehaviour
             }
             else if (record.Type == ActionType.Destroy)
             {
-                if (record.DestroyedPart != null) record.DestroyedPart.SetActive(true);
+                if (record.DestroyedPart != null)
+                {
+                    record.DestroyedPart.SetActive(true);
+                    StopShaking(record.DestroyedPart.name);
+                }
             }
 
             redoStack.Push(record);
@@ -311,7 +342,7 @@ public class ModelController : MonoBehaviour
     {
         ClearHistory();
 
-        var partsToRemove = allParts.Keys.Where(key => key != rootModel.name).ToList();
+        var partsToRemove = allParts.Keys.Where(key => rootModel != null && key != rootModel.name).ToList();
         foreach (var key in partsToRemove)
         {
             if (allParts.TryGetValue(key, out GameObject part))
@@ -347,6 +378,60 @@ public class ModelController : MonoBehaviour
         if (activeLineRenderer == null) return;
         activeLineRenderer.enabled = false;
         activeLineRenderer.positionCount = 0;
+    }
+
+    public void StartShaking(string partID)
+    {
+        if (allParts.TryGetValue(partID, out GameObject partToShake))
+        {
+            if (!shakingCoroutines.ContainsKey(partToShake))
+            {
+                originalLocalPositions[partToShake] = partToShake.transform.localPosition;
+                Coroutine shakeCoroutine = StartCoroutine(ShakeCoroutine(partToShake));
+                shakingCoroutines[partToShake] = shakeCoroutine;
+            }
+        }
+    }
+
+    public void StopShaking(string partID, bool resetPosition = true)
+    {
+        if (allParts.TryGetValue(partID, out GameObject partToStop))
+        {
+            if (shakingCoroutines.TryGetValue(partToStop, out Coroutine shakeCoroutine))
+            {
+                StopCoroutine(shakeCoroutine);
+                shakingCoroutines.Remove(partToStop);
+                shakeOffsets.Remove(partToStop);
+
+                if (resetPosition && originalLocalPositions.TryGetValue(partToStop, out Vector3 originalPos))
+                {
+                    partToStop.transform.localPosition = originalPos;
+                    originalLocalPositions.Remove(partToStop);
+                }
+            }
+        }
+    }
+
+    private IEnumerator ShakeCoroutine(GameObject targetObject)
+    {
+        if (!originalLocalPositions.ContainsKey(targetObject)) yield break;
+        Transform targetTransform = targetObject.transform;
+        Vector3 startPosition = originalLocalPositions[targetObject];
+        float seedX = Random.Range(0f, 100f);
+        float seedY = Random.Range(0f, 100f);
+        float seedZ = Random.Range(0f, 100f);
+
+        while (true)
+        {
+            float x = (Mathf.PerlinNoise(seedX, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
+            float y = (Mathf.PerlinNoise(seedY, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
+            float z = (Mathf.PerlinNoise(seedZ, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
+
+            Vector3 offset = new Vector3(x, y, z);
+            shakeOffsets[targetObject] = offset;
+            targetTransform.localPosition = startPosition + offset;
+            yield return null;
+        }
     }
 
     private void SetupHull(GameObject hull, GameObject original)

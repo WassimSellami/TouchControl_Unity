@@ -30,6 +30,9 @@ public class CommandInterpreter : MonoBehaviour
             case "LOAD_MODEL":
                 ProcessLoadModelCommand(args);
                 break;
+            case "UNLOAD_MODEL":
+                ProcessUnloadModelCommand();
+                break;
             case "UPDATE_VISUAL_CROP_PLANE":
                 ProcessVisualCropPlaneCommand(args);
                 break;
@@ -38,6 +41,12 @@ public class CommandInterpreter : MonoBehaviour
                 break;
             case "EXECUTE_DESTROY_ACTION":
                 ProcessExecuteDestroyActionCommand(args);
+                break;
+            case "START_SHAKE":
+                ProcessStartShakeCommand(args);
+                break;
+            case "STOP_SHAKE":
+                ProcessStopShakeCommand(args);
                 break;
             case "UNDO_ACTION":
                 ProcessUndoActionCommand();
@@ -98,6 +107,14 @@ public class CommandInterpreter : MonoBehaviour
         }
     }
 
+    private void ProcessUnloadModelCommand()
+    {
+        if (ModelController != null)
+        {
+            ModelController.UnloadCurrentModel();
+        }
+    }
+
     private void ProcessVisualCropPlaneCommand(string args)
     {
         if (ModelController == null || string.IsNullOrEmpty(args)) return;
@@ -137,6 +154,34 @@ public class CommandInterpreter : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"[CommandInterpreter] Error parsing DestroyActionData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessStartShakeCommand(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            DestroyActionData data = JsonUtility.FromJson<DestroyActionData>(args);
+            ModelController.StartShaking(data.targetPartID);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing Shake Data: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessStopShakeCommand(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            DestroyActionData data = JsonUtility.FromJson<DestroyActionData>(args);
+            ModelController.StopShaking(data.targetPartID);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing Shake Data: {ex.Message} | Args: {args}");
         }
     }
 

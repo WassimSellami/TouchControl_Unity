@@ -188,6 +188,20 @@ public class WebSocketClientManager : MonoBehaviour
         SendMessageToServer($"EXECUTE_DESTROY_ACTION:{jsonData}");
     }
 
+    public void SendStartShake(DestroyActionData data)
+    {
+        if (!IsConnected) return;
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"START_SHAKE:{jsonData}");
+    }
+
+    public void SendStopShake(DestroyActionData data)
+    {
+        if (!IsConnected) return;
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"STOP_SHAKE:{jsonData}");
+    }
+
     public void SendUndoAction(string actionID)
     {
         if (!IsConnected) return;
@@ -313,7 +327,7 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (IsConnected && !autoConnectMode)
         {
-            if (ws != null) ws.CloseAsync();
+            SendMessageToServer("UNLOAD_MODEL");
         }
 
         if (uiManager != null) uiManager.ShowMainMenuPanel();

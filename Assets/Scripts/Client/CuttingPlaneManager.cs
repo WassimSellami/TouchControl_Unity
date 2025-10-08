@@ -177,6 +177,24 @@ public class CuttingPlaneManager : MonoBehaviour
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
 
+    public void StartShake(GameObject partToShake)
+    {
+        if (partToShake != null && webSocketClientManager != null)
+        {
+            var shakeData = new DestroyActionData { targetPartID = partToShake.name };
+            webSocketClientManager.SendStartShake(shakeData);
+        }
+    }
+
+    public void StopShake(GameObject partToShake)
+    {
+        if (partToShake != null && webSocketClientManager != null)
+        {
+            var shakeData = new DestroyActionData { targetPartID = partToShake.name };
+            webSocketClientManager.SendStopShake(shakeData);
+        }
+    }
+
     public GameObject GetModelPartAtScreenPoint(Vector2 screenPoint)
     {
         if (mainCamera == null) return null;
