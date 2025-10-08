@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using EzySlice;
 using System.Linq;
 using System.Collections;
+using UnityEngine.UI;
 
 public class ModelController : MonoBehaviour
 {
@@ -35,8 +36,15 @@ public class ModelController : MonoBehaviour
     [SerializeField] private float serverArrowheadHeightFactor = 3f;
 
     [Header("Shaking Effect")]
-    [SerializeField] private float shakeMagnitude = 0.01f;
-    [SerializeField] private float shakeRoughness = 5f;
+    [SerializeField] private float wiggleAngle = 5f;
+    [SerializeField] private float wiggleSpeed = 10f;
+    [SerializeField] private Vector3 wiggleAxis = Vector3.up;
+
+    [Header("UI Feedback")]
+    [SerializeField] private Camera serverCamera;
+    [SerializeField] private RectTransform uiCanvasRectTransform;
+    [SerializeField] private Image destroyIconImage;
+    [SerializeField] private Sprite destroyIconSprite;
 
     private GameObject worldContainer;
     private GameObject modelContainer;
@@ -51,30 +59,32 @@ public class ModelController : MonoBehaviour
     private Stack<ActionRecord> redoStack = new Stack<ActionRecord>();
     private Dictionary<string, GameObject> allParts = new Dictionary<string, GameObject>();
     private Dictionary<GameObject, Coroutine> shakingCoroutines = new Dictionary<GameObject, Coroutine>();
-    private Dictionary<GameObject, Vector3> originalLocalPositions = new Dictionary<GameObject, Vector3>();
-    private Dictionary<GameObject, Vector3> shakeOffsets = new Dictionary<GameObject, Vector3>();
+    private Dictionary<GameObject, Quaternion> originalLocalRotations = new Dictionary<GameObject, Quaternion>();
 
     public string CurrentModelID { get; private set; } = null;
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
+
+    void Awake()
+    {
+        if (destroyIconImage != null)
+        {
+            destroyIconImage.gameObject.SetActive(false);
+        }
+        if (serverCamera == null)
+        {
+            Debug.LogError("[ModelController] Server Camera is not assigned. UI feedback will not work.");
+        }
+        if (uiCanvasRectTransform == null)
+        {
+            Debug.LogError("[ModelController] UI Canvas Rect Transform is not assigned. UI feedback will not work.");
+        }
+    }
 
     void LateUpdate()
     {
         if (axesContainer != null && modelReferencePoint != null)
         {
-            Vector3 worldShakeOffset = Vector3.zero;
-            if (rootModel != null && shakeOffsets.TryGetValue(rootModel, out Vector3 localOffset))
-            {
-                if (rootModel.transform.parent != null)
-                {
-                    worldShakeOffset = rootModel.transform.parent.TransformVector(localOffset);
-                }
-                else
-                {
-                    worldShakeOffset = localOffset;
-                }
-            }
-
-            axesContainer.transform.position = modelReferencePoint.position - worldShakeOffset;
+            axesContainer.transform.position = modelReferencePoint.position;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
     }
@@ -101,9 +111,13 @@ public class ModelController : MonoBehaviour
             if (coroutine != null) StopCoroutine(coroutine);
         }
 
+        if (destroyIconImage != null)
+        {
+            destroyIconImage.gameObject.SetActive(false);
+        }
+
         shakingCoroutines.Clear();
-        originalLocalPositions.Clear();
-        shakeOffsets.Clear();
+        originalLocalRotations.Clear();
         allParts.Clear();
         undoStack.Clear();
         redoStack.Clear();
@@ -380,33 +394,53 @@ public class ModelController : MonoBehaviour
         activeLineRenderer.positionCount = 0;
     }
 
-    public void StartShaking(string partID)
+    public void StartShaking(string partID, Vector3 receivedLocalPosition)
     {
-        if (allParts.TryGetValue(partID, out GameObject partToShake))
+        if (allParts.TryGetValue(partID, out GameObject serverPartToShake))
         {
-            if (!shakingCoroutines.ContainsKey(partToShake))
+            if (!shakingCoroutines.ContainsKey(serverPartToShake))
             {
-                originalLocalPositions[partToShake] = partToShake.transform.localPosition;
-                Coroutine shakeCoroutine = StartCoroutine(ShakeCoroutine(partToShake));
-                shakingCoroutines[partToShake] = shakeCoroutine;
+                originalLocalRotations[serverPartToShake] = serverPartToShake.transform.localRotation;
+                Coroutine shakeCoroutine = StartCoroutine(ShakeCoroutine(serverPartToShake));
+                shakingCoroutines[serverPartToShake] = shakeCoroutine;
+
+                if (destroyIconImage != null && destroyIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
+                {
+                    Vector3 serverWorldPosition = serverPartToShake.transform.position;
+                    Vector2 screenPoint = serverCamera.WorldToScreenPoint(serverWorldPosition);
+
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        uiCanvasRectTransform,
+                        screenPoint,
+                        null,
+                        out Vector2 localPoint);
+
+                    destroyIconImage.sprite = destroyIconSprite;
+                    destroyIconImage.rectTransform.anchoredPosition = localPoint;
+                    destroyIconImage.gameObject.SetActive(true);
+                }
             }
         }
     }
 
     public void StopShaking(string partID, bool resetPosition = true)
     {
+        if (destroyIconImage != null)
+        {
+            destroyIconImage.gameObject.SetActive(false);
+        }
+
         if (allParts.TryGetValue(partID, out GameObject partToStop))
         {
             if (shakingCoroutines.TryGetValue(partToStop, out Coroutine shakeCoroutine))
             {
                 StopCoroutine(shakeCoroutine);
                 shakingCoroutines.Remove(partToStop);
-                shakeOffsets.Remove(partToStop);
 
-                if (resetPosition && originalLocalPositions.TryGetValue(partToStop, out Vector3 originalPos))
+                if (resetPosition && originalLocalRotations.TryGetValue(partToStop, out Quaternion originalRot))
                 {
-                    partToStop.transform.localPosition = originalPos;
-                    originalLocalPositions.Remove(partToStop);
+                    partToStop.transform.localRotation = originalRot;
+                    originalLocalRotations.Remove(partToStop);
                 }
             }
         }
@@ -414,22 +448,16 @@ public class ModelController : MonoBehaviour
 
     private IEnumerator ShakeCoroutine(GameObject targetObject)
     {
-        if (!originalLocalPositions.ContainsKey(targetObject)) yield break;
+        if (!originalLocalRotations.ContainsKey(targetObject)) yield break;
+
         Transform targetTransform = targetObject.transform;
-        Vector3 startPosition = originalLocalPositions[targetObject];
-        float seedX = Random.Range(0f, 100f);
-        float seedY = Random.Range(0f, 100f);
-        float seedZ = Random.Range(0f, 100f);
+        Quaternion startRotation = originalLocalRotations[targetObject];
 
         while (true)
         {
-            float x = (Mathf.PerlinNoise(seedX, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
-            float y = (Mathf.PerlinNoise(seedY, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
-            float z = (Mathf.PerlinNoise(seedZ, Time.time * shakeRoughness) - 0.5f) * 2f * shakeMagnitude;
-
-            Vector3 offset = new Vector3(x, y, z);
-            shakeOffsets[targetObject] = offset;
-            targetTransform.localPosition = startPosition + offset;
+            float angle = Mathf.Sin(Time.time * wiggleSpeed) * wiggleAngle;
+            Quaternion offsetRotation = Quaternion.AngleAxis(angle, wiggleAxis);
+            targetTransform.localRotation = startRotation * offsetRotation;
             yield return null;
         }
     }

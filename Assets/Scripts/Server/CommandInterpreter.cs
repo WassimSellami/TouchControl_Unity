@@ -163,7 +163,7 @@ public class CommandInterpreter : MonoBehaviour
         try
         {
             DestroyActionData data = JsonUtility.FromJson<DestroyActionData>(args);
-            ModelController.StartShaking(data.targetPartID);
+            ModelController.StartShaking(data.targetPartID, data.localPosition); // CHANGED
         }
         catch (Exception ex)
         {

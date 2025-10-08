@@ -90,7 +90,8 @@ public class SliceActionData
 public class DestroyActionData
 {
     public string actionID;
-    public string targetPartID; // Corrected: Simplified to only what's needed
+    public string targetPartID;
+    public Vector3 localPosition; // Renamed from worldPosition
 }
 
 [System.Serializable]

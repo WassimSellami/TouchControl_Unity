@@ -136,7 +136,7 @@ public class InputManager : MonoBehaviour
                     longPressAchieved = true;
                     if (potentialInteractionTarget != null && cuttingPlaneManager != null)
                     {
-                        cuttingPlaneManager.StartShake(potentialInteractionTarget);
+                        cuttingPlaneManager.StartShake(potentialInteractionTarget, startPressPosition);
                         isShakingSent = true;
                     }
                 }

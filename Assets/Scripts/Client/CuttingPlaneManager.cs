@@ -177,11 +177,15 @@ public class CuttingPlaneManager : MonoBehaviour
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
 
-    public void StartShake(GameObject partToShake)
+    public void StartShake(GameObject partToShake, Vector2 screenPoint)
     {
         if (partToShake != null && webSocketClientManager != null)
         {
-            var shakeData = new DestroyActionData { targetPartID = partToShake.name };
+            var shakeData = new DestroyActionData
+            {
+                targetPartID = partToShake.name,
+                localPosition = partToShake.transform.localPosition // CHANGED
+            };
             webSocketClientManager.SendStartShake(shakeData);
         }
     }
@@ -237,8 +241,6 @@ public class CuttingPlaneManager : MonoBehaviour
         Vector3 lineVector = finalEndWorldPosRaw - startWorldPos;
         currentPlaneNormal = Vector3.Cross(lineVector, mainCamera.transform.forward).normalized;
     }
-
-
 
     private void ResetDrawing()
     {
