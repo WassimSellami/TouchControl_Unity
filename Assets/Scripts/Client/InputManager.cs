@@ -134,10 +134,17 @@ public class InputManager : MonoBehaviour
                 if (longPressTimer >= longPressThreshold)
                 {
                     longPressAchieved = true;
-                    if (potentialInteractionTarget != null && cuttingPlaneManager != null)
+                    if (cuttingPlaneManager != null)
                     {
-                        cuttingPlaneManager.StartShake(potentialInteractionTarget, startPressPosition);
-                        isShakingSent = true;
+                        if (potentialInteractionTarget != null)
+                        {
+                            cuttingPlaneManager.StartShake(potentialInteractionTarget, startPressPosition);
+                            isShakingSent = true;
+                        }
+                        else
+                        {
+                            cuttingPlaneManager.ShowSliceIconAtPosition(startPressPosition);
+                        }
                     }
                 }
                 else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
@@ -286,6 +293,10 @@ public class InputManager : MonoBehaviour
         if (isShakingSent && potentialInteractionTarget != null && cuttingPlaneManager != null)
         {
             cuttingPlaneManager.StopShake(potentialInteractionTarget);
+        }
+        if (cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.HideSliceIcon();
         }
 
         isShakingSent = false;

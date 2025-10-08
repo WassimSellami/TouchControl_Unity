@@ -63,6 +63,12 @@ public class CommandInterpreter : MonoBehaviour
             case "HIDE_CUT_LINE":
                 ProcessHideCutLineCommand();
                 break;
+            case "SHOW_SLICE_ICON":
+                ProcessShowSliceIconCommand(args);
+                break;
+            case "HIDE_SLICE_ICON":
+                ProcessHideSliceIconCommand();
+                break;
             default:
                 Debug.LogWarning($"[CommandInterpreter] Unknown command received: {commandData}");
                 break;
@@ -163,7 +169,7 @@ public class CommandInterpreter : MonoBehaviour
         try
         {
             DestroyActionData data = JsonUtility.FromJson<DestroyActionData>(args);
-            ModelController.StartShaking(data.targetPartID, data.localPosition); // CHANGED
+            ModelController.StartShaking(data.targetPartID, data.localPosition);
         }
         catch (Exception ex)
         {
@@ -218,5 +224,24 @@ public class CommandInterpreter : MonoBehaviour
     {
         if (ModelController == null) return;
         ModelController.HideCutLine();
+    }
+
+    private void ProcessShowSliceIconCommand(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            ShowSliceIconData data = JsonUtility.FromJson<ShowSliceIconData>(args);
+            ModelController.ShowSliceIcon(data.worldPosition);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[CommandInterpreter] Error parsing ShowSliceIconData: {ex.Message} | Args: {args}");
+        }
+    }
+
+    private void ProcessHideSliceIconCommand()
+    {
+        if (ModelController != null) ModelController.HideSliceIcon();
     }
 }

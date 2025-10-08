@@ -45,6 +45,8 @@ public class ModelController : MonoBehaviour
     [SerializeField] private RectTransform uiCanvasRectTransform;
     [SerializeField] private Image destroyIconImage;
     [SerializeField] private Sprite destroyIconSprite;
+    [SerializeField] private Image sliceIconImage;
+    [SerializeField] private Sprite sliceIconSprite;
 
     private GameObject worldContainer;
     private GameObject modelContainer;
@@ -72,6 +74,10 @@ public class ModelController : MonoBehaviour
         if (destroyIconImage != null)
         {
             destroyIconImage.gameObject.SetActive(false);
+        }
+        if (sliceIconImage != null)
+        {
+            sliceIconImage.gameObject.SetActive(false);
         }
         if (serverCamera == null)
         {
@@ -117,6 +123,10 @@ public class ModelController : MonoBehaviour
         if (destroyIconImage != null)
         {
             destroyIconImage.gameObject.SetActive(false);
+        }
+        if (sliceIconImage != null)
+        {
+            sliceIconImage.gameObject.SetActive(false);
         }
 
         shakingCoroutines.Clear();
@@ -401,6 +411,32 @@ public class ModelController : MonoBehaviour
         if (activeLineRenderer == null) return;
         activeLineRenderer.enabled = false;
         activeLineRenderer.positionCount = 0;
+    }
+
+    public void ShowSliceIcon(Vector3 worldPosition)
+    {
+        if (sliceIconImage != null && sliceIconSprite != null && serverCamera != null && uiCanvasRectTransform != null)
+        {
+            Vector2 screenPoint = serverCamera.WorldToScreenPoint(worldPosition);
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                uiCanvasRectTransform,
+                screenPoint,
+                null,
+                out Vector2 localPoint);
+
+            sliceIconImage.sprite = sliceIconSprite;
+            sliceIconImage.rectTransform.anchoredPosition = localPoint;
+            sliceIconImage.gameObject.SetActive(true);
+        }
+    }
+
+    public void HideSliceIcon()
+    {
+        if (sliceIconImage != null)
+        {
+            sliceIconImage.gameObject.SetActive(false);
+        }
     }
 
     public void StartShaking(string partID, Vector3 receivedLocalPosition)

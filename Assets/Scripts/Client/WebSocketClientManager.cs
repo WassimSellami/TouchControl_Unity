@@ -234,6 +234,20 @@ public class WebSocketClientManager : MonoBehaviour
         SendMessageToServer("HIDE_CUT_LINE");
     }
 
+    public void SendShowSliceIcon(Vector3 worldPosition)
+    {
+        if (!IsConnected) return;
+        var data = new ShowSliceIconData { worldPosition = worldPosition };
+        string jsonData = JsonUtility.ToJson(data);
+        SendMessageToServer($"SHOW_SLICE_ICON:{jsonData}");
+    }
+
+    public void SendHideSliceIcon()
+    {
+        if (!IsConnected) return;
+        SendMessageToServer("HIDE_SLICE_ICON");
+    }
+
     private void OnWebSocketOpen()
     {
         UpdateConnectionUI(ConnectionState.Connected);

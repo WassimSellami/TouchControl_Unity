@@ -72,6 +72,35 @@ public class CuttingPlaneManager : MonoBehaviour
         ResetCrop();
     }
 
+    public void ShowSliceIconAtPosition(Vector2 screenPoint)
+    {
+        if (webSocketClientManager == null) return;
+
+        modelCenterWorld = GetCollectiveBounds().center;
+        UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
+        Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
+        Vector3 worldPoint;
+
+        if (centerPlane.Raycast(rayOrigin, out float enter))
+        {
+            worldPoint = rayOrigin.GetPoint(enter);
+        }
+        else
+        {
+            worldPoint = rayOrigin.GetPoint(planeDepth);
+        }
+
+        webSocketClientManager.SendShowSliceIcon(worldPoint);
+    }
+
+    public void HideSliceIcon()
+    {
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendHideSliceIcon();
+        }
+    }
+
     public void StartCutDrag(Vector2 screenPoint)
     {
         modelCenterWorld = GetCollectiveBounds().center;
@@ -184,7 +213,7 @@ public class CuttingPlaneManager : MonoBehaviour
             var shakeData = new DestroyActionData
             {
                 targetPartID = partToShake.name,
-                localPosition = partToShake.transform.localPosition // CHANGED
+                localPosition = partToShake.transform.localPosition
             };
             webSocketClientManager.SendStartShake(shakeData);
         }
@@ -229,7 +258,7 @@ public class CuttingPlaneManager : MonoBehaviour
     private void DrawPlaneVisualizer()
     {
         if (activePlaneVisualizer == null) return;
-        if (webSocketClientManager != null) webSocketClientManager.SendVisualCropPlane(currentPlanePoint, currentPlaneNormal, planeScaleFactor);
+        if (webSocketClientManager != null) webSocketClientManager.SendVisualCropPlane(currentPlaneNormal, currentPlaneNormal, planeScaleFactor);
 
         activePlaneVisualizer.transform.SetPositionAndRotation(currentPlanePoint, Quaternion.LookRotation(currentPlaneNormal));
         activePlaneVisualizer.transform.localScale = Vector3.one * planeScaleFactor;
@@ -249,7 +278,11 @@ public class CuttingPlaneManager : MonoBehaviour
             activeLineRenderer.positionCount = 0;
             activeLineRenderer.enabled = false;
         }
-        if (webSocketClientManager != null) webSocketClientManager.SendHideLine();
+        if (webSocketClientManager != null)
+        {
+            webSocketClientManager.SendHideLine();
+            webSocketClientManager.SendHideSliceIcon();
+        }
     }
 
     public void ResetClipping()

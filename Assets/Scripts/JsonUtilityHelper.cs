@@ -91,11 +91,17 @@ public class DestroyActionData
 {
     public string actionID;
     public string targetPartID;
-    public Vector3 localPosition; // Renamed from worldPosition
+    public Vector3 localPosition;
 }
 
 [System.Serializable]
 public class UndoRedoActionData
 {
     public string actionID;
+}
+
+[System.Serializable]
+public class ShowSliceIconData
+{
+    public Vector3 worldPosition;
 }
