@@ -3,7 +3,6 @@ using EzySlice;
 using System.Collections;
 using System.Collections.Generic;
 using System;
-using System.Linq;
 
 public class SliceCommand : ICommand
 {
@@ -110,7 +109,7 @@ public class SliceCommand : ICommand
                     actionID = this.ActionID,
                     planePoint = this.planePoint,
                     planeNormal = this.planeNormal,
-                    separationFactor = sliceManager.separationFactor,
+                    separationFactor = Constants.SEPARATION_FACTOR,
                     targetPartIDs = originalPartIDs.ToArray()
                 };
                 webSocketClientManager.SendExecuteSlice(sliceData);
@@ -164,9 +163,9 @@ public class SliceCommand : ICommand
 
     private IEnumerator AnimateSeparation(GameObject upperHull, GameObject lowerHull, GameObject original)
     {
-        float duration = sliceManager.separationAnimationDuration;
+        float duration = Constants.SEPARATION_ANIMATION_DURATION;
         Bounds originalBounds = original.GetComponent<Renderer>().bounds;
-        float separationDistance = originalBounds.size.magnitude * sliceManager.separationFactor;
+        float separationDistance = originalBounds.size.magnitude * Constants.SEPARATION_FACTOR;
         Vector3 separationVector = planeNormal * (separationDistance * 0.5f);
 
         Vector3 upperStartPos = upperHull.transform.position;

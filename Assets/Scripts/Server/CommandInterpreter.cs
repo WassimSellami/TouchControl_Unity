@@ -21,52 +21,52 @@ public class CommandInterpreter : MonoBehaviour
 
         switch (command)
         {
-            case "UPDATE_MODEL_TRANSFORM":
+            case Constants.UPDATE_MODEL_TRANSFORM:
                 ProcessUpdateModelTransformCommand(args);
                 break;
-            case "UPDATE_CAMERA_TRANSFORM":
+            case Constants.UPDATE_CAMERA_TRANSFORM:
                 ProcessUpdateCameraTransformCommand(args);
                 break;
-            case "LOAD_MODEL":
+            case Constants.LOAD_MODEL:
                 ProcessLoadModelCommand(args);
                 break;
-            case "UNLOAD_MODEL":
+            case Constants.UNLOAD_MODEL:
                 ProcessUnloadModelCommand();
                 break;
-            case "UPDATE_VISUAL_CROP_PLANE":
+            case Constants.UPDATE_VISUAL_CROP_PLANE:
                 ProcessVisualCropPlaneCommand(args);
                 break;
-            case "EXECUTE_SLICE_ACTION":
+            case Constants.EXECUTE_SLICE_ACTION:
                 ProcessExecuteSliceActionCommand(args);
                 break;
-            case "EXECUTE_DESTROY_ACTION":
+            case Constants.EXECUTE_DESTROY_ACTION:
                 ProcessExecuteDestroyActionCommand(args);
                 break;
-            case "START_SHAKE":
+            case Constants.START_SHAKE:
                 ProcessStartShakeCommand(args);
                 break;
-            case "STOP_SHAKE":
+            case Constants.STOP_SHAKE:
                 ProcessStopShakeCommand(args);
                 break;
-            case "UNDO_ACTION":
+            case Constants.UNDO_ACTION:
                 ProcessUndoActionCommand();
                 break;
-            case "REDO_ACTION":
+            case Constants.REDO_ACTION:
                 ProcessRedoActionCommand();
                 break;
-            case "RESET_ALL":
+            case Constants.RESET_ALL:
                 ProcessResetAllCommand();
                 break;
-            case "UPDATE_CUT_LINE":
+            case Constants.UPDATE_CUT_LINE:
                 ProcessUpdateCutLineCommand(args);
                 break;
-            case "HIDE_CUT_LINE":
+            case Constants.HIDE_CUT_LINE:
                 ProcessHideCutLineCommand();
                 break;
-            case "SHOW_SLICE_ICON":
+            case Constants.SHOW_SLICE_ICON:
                 ProcessShowSliceIconCommand(args);
                 break;
-            case "HIDE_SLICE_ICON":
+            case Constants.HIDE_SLICE_ICON:
                 ProcessHideSliceIconCommand();
                 break;
             default:

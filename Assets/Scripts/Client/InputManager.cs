@@ -12,23 +12,6 @@ public class InputManager : MonoBehaviour
     [SerializeField]
     private CuttingPlaneManager cuttingPlaneManager;
 
-    [Header("Gesture Thresholds")]
-    private int orbitTouchCount = 1;
-    private int zoomTouchCount = 2;
-    private int minPanTouchCount = 3;
-    private int rotateTouchCount = 5;
-    private int smoothSamplesCount = 5;
-    [SerializeField] private float swipeThresholdPixels = 100f;
-    [SerializeField] private float pinchRegisterThreshold = 20f;
-
-
-    [Header("Cut Gesture")]
-    [SerializeField] private float longPressThreshold = 0.5f;
-    [SerializeField] private float maxHoldMovementPixels = 500f;
-
-    [Header("Double Tap Gesture")]
-    [SerializeField] private float doubleTapTimeThreshold = 0.3f;
-
     private bool isHolding = false;
     private bool longPressAchieved = false;
     private bool isCutActive = false;
@@ -77,18 +60,18 @@ public class InputManager : MonoBehaviour
             return;
         }
 
-        if (currentTouchCount == rotateTouchCount) HandleRotateGesture();
-        else if (currentTouchCount == zoomTouchCount) HandleTwoFingerGesture();
-        else if (!isZooming && !isRotating && currentTouchCount >= minPanTouchCount) HandlePanGesture();
-        else if (currentTouchCount == orbitTouchCount) HandleSingleTouchInput();
+        if (currentTouchCount == Constants.ROTATE_TOUCH_COUNT) HandleRotateGesture();
+        else if (currentTouchCount == Constants.ZOOM_TOUCH_COUNT) HandleTwoFingerGesture();
+        else if (!isZooming && !isRotating && currentTouchCount >= Constants.MIN_PAN_TOUCH_COUNT) HandlePanGesture();
+        else if (currentTouchCount == Constants.ORBIT_TOUCH_COUNT) HandleSingleTouchInput();
         else
         {
             if (isPanning || isOrbiting || isZooming || isCutActive || isRotating)
             {
-                if ((isRotating && currentTouchCount != rotateTouchCount) ||
-                    (isZooming && currentTouchCount != zoomTouchCount) ||
-                    (isPanning && currentTouchCount < minPanTouchCount) ||
-                    ((isOrbiting || isCutActive) && currentTouchCount != orbitTouchCount))
+                if ((isRotating && currentTouchCount != Constants.ROTATE_TOUCH_COUNT) ||
+                    (isZooming && currentTouchCount != Constants.ZOOM_TOUCH_COUNT) ||
+                    (isPanning && currentTouchCount < Constants.MIN_PAN_TOUCH_COUNT) ||
+                    ((isOrbiting || isCutActive) && currentTouchCount != Constants.ORBIT_TOUCH_COUNT))
                 {
                     ResetGestureStates();
                 }
@@ -131,7 +114,7 @@ public class InputManager : MonoBehaviour
 
             if (!longPressAchieved)
             {
-                if (longPressTimer >= longPressThreshold)
+                if (longPressTimer >= Constants.LONG_PRESS_THRESHOLD)
                 {
                     longPressAchieved = true;
                     if (cuttingPlaneManager != null)
@@ -147,7 +130,7 @@ public class InputManager : MonoBehaviour
                         }
                     }
                 }
-                else if (Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+                else if (Vector2.Distance(startPressPosition, currentRawPosition) > Constants.MAX_HOLD_MOVEMENT_PIXELS)
                 {
                     isHolding = false;
                     isOrbiting = true;
@@ -156,7 +139,7 @@ public class InputManager : MonoBehaviour
             }
             else
             {
-                if (potentialInteractionTarget == null && !isCutActive && Vector2.Distance(startPressPosition, currentRawPosition) > maxHoldMovementPixels)
+                if (potentialInteractionTarget == null && !isCutActive && Vector2.Distance(startPressPosition, currentRawPosition) > Constants.MAX_HOLD_MOVEMENT_PIXELS)
                 {
                     isHolding = false;
                     isCutActive = true;
@@ -194,7 +177,7 @@ public class InputManager : MonoBehaviour
 
     private void HandleTap(Vector2 tapPosition)
     {
-        if (Time.time > lastTapTime + doubleTapTimeThreshold) tapCount = 0;
+        if (Time.time > lastTapTime + Constants.DOUBLE_TAP_TIME_THRESHOLD) tapCount = 0;
         tapCount++;
         lastTapTime = Time.time;
 
@@ -232,14 +215,14 @@ public class InputManager : MonoBehaviour
             float pinchAmount = Mathf.Abs(currentDistance - twoFingerStartDistance);
             float swipeAmount = Mathf.Abs(currentCentroid.x - twoFingerStartCentroid.x);
 
-            if (pinchAmount > pinchRegisterThreshold && pinchAmount > swipeAmount)
+            if (pinchAmount > Constants.PINCH_REGISTER_THRESHOLD && pinchAmount > swipeAmount)
             {
                 isEvaluatingTwoFingerGesture = false;
                 isZooming = true;
                 zoomDistanceHistory.Clear();
                 previousZoomDistance = GetSmoothedFloat(currentDistance, zoomDistanceHistory);
             }
-            else if (swipeAmount > swipeThresholdPixels)
+            else if (swipeAmount > Constants.SWIPTE_THRESHOLD_PIXELS)
             {
                 isEvaluatingTwoFingerGesture = false;
                 float direction = Mathf.Sign(currentCentroid.x - twoFingerStartCentroid.x);
@@ -313,7 +296,7 @@ public class InputManager : MonoBehaviour
     {
         if (targetModelController == null) { isPanning = false; return; }
         List<Vector2> activeTouches = GetActiveTouchPositions();
-        if (activeTouches.Count < minPanTouchCount) { isPanning = false; return; }
+        if (activeTouches.Count < Constants.MIN_PAN_TOUCH_COUNT) { isPanning = false; return; }
 
         Vector2 smoothedCentroid = GetSmoothedVector2(GetCentroid(activeTouches), panCentroidHistory);
         if (!isPanning)
@@ -332,16 +315,16 @@ public class InputManager : MonoBehaviour
 
     private void HandleRotateGesture()
     {
-        if (targetModelController == null || GetTouchOrMouseCount() != rotateTouchCount) { isRotating = false; return; }
+        if (targetModelController == null || GetTouchOrMouseCount() != Constants.ROTATE_TOUCH_COUNT) { isRotating = false; return; }
         List<Vector2> activeTouches = GetActiveTouchPositions();
-        if (activeTouches.Count < rotateTouchCount) { isRotating = false; return; }
+        if (activeTouches.Count < Constants.ROTATE_TOUCH_COUNT) { isRotating = false; return; }
 
         Vector2 centroid = GetCentroid(activeTouches);
         Vector2 referenceVector = activeTouches[0] - centroid;
         float currentAngle = Mathf.Atan2(referenceVector.y, referenceVector.x) * Mathf.Rad2Deg;
         float smoothedAngle = GetSmoothedFloat(currentAngle, rotationAngleHistory);
         bool isNewGesture = false;
-        for (int i = 0; i < rotateTouchCount; i++) if (Input.GetTouch(i).phase == TouchPhase.Began) { isNewGesture = true; break; }
+        for (int i = 0; i < Constants.ROTATE_TOUCH_COUNT; i++) if (Input.GetTouch(i).phase == TouchPhase.Began) { isNewGesture = true; break; }
 
         if (!isRotating || isNewGesture)
         {
@@ -379,7 +362,7 @@ public class InputManager : MonoBehaviour
     private Vector2 GetSmoothedVector2(Vector2 newSample, Queue<Vector2> historyQueue)
     {
         historyQueue.Enqueue(newSample);
-        while (historyQueue.Count > smoothSamplesCount) { historyQueue.Dequeue(); }
+        while (historyQueue.Count > Constants.SMOOTH_SAMPLES_COUNT) { historyQueue.Dequeue(); }
         Vector2 sum = Vector2.zero;
         foreach (Vector2 sample in historyQueue) { sum += sample; }
         return sum / Mathf.Max(1, historyQueue.Count);
@@ -388,7 +371,7 @@ public class InputManager : MonoBehaviour
     private float GetSmoothedFloat(float newSample, Queue<float> historyQueue)
     {
         historyQueue.Enqueue(newSample);
-        while (historyQueue.Count > smoothSamplesCount) { historyQueue.Dequeue(); }
+        while (historyQueue.Count > Constants.SMOOTH_SAMPLES_COUNT) { historyQueue.Dequeue(); }
         float sum = 0f;
         foreach (float sample in historyQueue) { sum += sample; }
         return sum / Mathf.Max(1, historyQueue.Count);

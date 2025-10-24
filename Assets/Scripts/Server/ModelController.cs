@@ -30,14 +30,8 @@ public class ModelController : MonoBehaviour
     [Header("Axis Visuals (Server)")]
     [SerializeField] private bool showServerAxes = true;
     [SerializeField] private Vector3 serverAxisOriginOffset = new Vector3(0f, 0f, 0f);
-    [SerializeField] private float serverAxisLength = 10f;
-    [SerializeField] private float serverAxisThickness = 0.03f;
-    [SerializeField] private float serverArrowheadRadiusFactor = 2.5f;
-    [SerializeField] private float serverArrowheadHeightFactor = 3f;
 
     [Header("Shaking Effect")]
-    [SerializeField] private float wiggleAngle = 7f;
-    [SerializeField] private float wiggleSpeed = 10f;
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
 
     [Header("UI Feedback")]
@@ -490,7 +484,7 @@ public class ModelController : MonoBehaviour
 
         while (true)
         {
-            float angle = Mathf.Sin(Time.time * wiggleSpeed) * wiggleAngle;
+            float angle = Mathf.Sin(Time.time * Constants.WIGGLE_SPEED) * Constants.WIGGLE_ANGLE;
             Quaternion offsetRotation = Quaternion.AngleAxis(angle, wiggleAxis);
             targetTransform.localRotation = startRotation * offsetRotation;
             yield return null;
@@ -552,14 +546,14 @@ public class ModelController : MonoBehaviour
     {
         if (!showServerAxes || axesParentTransform == null) return;
         ClearCurrentModelAxisVisuals();
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.right, serverAxisLength, serverAxisThickness, Color.red, "X_Axis_Server");
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.up, serverAxisLength, serverAxisThickness, Color.green, "Y_Axis_Server");
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.forward, serverAxisLength, serverAxisThickness, Color.blue, "Z_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.right, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.red, "X_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.up, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.green, "Y_Axis_Server");
+        CreateSingleServerAxisVisual(axesParentTransform, Vector3.forward, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.blue, "Z_Axis_Server");
     }
 
     void CreateSingleServerAxisVisual(Transform parentRef, Vector3 direction, float length, float thickness, Color color, string baseName)
     {
-        float capHeight = thickness * serverArrowheadHeightFactor;
+        float capHeight = thickness * Constants.ARROWHEAD_HEIGHT_FACTOR;
         float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         shaft.name = baseName + "_Shaft";
@@ -575,7 +569,7 @@ public class ModelController : MonoBehaviour
         arrowheadCap.name = baseName + "_HeadCap";
         arrowheadCap.transform.SetParent(parentRef, false);
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-        float capRadius = thickness * serverArrowheadRadiusFactor;
+        float capRadius = thickness * Constants.ARROWHEAD_RADIUS_FACTOR;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
         arrowheadCap.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
         arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);

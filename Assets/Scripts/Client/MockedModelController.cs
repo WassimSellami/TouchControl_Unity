@@ -4,34 +4,19 @@ using System.Collections.Generic;
 
 public class MockedModelController : MonoBehaviour
 {
-    [Header("Control Settings")]
-    [SerializeField] private float panSensitivity = 0.01f;
-    [SerializeField] private float orbitSensitivity = 0.5f;
-    [SerializeField] private float zoomSensitivity = 0.1f;
-    [SerializeField] private float rollSensitivity = 0.5f;
-    [SerializeField] private float scaleMin = 0.1f;
-    [SerializeField] private float scaleMax = 10.0f;
-    [SerializeField] private float presetViewRotationStep = 45f;
-    [SerializeField] private float presetViewAnimationDuration = 0.4f;
-    [SerializeField] private float autoRotationSpeed = 20f;
-    [SerializeField] private AnimationCurve presetViewEaseCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
-
     [Header("References")]
     [SerializeField] private GameObject mockVisualModel;
     [SerializeField] private Camera referenceCamera;
 
     [Header("Axis Visuals")]
     [SerializeField] private Vector3 axisOriginOffset = new Vector3(0f, 0f, 0f);
-    [SerializeField] private float axisLength = 10f;
-    [SerializeField] private float axisThickness = 0.03f;
-    [SerializeField] private float arrowheadRadiusFactor = 2.5f;
-    [SerializeField] private float arrowheadHeightFactor = 3f;
 
     [Header("Axis Materials")]
     [SerializeField] private Material redAxisMaterial;
     [SerializeField] private Material greenAxisMaterial;
     [SerializeField] private Material blueAxisMaterial;
 
+    private AnimationCurve PRESET_VIEW_EASE_CAVE = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     private Vector3 initialScale;
@@ -81,7 +66,7 @@ public class MockedModelController : MonoBehaviour
     {
         if (isAutoRotating)
         {
-            float rotationAmount = autoRotationSpeed * autoRotationDirection * Time.deltaTime;
+            float rotationAmount = Constants.AUTO_ROTATION_SPEED * autoRotationDirection * Time.deltaTime;
             transform.Rotate(Vector3.up, rotationAmount, Space.World);
         }
     }
@@ -129,10 +114,10 @@ public class MockedModelController : MonoBehaviour
         switch (lockedOrbitAxis)
         {
             case OrbitAxis.Horizontal:
-                transform.Rotate(Vector3.up, -screenDelta.x * orbitSensitivity, Space.World);
+                transform.Rotate(Vector3.up, -screenDelta.x * Constants.ORBIT_SENSITIVITY, Space.World);
                 break;
             case OrbitAxis.Vertical:
-                transform.Rotate(referenceCamera.transform.right, screenDelta.y * orbitSensitivity, Space.World);
+                transform.Rotate(referenceCamera.transform.right, screenDelta.y * Constants.ORBIT_SENSITIVITY, Space.World);
                 break;
         }
     }
@@ -148,7 +133,7 @@ public class MockedModelController : MonoBehaviour
         if (referenceCamera == null || isAnimatingPresetView) return;
         Vector3 right = referenceCamera.transform.right * -screenDelta.x;
         Vector3 up = referenceCamera.transform.up * -screenDelta.y;
-        Vector3 worldDelta = (right + up) * panSensitivity;
+        Vector3 worldDelta = (right + up) * Constants.PAN_SENSITIVITY;
         transform.Translate(worldDelta, Space.World);
     }
 
@@ -156,11 +141,11 @@ public class MockedModelController : MonoBehaviour
     {
         StopContinuousRotation();
         if (isAnimatingPresetView || zoomAmount == 0) return;
-        float scaleChange = 1.0f + (zoomAmount * zoomSensitivity);
+        float scaleChange = 1.0f + (zoomAmount * Constants.ZOOM_SENSITIVITY);
         Vector3 newScale = transform.localScale * scaleChange;
-        newScale.x = Mathf.Clamp(newScale.x, scaleMin, scaleMax);
-        newScale.y = Mathf.Clamp(newScale.y, scaleMin, scaleMax);
-        newScale.z = Mathf.Clamp(newScale.z, scaleMin, scaleMax);
+        newScale.x = Mathf.Clamp(newScale.x, Constants.SCALE_MIN, Constants.SCALE_MAX);
+        newScale.y = Mathf.Clamp(newScale.y, Constants.SCALE_MIN, Constants.SCALE_MAX);
+        newScale.z = Mathf.Clamp(newScale.z, Constants.SCALE_MIN, Constants.SCALE_MAX);
         transform.localScale = newScale;
     }
 
@@ -169,7 +154,7 @@ public class MockedModelController : MonoBehaviour
         StopContinuousRotation();
         if (referenceCamera == null || isAnimatingPresetView) return;
         Vector3 rotationAxis = referenceCamera.transform.forward;
-        transform.Rotate(rotationAxis, angleDelta * rollSensitivity, Space.World);
+        transform.Rotate(rotationAxis, angleDelta * Constants.ROLL_SENSITIVITY, Space.World);
     }
 
     public void ResetState()
@@ -203,15 +188,15 @@ public class MockedModelController : MonoBehaviour
         isAnimatingPresetView = true;
 
         Quaternion startRotation = transform.rotation;
-        Quaternion targetRotation = startRotation * Quaternion.AngleAxis(presetViewRotationStep * direction, Vector3.up);
+        Quaternion targetRotation = startRotation * Quaternion.AngleAxis(Constants.PRESET_VIEW_ROTATION_STEP * direction, Vector3.up);
 
         float elapsedTime = 0f;
 
-        while (elapsedTime < presetViewAnimationDuration)
+        while (elapsedTime < Constants.PRESET_VIEW_ANIMATION_DURATION)
         {
             elapsedTime += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsedTime / presetViewAnimationDuration);
-            float easedProgress = presetViewEaseCurve.Evaluate(progress);
+            float progress = Mathf.Clamp01(elapsedTime / Constants.PRESET_VIEW_ANIMATION_DURATION);
+            float easedProgress = PRESET_VIEW_EASE_CAVE.Evaluate(progress);
             transform.rotation = Quaternion.Slerp(startRotation, targetRotation, easedProgress);
             yield return null;
         }
@@ -251,14 +236,14 @@ public class MockedModelController : MonoBehaviour
         foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
         axisVisuals.Clear();
 
-        CreateSingleAxisVisual(axesContainer.transform, Vector3.right, axisLength, axisThickness, redAxisMaterial, "X_Axis_Client");
-        CreateSingleAxisVisual(axesContainer.transform, Vector3.up, axisLength, axisThickness, greenAxisMaterial, "Y_Axis_Client");
-        CreateSingleAxisVisual(axesContainer.transform, Vector3.forward, axisLength, axisThickness, blueAxisMaterial, "Z_Axis_Client");
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.right, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, redAxisMaterial, "X_Axis_Client");
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.up, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, greenAxisMaterial, "Y_Axis_Client");
+        CreateSingleAxisVisual(axesContainer.transform, Vector3.forward, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, blueAxisMaterial, "Z_Axis_Client");
     }
 
     void CreateSingleAxisVisual(Transform parentForAxes, Vector3 direction, float length, float thickness, Material axisMat, string baseName)
     {
-        float capHeight = thickness * arrowheadHeightFactor;
+        float capHeight = thickness * Constants.ARROWHEAD_HEIGHT_FACTOR;
         float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
 
         GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -275,7 +260,7 @@ public class MockedModelController : MonoBehaviour
         arrowheadCap.name = baseName + "_HeadCap";
         arrowheadCap.transform.SetParent(parentForAxes, false);
         Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-        float capRadius = thickness * arrowheadRadiusFactor;
+        float capRadius = thickness * Constants.ARROWHEAD_RADIUS_FACTOR;
         arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
         arrowheadCap.transform.localPosition = axisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
         arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);

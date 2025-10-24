@@ -13,18 +13,11 @@ public class CuttingPlaneManager : MonoBehaviour
     [Header("Slicing Options")]
     public Material crossSectionMaterial;
     public bool showPlaneVisualizer = true;
-    public float planeScaleFactor = 50f;
-    public float separationFactor = 0.1f;
     [Tooltip("How long the separation animation takes in seconds.")]
-    public float separationAnimationDuration = 0.3f;
 
     [Header("Visuals Prefabs")]
     public GameObject lineRendererPrefab;
     public GameObject planeVisualizerPrefab;
-
-    [Header("Interaction Settings")]
-    public float planeDepth = 10f;
-    public float lineDuration = 0.5f;
 
     [HideInInspector]
     public List<GameObject> activeModelParts = new List<GameObject>();
@@ -39,10 +32,6 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 initialPlanePointForDepth;
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
-
-    private const float VISUAL_DEPTH_OFFSET = 0.005f;
-    private const float MIN_DRAG_DISTANCE_SQUARED = 4f;
-
     void Start()
     {
         if (webSocketClientManager == null) webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
@@ -87,7 +76,7 @@ public class CuttingPlaneManager : MonoBehaviour
         }
         else
         {
-            worldPoint = rayOrigin.GetPoint(planeDepth);
+            worldPoint = rayOrigin.GetPoint(Constants.PLANE_DEPTH);
         }
 
         webSocketClientManager.SendShowSliceIcon(worldPoint);
@@ -112,7 +101,7 @@ public class CuttingPlaneManager : MonoBehaviour
         Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
 
         if (centerPlane.Raycast(rayOrigin, out float enter)) initialPlanePointForDepth = rayOrigin.GetPoint(enter);
-        else initialPlanePointForDepth = rayOrigin.GetPoint(planeDepth);
+        else initialPlanePointForDepth = rayOrigin.GetPoint(Constants.PLANE_DEPTH);
 
         float distanceToPlane = Vector3.Distance(mainCamera.transform.position, initialPlanePointForDepth);
         startWorldPos = mainCamera.ScreenToWorldPoint(new Vector3(startPointScreen.x, startPointScreen.y, distanceToPlane));
@@ -130,8 +119,8 @@ public class CuttingPlaneManager : MonoBehaviour
         finalEndWorldPosRaw = mainCamera.ScreenToWorldPoint(new Vector3(screenPoint.x, screenPoint.y, distanceToPlane));
 
         Vector3 cameraForward = mainCamera.transform.forward;
-        Vector3 startWorld = startWorldPos + cameraForward * VISUAL_DEPTH_OFFSET;
-        Vector3 endWorld = finalEndWorldPosRaw + cameraForward * VISUAL_DEPTH_OFFSET;
+        Vector3 startWorld = startWorldPos + cameraForward * Constants.VISUAL_DEPTH_OFFSET;
+        Vector3 endWorld = finalEndWorldPosRaw + cameraForward * Constants.VISUAL_DEPTH_OFFSET;
 
         activeLineRenderer.positionCount = 2;
         activeLineRenderer.SetPosition(0, startWorld);
@@ -142,12 +131,12 @@ public class CuttingPlaneManager : MonoBehaviour
 
     public void EndCutGesture(Vector2 endPointScreen)
     {
-        if (Vector2.SqrMagnitude(startPointScreen - endPointScreen) > MIN_DRAG_DISTANCE_SQUARED)
+        if (Vector2.SqrMagnitude(startPointScreen - endPointScreen) > Constants.MIN_DRAG_DISTANCE_SQUARED)
         {
             CalculatePlaneNormalByWorldPoints();
             ProjectPlaneOriginToModelCenter(startWorldPos);
             PerformSlice();
-            Invoke(nameof(HideLineAndShowPlane), lineDuration);
+            Invoke(nameof(HideLineAndShowPlane), Constants.LINE_DURATION);
         }
         else
         {
@@ -221,7 +210,7 @@ public class CuttingPlaneManager : MonoBehaviour
             }
             else
             {
-                worldPoint = rayOrigin.GetPoint(planeDepth);
+                worldPoint = rayOrigin.GetPoint(Constants.PLANE_DEPTH);
             }
 
             var shakeData = new DestroyActionData
@@ -272,10 +261,10 @@ public class CuttingPlaneManager : MonoBehaviour
     private void DrawPlaneVisualizer()
     {
         if (activePlaneVisualizer == null) return;
-        if (webSocketClientManager != null) webSocketClientManager.SendVisualCropPlane(currentPlaneNormal, currentPlaneNormal, planeScaleFactor);
+        if (webSocketClientManager != null) webSocketClientManager.SendVisualCropPlane(currentPlaneNormal, currentPlaneNormal, Constants.PLANE_SCALE_FACTOR);
 
         activePlaneVisualizer.transform.SetPositionAndRotation(currentPlanePoint, Quaternion.LookRotation(currentPlaneNormal));
-        activePlaneVisualizer.transform.localScale = Vector3.one * planeScaleFactor;
+        activePlaneVisualizer.transform.localScale = Vector3.one * Constants.PLANE_SCALE_FACTOR;
         activePlaneVisualizer.SetActive(showPlaneVisualizer);
     }
 
