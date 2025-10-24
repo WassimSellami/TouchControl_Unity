@@ -3,6 +3,9 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using WebSocketSharp;
+using UnityEngine.EventSystems;
+using Unity.VisualScripting;
+
 public class WebSocketClientManager : MonoBehaviour
 {
     [SerializeField] private bool autoConnectMode = false;
@@ -31,6 +34,17 @@ public class WebSocketClientManager : MonoBehaviour
     private bool isMockConnected = false;
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
+
+    private Vector3 loadModel1ButtonOriginalPos;
+    private Vector3 loadModel2ButtonOriginalPos;
+    private GameObject currentDraggedButton = null;
+
+    private GameObject glidingButton = null;
+    private Vector2 buttonVelocity = Vector2.zero;
+    private Vector2 lastButtonPosition;
+    private float glideFriction = 3.5f;
+    private float maxVelocity = 1300f;
+
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
@@ -81,23 +95,125 @@ public class WebSocketClientManager : MonoBehaviour
             UpdateConnectionUI(ConnectionState.IdleWaiting);
         }
 
-        if (loadModel1Button != null) loadModel1Button.onClick.AddListener(() => OnLoadModelSelected("1"));
-        if (loadModel2Button != null) loadModel2Button.onClick.AddListener(() => OnLoadModelSelected("2"));
+        if (loadModel1Button != null)
+        {
+            loadModel1ButtonOriginalPos = loadModel1Button.transform.position;
+            SetupButtonDrag(loadModel1Button.gameObject);
+        }
+        if (loadModel2Button != null)
+        {
+            loadModel2ButtonOriginalPos = loadModel2Button.transform.position;
+            SetupButtonDrag(loadModel2Button.gameObject);
+        }
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
+    }
+
+    private void SetupButtonDrag(GameObject buttonObj)
+    {
+        EventTrigger trigger = buttonObj.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = buttonObj.AddComponent<EventTrigger>();
+
+        EventTrigger.Entry entryBeginDrag = new EventTrigger.Entry();
+        entryBeginDrag.eventID = EventTriggerType.BeginDrag;
+        entryBeginDrag.callback.AddListener((data) => { OnButtonDragStart((PointerEventData)data); });
+        trigger.triggers.Add(entryBeginDrag);
+
+        EventTrigger.Entry entryDrag = new EventTrigger.Entry();
+        entryDrag.eventID = EventTriggerType.Drag;
+        entryDrag.callback.AddListener((data) => { OnButtonDrag((PointerEventData)data); });
+        trigger.triggers.Add(entryDrag);
+
+        EventTrigger.Entry entryEndDrag = new EventTrigger.Entry();
+        entryEndDrag.eventID = EventTriggerType.EndDrag;
+        entryEndDrag.callback.AddListener((data) => { OnButtonDragEnd((PointerEventData)data); });
+        trigger.triggers.Add(entryEndDrag);
+    }
+
+    public void OnButtonDragStart(PointerEventData eventData)
+    {
+        glidingButton = null;
+        if (eventData.pointerPress == loadModel1Button.gameObject || eventData.pointerPress == loadModel2Button.gameObject)
+        {
+            currentDraggedButton = eventData.pointerPress;
+            lastButtonPosition = eventData.position;
+            buttonVelocity = Vector2.zero;
+        }
+    }
+
+    public void OnButtonDrag(PointerEventData eventData)
+    {
+        if (currentDraggedButton != null)
+        {
+            currentDraggedButton.transform.position = eventData.position;
+            buttonVelocity = (eventData.position - lastButtonPosition) / Time.deltaTime;
+            lastButtonPosition = eventData.position;
+        }
+    }
+
+    public void OnButtonDragEnd(PointerEventData eventData)
+    {
+        if (currentDraggedButton != null)
+        {
+            glidingButton = currentDraggedButton;
+            currentDraggedButton = null;
+        }
     }
 
     void Update()
     {
+        if (glidingButton != null)
+        {
+            HandleGlidingButton();
+        }
+
         if (IsConnected && mockedModelControllerRef != null && modelViewPanelCachedRef != null && modelViewPanelCachedRef.activeInHierarchy)
         {
             timeSinceLastModelUpdate += Time.deltaTime;
             if (timeSinceLastModelUpdate >= modelUpdateInterval)
             {
                 SendModelTransformState();
-                SendCameraTransformState();
                 timeSinceLastModelUpdate = 0f;
             }
         }
+    }
+
+    private void HandleGlidingButton()
+    {
+        glidingButton.transform.position += (Vector3)buttonVelocity * Time.deltaTime;
+        buttonVelocity = Vector2.Lerp(buttonVelocity, Vector2.zero, glideFriction * Time.deltaTime);
+
+        RectTransform buttonRect = glidingButton.GetComponent<RectTransform>();
+        Vector3[] corners = new Vector3[4];
+        buttonRect.GetWorldCorners(corners);
+
+        float minX = corners[0].x;
+        float maxX = corners[2].x;
+        float minY = corners[0].y;
+        float maxY = corners[1].y;
+
+        bool isOffScreen = maxX < 0 || minX > Screen.width || maxY < 0 || minY > Screen.height;
+
+        if (isOffScreen)
+        {
+            if (glidingButton == loadModel1Button.gameObject) OnLoadModelSelected("1");
+            else if (glidingButton == loadModel2Button.gameObject) OnLoadModelSelected("2");
+            ResetAndStopGlidingButton();
+        }
+        buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, maxVelocity);
+
+        if (buttonVelocity.sqrMagnitude < 10f)
+        {
+            ResetAndStopGlidingButton();
+        }
+    }
+
+    private void ResetAndStopGlidingButton()
+    {
+        if (glidingButton == loadModel1Button.gameObject) glidingButton.transform.position = loadModel1ButtonOriginalPos;
+        else if (glidingButton == loadModel2Button.gameObject) glidingButton.transform.position = loadModel2ButtonOriginalPos;
+
+        glidingButton = null;
+        buttonVelocity = Vector2.zero;
     }
 
     public void AttemptConnect()
