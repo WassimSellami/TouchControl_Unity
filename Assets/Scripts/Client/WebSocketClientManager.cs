@@ -4,7 +4,7 @@ using TMPro;
 using System;
 using WebSocketSharp;
 using UnityEngine.EventSystems;
-using Unity.VisualScripting;
+using System.Collections.Generic;
 
 public class WebSocketClientManager : MonoBehaviour
 {
@@ -24,8 +24,7 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private Image indicatorImage;
     [SerializeField] private Sprite defaultIndicatorSprite;
-    [SerializeField] private Button loadModel1Button;
-    [SerializeField] private Button loadModel2Button;
+    [SerializeField] private Button[] loadModelButtons;
     [SerializeField] private Button backButtonFromModelView;
 
     private GameObject modelViewPanelCachedRef;
@@ -35,15 +34,14 @@ public class WebSocketClientManager : MonoBehaviour
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
 
-    private Vector3 loadModel1ButtonOriginalPos;
-    private Vector3 loadModel2ButtonOriginalPos;
+    private Dictionary<GameObject, Vector3> buttonOriginalPositions = new Dictionary<GameObject, Vector3>();
     private GameObject currentDraggedButton = null;
 
     private GameObject glidingButton = null;
     private Vector2 buttonVelocity = Vector2.zero;
     private Vector2 lastButtonPosition;
-    private float glideFriction = 3.5f;
-    private float maxVelocity = 1300f;
+    private float glideFriction = 3f;
+    private float maxVelocity = 1200f;
 
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
@@ -94,16 +92,18 @@ public class WebSocketClientManager : MonoBehaviour
             uiManager.ShowConnectionPanel();
             UpdateConnectionUI(ConnectionState.IdleWaiting);
         }
-
-        if (loadModel1Button != null)
+        foreach (Button loadModelButton in loadModelButtons)
         {
-            loadModel1ButtonOriginalPos = loadModel1Button.transform.position;
-            SetupButtonDrag(loadModel1Button.gameObject);
-        }
-        if (loadModel2Button != null)
-        {
-            loadModel2ButtonOriginalPos = loadModel2Button.transform.position;
-            SetupButtonDrag(loadModel2Button.gameObject);
+            if (loadModelButton != null)
+            {
+                if (string.IsNullOrEmpty(loadModelButton.gameObject.tag))
+                {
+                    Debug.LogWarning($"Button '{loadModelButton.name}' does not have a tag. It will not function as a model loader.");
+                    continue;
+                }
+                buttonOriginalPositions[loadModelButton.gameObject] = loadModelButton.transform.position;
+                SetupButtonDrag(loadModelButton.gameObject);
+            }
         }
         if (backButtonFromModelView != null) backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
     }
@@ -132,7 +132,7 @@ public class WebSocketClientManager : MonoBehaviour
     public void OnButtonDragStart(PointerEventData eventData)
     {
         glidingButton = null;
-        if (eventData.pointerPress == loadModel1Button.gameObject || eventData.pointerPress == loadModel2Button.gameObject)
+        if (eventData.pointerPress == loadModelButtons[0].gameObject || eventData.pointerPress == loadModelButtons[1].gameObject)
         {
             currentDraggedButton = eventData.pointerPress;
             lastButtonPosition = eventData.position;
@@ -195,13 +195,12 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (isOffScreen)
         {
-            if (glidingButton == loadModel1Button.gameObject) OnLoadModelSelected("1");
-            else if (glidingButton == loadModel2Button.gameObject) OnLoadModelSelected("2");
+            OnLoadModelSelected(glidingButton.tag);
             ResetAndStopGlidingButton();
         }
         buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, maxVelocity);
 
-        if (buttonVelocity.sqrMagnitude < 10f)
+        if (buttonVelocity.sqrMagnitude < 100f)
         {
             ResetAndStopGlidingButton();
         }
@@ -209,9 +208,7 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void ResetAndStopGlidingButton()
     {
-        if (glidingButton == loadModel1Button.gameObject) glidingButton.transform.position = loadModel1ButtonOriginalPos;
-        else if (glidingButton == loadModel2Button.gameObject) glidingButton.transform.position = loadModel2ButtonOriginalPos;
-
+        glidingButton.transform.position = buttonOriginalPositions[glidingButton];
         glidingButton = null;
         buttonVelocity = Vector2.zero;
     }
