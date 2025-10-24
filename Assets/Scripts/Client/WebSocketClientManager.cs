@@ -16,8 +16,6 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private TMP_InputField ipAddressInput;
     [SerializeField] private string defaultIpAddress = "192.168.0.83";
     [SerializeField] private int serverPort = 8070;
-    [SerializeField] private string servicePath = "/Control";
-    [SerializeField] private float modelUpdateRateFPS = 60f;
 
     [SerializeField] private Button connectButton;
     [SerializeField] private TMP_Text connectButtonText;
@@ -40,8 +38,6 @@ public class WebSocketClientManager : MonoBehaviour
     private GameObject glidingButton = null;
     private Vector2 buttonVelocity = Vector2.zero;
     private Vector2 lastButtonPosition;
-    private float glideFriction = 3f;
-    private float maxVelocity = 1200f;
 
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
@@ -69,7 +65,7 @@ public class WebSocketClientManager : MonoBehaviour
         if (uiManager.modelViewPanel != null) { modelViewPanelCachedRef = uiManager.modelViewPanel; }
         else { Debug.LogError("[WSClientManager] UIManager's modelViewPanel is null."); }
 
-        modelUpdateInterval = 1.0f / Mathf.Max(1f, modelUpdateRateFPS);
+        modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
 
         if (autoConnectMode)
         {
@@ -180,7 +176,7 @@ public class WebSocketClientManager : MonoBehaviour
     private void HandleGlidingButton()
     {
         glidingButton.transform.position += (Vector3)buttonVelocity * Time.deltaTime;
-        buttonVelocity = Vector2.Lerp(buttonVelocity, Vector2.zero, glideFriction * Time.deltaTime);
+        buttonVelocity = Vector2.Lerp(buttonVelocity, Vector2.zero, Constants.MODEL_THUMBNAIL_GLIDE_FRICTION * Time.deltaTime);
 
         RectTransform buttonRect = glidingButton.GetComponent<RectTransform>();
         Vector3[] corners = new Vector3[4];
@@ -198,9 +194,9 @@ public class WebSocketClientManager : MonoBehaviour
             OnLoadModelSelected(glidingButton.tag);
             ResetAndStopGlidingButton();
         }
-        buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, maxVelocity);
+        buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, Constants.MODEL_THUMBNAIL_MAX_VELOCITY);
 
-        if (buttonVelocity.sqrMagnitude < 100f)
+        if (buttonVelocity.sqrMagnitude < Constants.MODEL_THUMBNAIL_RESET_VELOCITY)
         {
             ResetAndStopGlidingButton();
         }
@@ -227,7 +223,7 @@ public class WebSocketClientManager : MonoBehaviour
             ? ipAddressInput.text
             : defaultIpAddress;
 
-        string url = $"ws://{ip}:{serverPort}{servicePath}";
+        string url = $"ws://{ip}:{serverPort}{Constants.SERVICE_PATH}";
 
         UpdateConnectionUI(ConnectionState.Connecting);
         isAttemptingConnection = true;
