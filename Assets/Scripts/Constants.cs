@@ -30,9 +30,9 @@ public static class Constants
     public const float AXIS_THICKNESS = 0.03f;
     public const float ARROWHEAD_RADIUS_FACTOR = 2.5f;
     public const float ARROWHEAD_HEIGHT_FACTOR = 3f;
-    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 3f;
-    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 1200f;
-    public const float MODEL_THUMBNAIL_RESET_VELOCITY = 100f;
+    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 2f;
+    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 1000f;
+    public const float MODEL_THUMBNAIL_RESET_VELOCITY = 200f;
 
     // Slice feature
     public const float PLANE_SCALE_FACTOR = 50f;

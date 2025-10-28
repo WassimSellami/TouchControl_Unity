@@ -1101,11 +1101,6 @@ MonoBehaviour:
   targetModelController: {fileID: 980018137}
   eventSystem: {fileID: 1616439627}
   cuttingPlaneManager: {fileID: 966730136}
-  swipeThresholdPixels: 100
-  pinchRegisterThreshold: 20
-  longPressThreshold: 0.5
-  maxHoldMovementPixels: 15
-  doubleTapTimeThreshold: 0.3
 --- !u!4 &504893849
 Transform:
   m_ObjectHideFlags: 0
@@ -1797,15 +1792,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 1
+  autoConnectMode: 0
   uiManager: {fileID: 751785403}
   mockedModelControllerRef: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
   ipAddressInput: {fileID: 698393692}
-  defaultIpAddress: 192.168.0.83
+  defaultIpAddress: 192.168.0.36
   serverPort: 8070
-  servicePath: /Control
-  modelUpdateRateFPS: 60
   connectButton: {fileID: 885532448}
   connectButtonText: {fileID: 488383159}
   statusText: {fileID: 2104096725}
@@ -2256,13 +2249,8 @@ MonoBehaviour:
   webSocketClientManager: {fileID: 838438841}
   crossSectionMaterial: {fileID: 2100000, guid: c73021a10d2dca34399a569c8e603b60, type: 2}
   showPlaneVisualizer: 0
-  planeScaleFactor: 3
-  separationFactor: 0.1
-  separationAnimationDuration: 0.5
   lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
   planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
-  planeDepth: 10
-  lineDuration: 0.5
   activeModelParts: []
 --- !u!4 &966730137
 Transform:
@@ -2324,46 +2312,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c76b271fec6baf14185e8bb7d3d1d8a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  panSensitivity: 0.01
-  orbitSensitivity: 0.1
-  zoomSensitivity: 0.005
-  rollSensitivity: 0.5
-  scaleMin: 0.1
-  scaleMax: 10
-  presetViewRotationStep: 45
-  presetViewAnimationDuration: 1
-  autoRotationSpeed: 40
-  presetViewEaseCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 2
-      outSlope: 2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
   mockVisualModel: {fileID: 1579986874}
   referenceCamera: {fileID: 961739752}
   axisOriginOffset: {x: 0, y: 0, z: 0}
-  axisLength: 10
-  axisThickness: 0.03
-  arrowheadRadiusFactor: 2.5
-  arrowheadHeightFactor: 3
   redAxisMaterial: {fileID: 2100000, guid: c43d4c43a365b1349a683e671b8b1c5e, type: 2}
   greenAxisMaterial: {fileID: 2100000, guid: 4b8fadb3294ea45489446653acdd0524, type: 2}
   blueAxisMaterial: {fileID: 2100000, guid: 6755b73d59d2ca443a73e9c5579a7ecd, type: 2}

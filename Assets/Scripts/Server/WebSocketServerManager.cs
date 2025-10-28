@@ -9,7 +9,6 @@ public class WebSocketServerManager : MonoBehaviour
 {
     [Header("Server Configuration")]
     [SerializeField] private int serverPort = 8070;
-    [SerializeField] private string servicePath = "/Control";
 
     [Header("Object Control")]
     [SerializeField] private ModelController modelController;
@@ -77,7 +76,7 @@ public class WebSocketServerManager : MonoBehaviour
     private void StartWebSocketServer()
     {
         wsServer = new WebSocketServer(IPAddress.Any, serverPort);
-        wsServer.AddWebSocketService<ModelControlService>(servicePath, (serviceInstance) => {
+        wsServer.AddWebSocketService<ModelControlService>(Constants.SERVICE_PATH, (serviceInstance) => {
             serviceInstance.LogCallback = LogOnMainThread;
             serviceInstance.ProcessCommandCallback = ProcessReceivedCommand;
         });
@@ -87,7 +86,7 @@ public class WebSocketServerManager : MonoBehaviour
             wsServer.Start();
             if (wsServer.IsListening)
             {
-                LogOnMainThread($"[Server] Listening on ws://YOUR_IP:{wsServer.Port}{servicePath}");
+                LogOnMainThread($"[Server] Listening on ws://YOUR_IP:{wsServer.Port}{Constants.SERVICE_PATH}");
             }
             else
             {
