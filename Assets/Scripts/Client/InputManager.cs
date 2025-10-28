@@ -222,7 +222,7 @@ public class InputManager : MonoBehaviour
                 zoomDistanceHistory.Clear();
                 previousZoomDistance = GetSmoothedFloat(currentDistance, zoomDistanceHistory);
             }
-            else if (swipeAmount > Constants.SWIPTE_THRESHOLD_PIXELS)
+            else if (swipeAmount > Constants.SWIPE_THRESHOLD_PIXELS)
             {
                 isEvaluatingTwoFingerGesture = false;
                 float direction = Mathf.Sign(currentCentroid.x - twoFingerStartCentroid.x);

@@ -10,22 +10,22 @@ public static class Constants
     public const int MIN_PAN_TOUCH_COUNT = 3;
     public const int ROTATE_TOUCH_COUNT = 5;
     public const int SMOOTH_SAMPLES_COUNT = 5;
-    public const float SWIPTE_THRESHOLD_PIXELS = 100f;
+    public const float SWIPE_THRESHOLD_PIXELS = 100f;
     public const float PINCH_REGISTER_THRESHOLD = 20f;
     public const float LONG_PRESS_THRESHOLD = 0.5f;
-    public const float MAX_HOLD_MOVEMENT_PIXELS = 500f;
+    public const float MAX_HOLD_MOVEMENT_PIXELS = 15f;
     public const float DOUBLE_TAP_TIME_THRESHOLD = 0.3f;
 
     // Control parameters
     public const float PAN_SENSITIVITY = 0.01f;
-    public const float ORBIT_SENSITIVITY = 0.5f;
-    public const float ZOOM_SENSITIVITY = 0.1f;
+    public const float ORBIT_SENSITIVITY = 0.1f;
+    public const float ZOOM_SENSITIVITY = 0.005f;
     public const float ROLL_SENSITIVITY = 0.5f;
     public const float SCALE_MIN = 0.1f;
     public const float SCALE_MAX = 10.0f;
     public const float PRESET_VIEW_ROTATION_STEP = 45f;
-    public const float PRESET_VIEW_ANIMATION_DURATION = 0.4f;
-    public const float AUTO_ROTATION_SPEED = 15f;
+    public const float PRESET_VIEW_ANIMATION_DURATION = 1f;
+    public const float AUTO_ROTATION_SPEED = 40f;
     public const float AXIS_LENGTH = 10f;
     public const float AXIS_THICKNESS = 0.03f;
     public const float ARROWHEAD_RADIUS_FACTOR = 2.5f;
@@ -35,9 +35,9 @@ public static class Constants
     public const float MODEL_THUMBNAIL_RESET_VELOCITY = 200f;
 
     // Slice feature
-    public const float PLANE_SCALE_FACTOR = 50f;
+    public const float PLANE_SCALE_FACTOR = 3f;
     public const float SEPARATION_FACTOR = 0.1f;
-    public const float SEPARATION_ANIMATION_DURATION = 0.3f;
+    public const float SEPARATION_ANIMATION_DURATION = 0.5f;
     public const float PLANE_DEPTH = 10f;
     public const float LINE_DURATION = 0.5f;
     public const float VISUAL_DEPTH_OFFSET = 0.005f;
