@@ -4,6 +4,7 @@ using EzySlice;
 using System.Linq;
 using System.Collections;
 using UnityEngine.UI;
+using UnityVolumeRendering;
 
 public class ModelController : MonoBehaviour
 {
@@ -17,9 +18,10 @@ public class ModelController : MonoBehaviour
         public GameObject DestroyedPart;
     }
 
-    [Header("Model Prefabs")]
-    [SerializeField] private GameObject modelPrefab1;
-    [SerializeField] private GameObject modelPrefab2;
+    [Header("Available Models")]
+    [SerializeField] private List<ModelData> availableModels = new();
+
+    private Dictionary<string, ModelData> modelDataLookup = new();
 
     [Header("Cutting Components")]
     [SerializeField] private Material crossSectionMaterial;
@@ -60,10 +62,18 @@ public class ModelController : MonoBehaviour
     private Quaternion refPointLocalRotation;
 
     public string CurrentModelID { get; private set; } = null;
+
     public Vector3 CurrentModelBoundsSize { get; private set; } = Vector3.one;
 
     void Awake()
     {
+        foreach (var modelData in availableModels)
+        {
+            if (!string.IsNullOrEmpty(modelData.modelID))
+            {
+                modelDataLookup[modelData.modelID] = modelData;
+            }
+        }
         if (feedbackIconImage != null)
         {
             feedbackIconImage.gameObject.SetActive(false);
@@ -136,6 +146,37 @@ public class ModelController : MonoBehaviour
     {
         UnloadCurrentModel();
 
+        if (!modelDataLookup.TryGetValue(modelId, out ModelData modelData))
+        {
+            Debug.LogError($"Model ID '{modelId}' not found!");
+            return;
+        }
+
+        SetupContainers();
+        CurrentModelID = modelId;
+
+        GameObject rootModel = null;
+
+        if (modelData is VolumetricModelData volumetricData)
+        {
+            rootModel = LoadVolumetricModel(volumetricData);
+        }
+        else if (modelData is PolygonalModelData polygonalData)
+        {
+            rootModel = LoadPrefabModel(polygonalData);
+        }
+
+        rootModel.name = "RootModel";
+        allParts.Add(rootModel.name, rootModel);
+        CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
+
+        SetupReferencePoint(rootModel);
+
+        SetupVisualHelpers();
+    }
+
+    private void SetupContainers()
+    {
         worldContainer = new GameObject("WorldContainer");
         worldContainer.transform.SetParent(this.transform, false);
 
@@ -144,46 +185,63 @@ public class ModelController : MonoBehaviour
 
         axesContainer = new GameObject("AxesContainer");
         axesContainer.transform.SetParent(worldContainer.transform, false);
+    }
 
-        GameObject prefabToLoad = null;
-        modelId = modelId.ToUpperInvariant();
-        CurrentModelID = modelId;
+    private GameObject LoadVolumetricModel(VolumetricModelData data)
+    {
+        RawDatasetImporter importer = new RawDatasetImporter(
+            data.rawFilePath,
+            data.dimX, data.dimY, data.dimZ,
+            data.contentFormat,
+            data.endianness,
+            data.bytesToSkip
+        );
+        VolumeDataset dataset = importer.Import();
+        VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
+        volObj.gameObject.transform.SetParent(modelContainer.transform, false);
+        return volObj.gameObject;
+    }
 
-        if (modelId == "1") prefabToLoad = modelPrefab1;
-        else if (modelId == "2") prefabToLoad = modelPrefab2;
-        else { CurrentModelID = null; return; }
+    private GameObject LoadPrefabModel(PolygonalModelData data)
+    {
+        if (data.prefab == null) return null;
+        return Instantiate(data.prefab, modelContainer.transform);
+    }
 
-        if (prefabToLoad != null)
+
+    private void SetupReferencePoint(GameObject rootModel)
+    {
+        modelReferencePoint = rootModel.transform.Find("ref");
+        if (modelReferencePoint == null) modelReferencePoint = rootModel.transform;
+
+        bool isVolumetricData = rootModel.GetComponent<VolumeRenderedObject>() != null;
+
+        if (isVolumetricData)
         {
-            rootModel = Instantiate(prefabToLoad, modelContainer.transform);
-            rootModel.name = "RootModel";
-            allParts.Add(rootModel.name, rootModel);
-            CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
-
-            modelReferencePoint = rootModel.transform.Find("ref");
-            if (modelReferencePoint == null)
-            {
-                modelReferencePoint = rootModel.transform;
-            }
-
+            refPointLocalPosition = new Vector3(-0.6f, -0.4f, -0.5f);
+        }
+        else
+        {
             refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
             refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
-
-            if (planeVisualizerPrefab != null)
-            {
-                activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
-                activePlaneVisualizer.SetActive(false);
-            }
-            if (lineRendererPrefab != null)
-            {
-                activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
-                activeLineRenderer.enabled = false;
-            }
-
-            CreateServerAxisVisuals(axesContainer.transform);
-            if (axesContainer != null) axesContainer.SetActive(true);
         }
-        else { CurrentModelID = null; }
+    }
+
+
+    private void SetupVisualHelpers()
+    {
+        if (planeVisualizerPrefab != null)
+        {
+            activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
+            activePlaneVisualizer.SetActive(false);
+        }
+        if (lineRendererPrefab != null)
+        {
+            activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
+            activeLineRenderer.enabled = false;
+        }
+        CreateServerAxisVisuals(axesContainer.transform);
+        if (axesContainer != null) axesContainer.SetActive(true);
     }
 
     private void ClearRedoStack()

@@ -21,8 +21,8 @@ public static class Constants
     public const float ORBIT_SENSITIVITY = 0.1f;
     public const float ZOOM_SENSITIVITY = 0.005f;
     public const float ROLL_SENSITIVITY = 0.5f;
-    public const float SCALE_MIN = 0.1f;
-    public const float SCALE_MAX = 10.0f;
+    public const float SCALE_MIN = 0.001f;
+    public const float SCALE_MAX = 100.0f;
     public const float PRESET_VIEW_ROTATION_STEP = 45f;
     public const float PRESET_VIEW_ANIMATION_DURATION = 1f;
     public const float AUTO_ROTATION_SPEED = 40f;
@@ -30,8 +30,8 @@ public static class Constants
     public const float AXIS_THICKNESS = 0.03f;
     public const float ARROWHEAD_RADIUS_FACTOR = 2.5f;
     public const float ARROWHEAD_HEIGHT_FACTOR = 3f;
-    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 2f;
-    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 1000f;
+    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 0.1f;
+    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 800f;
     public const float MODEL_THUMBNAIL_RESET_VELOCITY = 200f;
 
     // Slice feature
@@ -44,8 +44,8 @@ public static class Constants
     public const float MIN_DRAG_DISTANCE_SQUARED = 4f;
 
     // server
-    public const float WIGGLE_ANGLE = 7f;
-    public const float WIGGLE_SPEED = 10f;
+    public const float WIGGLE_ANGLE = 1f;
+    public const float WIGGLE_SPEED = 30f;
 
    
     //commands
