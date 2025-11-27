@@ -15,7 +15,7 @@ MonoBehaviour:
   modelID: 3
   displayName: Skull
   description: This is a Skull volumetric dataset
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: a304d034146bb264fa6f4a4c401cb8c5, type: 3}
   boundsSize: {x: 1, y: 1.0000002, z: 1.0000002}
   rawFilePath: Assets\\DataFiles\\VisMale\\VisMale.raw
   dimX: 128

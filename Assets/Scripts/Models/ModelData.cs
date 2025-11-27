@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public abstract class ModelData : ScriptableObject
@@ -9,4 +10,17 @@ public abstract class ModelData : ScriptableObject
     public Vector3 boundsSize = Vector3.one;
 }
 
+[Serializable]
+public class ModelMetadata
+{
+    public string modelID;
+    public string displayName;
+    public string description;
+    public string thumbnailBase64;
+}
 
+[Serializable]
+public class ModelMetadataList
+{
+    public ModelMetadata[] models;
+}

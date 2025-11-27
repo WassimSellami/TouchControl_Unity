@@ -32,13 +32,14 @@ public class WebSocketClientManager : MonoBehaviour
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
 
-    private Dictionary<GameObject, Vector3> buttonOriginalPositions = new Dictionary<GameObject, Vector3>();
+    public Dictionary<GameObject, Vector3> buttonOriginalPositions = new Dictionary<GameObject, Vector3>();
     private GameObject currentDraggedButton = null;
 
     private GameObject glidingButton = null;
     private Vector2 buttonVelocity = Vector2.zero;
     private Vector2 lastButtonPosition;
 
+    private List<ModelMetadata> availableModels = new List<ModelMetadata>();
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
@@ -88,16 +89,16 @@ public class WebSocketClientManager : MonoBehaviour
             uiManager.ShowConnectionPanel();
             UpdateConnectionUI(ConnectionState.IdleWaiting);
         }
+
         foreach (Button loadModelButton in loadModelButtons)
         {
             if (loadModelButton != null)
             {
-                if (string.IsNullOrEmpty(loadModelButton.gameObject.tag))
+                if (string.IsNullOrEmpty(loadModelButton.gameObject.name))
                 {
                     Debug.LogWarning($"Button '{loadModelButton.name}' does not have a tag. It will not function as a model loader.");
                     continue;
                 }
-                buttonOriginalPositions[loadModelButton.gameObject] = loadModelButton.transform.position;
                 SetupButtonDrag(loadModelButton.gameObject);
             }
         }
@@ -128,11 +129,13 @@ public class WebSocketClientManager : MonoBehaviour
     public void OnButtonDragStart(PointerEventData eventData)
     {
         glidingButton = null;
-        if (eventData.pointerPress == loadModelButtons[0].gameObject || eventData.pointerPress == loadModelButtons[1].gameObject)
+        currentDraggedButton = eventData.pointerPress;
+        lastButtonPosition = eventData.position;
+        buttonVelocity = Vector2.zero;
+
+        if (!buttonOriginalPositions.ContainsKey(currentDraggedButton))
         {
-            currentDraggedButton = eventData.pointerPress;
-            lastButtonPosition = eventData.position;
-            buttonVelocity = Vector2.zero;
+            buttonOriginalPositions[currentDraggedButton] = currentDraggedButton.transform.position;
         }
     }
 
@@ -191,8 +194,9 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (isOffScreen)
         {
-            OnLoadModelSelected(glidingButton.tag);
+            OnLoadModelSelected(glidingButton.name);
             ResetAndStopGlidingButton();
+            return;
         }
         buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, Constants.MODEL_THUMBNAIL_MAX_VELOCITY);
 
@@ -204,6 +208,7 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void ResetAndStopGlidingButton()
     {
+        if (glidingButton == null) return;
         glidingButton.transform.position = buttonOriginalPositions[glidingButton];
         glidingButton = null;
         buttonVelocity = Vector2.zero;
@@ -373,18 +378,73 @@ public class WebSocketClientManager : MonoBehaviour
         string args = parts.Length > 1 ? parts[1] : null;
 
         if (command == "MODEL_SIZE_UPDATE") ProcessModelSizeUpdate(args);
+        else if (command == "MODELS_LIST_UPDATE") ProcessModelsListUpdate(args);
         else Debug.Log($"Received unknown message from server: \"{data}\"");
+    }
+
+    private void ProcessModelsListUpdate(string args)
+    {
+        if (string.IsNullOrEmpty(args)) return;
+
+        try
+        {
+            ModelMetadataList metadataList = JsonUtility.FromJson<ModelMetadataList>(args);
+            availableModels.Clear();
+
+            if (metadataList != null && metadataList.models != null)
+            {
+                foreach (var metadata in metadataList.models)
+                {
+                    availableModels.Add(metadata);
+                }
+
+                if (uiManager != null)
+                {
+                    uiManager.PopulateModelButtons(availableModels, this);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error parsing ModelMetadataList: {ex.Message} | Args: {args}");
+        }
     }
 
     private void ProcessModelSizeUpdate(string args)
     {
+
         if (mockedModelControllerRef == null || string.IsNullOrEmpty(args)) return;
         try
         {
             ModelBoundsSizeData sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(args);
             mockedModelControllerRef.ApplyServerModelScale(sizeData.size);
         }
-        catch (Exception ex) { Debug.LogError($"Error parsing ModelBoundsSizeData: {ex.Message} | Args: {args}"); }
+        catch (Exception ex) {}
+    }
+
+    public Sprite Base64ToSprite(string base64)
+    {
+        if (string.IsNullOrEmpty(base64)) return null;
+
+        try
+        {
+            byte[] imageBytes = Convert.FromBase64String(base64);
+            Texture2D texture = new Texture2D(2, 2);
+            texture.LoadImage(imageBytes);
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f)
+            );
+
+            return sprite;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error converting Base64 to Sprite: {ex.Message}");
+            return null;
+        }
     }
 
     private void OnWebSocketError(string errorMessage)
@@ -482,7 +542,6 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (autoConnectMode)
         {
-            Debug.Log($"[MOCK] Suppressing server message: {message}");
             return;
         }
 

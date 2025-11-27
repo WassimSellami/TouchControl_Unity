@@ -36,6 +36,8 @@ public class MockedModelController : MonoBehaviour
     private bool isAutoRotating = false;
     private float autoRotationDirection = 0f;
 
+    private Vector3 originalMockModelScale = Vector3.one;
+
     public bool IsAutoRotating => isAutoRotating;
 
     void Awake()
@@ -167,6 +169,12 @@ public class MockedModelController : MonoBehaviour
         transform.rotation = initialRotation;
         transform.localScale = initialScale;
 
+        if (mockVisualModel != null)
+        {
+            mockVisualModel.transform.localScale = Vector3.one;
+        }
+        originalMockModelScale = Vector3.one;
+
         if (referenceCamera != null)
         {
             referenceCamera.transform.position = initialCameraPosition;
@@ -175,6 +183,7 @@ public class MockedModelController : MonoBehaviour
 
         EnsureAxisVisualsAreCreated();
     }
+
 
     public void TriggerPresetViewRotation(float direction)
     {
@@ -226,10 +235,51 @@ public class MockedModelController : MonoBehaviour
 
     public void ApplyServerModelScale(Vector3 serverModelSize)
     {
-        if (mockVisualModel == null) return;
-        mockVisualModel.transform.localScale = serverModelSize;
+
+        if (mockVisualModel == null)
+        {
+            return;
+        }
+
+        Quaternion cachedRotation = mockVisualModel.transform.rotation;
+        mockVisualModel.transform.rotation = Quaternion.identity;
+
+        Renderer[] renderers = mockVisualModel.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            mockVisualModel.transform.rotation = cachedRotation;
+            return;
+        }
+
+        Bounds currentBounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            currentBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        Vector3 currentWorldSize = currentBounds.size;
+
+        if (currentWorldSize.x == 0 || currentWorldSize.y == 0 || currentWorldSize.z == 0)
+        {
+            mockVisualModel.transform.rotation = cachedRotation;
+            return;
+        }
+
+        Vector3 requiredScaleFactor = new Vector3(
+            serverModelSize.x / currentWorldSize.x,
+            serverModelSize.y / currentWorldSize.y,
+            serverModelSize.z / currentWorldSize.z
+        );
+
+        Vector3 newScale = Vector3.Scale(mockVisualModel.transform.localScale, requiredScaleFactor);
+
+        mockVisualModel.transform.localScale = newScale;
+
+        mockVisualModel.transform.rotation = cachedRotation;
+
         EnsureAxisVisualsAreCreated();
     }
+
 
     void CreateAxisVisuals()
     {

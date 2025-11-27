@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
+using System.Collections.Generic;
+using UnityEngine.EventSystems;
 
 public class UIManager : MonoBehaviour
 {
@@ -10,6 +13,12 @@ public class UIManager : MonoBehaviour
     public GameObject mainMenuPanel;
     [SerializeField]
     public GameObject modelViewPanel;
+
+    [Header("Model Button Setup")]
+    [SerializeField]
+    private Transform modelButtonsContainer;
+    [SerializeField]
+    private GameObject modelButtonPrefab;
 
     [Header("System References")]
     [SerializeField]
@@ -32,6 +41,8 @@ public class UIManager : MonoBehaviour
     private Button undoButton;
     [SerializeField]
     private Button redoButton;
+
+    private List<GameObject> dynamicModelButtons = new List<GameObject>();
 
     void Awake()
     {
@@ -58,6 +69,73 @@ public class UIManager : MonoBehaviour
 
         if (redoButton != null) redoButton.onClick.AddListener(OnRedoButtonPressed);
         else Debug.LogWarning("[UIManager] RedoButton is not assigned.");
+    }
+
+    public void PopulateModelButtons(List<ModelMetadata> models, WebSocketClientManager wsManager)
+    {
+        ClearDynamicButtons();
+
+        if (modelButtonsContainer == null || modelButtonPrefab == null)
+        {
+            Debug.LogWarning("[UIManager] modelButtonsContainer or modelButtonPrefab not assigned. Cannot populate buttons dynamically.");
+            return;
+        }
+
+        foreach (var modelMetadata in models)
+        {
+            GameObject buttonObj = Instantiate(modelButtonPrefab, modelButtonsContainer);
+            buttonObj.name = modelMetadata.modelID;
+
+            Image buttonImage = buttonObj.GetComponent<Image>();
+            if (buttonImage != null && !string.IsNullOrEmpty(modelMetadata.thumbnailBase64))
+            {
+                Sprite thumbnail = wsManager.Base64ToSprite(modelMetadata.thumbnailBase64);
+                if (thumbnail != null) buttonImage.sprite = thumbnail;
+            }
+
+            TMP_Text buttonText = buttonObj.GetComponentInChildren<TMP_Text>();
+            if (buttonText != null)
+            {
+                buttonText.text = modelMetadata.displayName;
+            }
+
+            SetupButtonDrag(buttonObj, wsManager);
+
+            dynamicModelButtons.Add(buttonObj);
+        }
+    }
+
+    private void SetupButtonDrag(GameObject buttonObj, WebSocketClientManager wsManager)
+    {
+        EventTrigger trigger = buttonObj.GetComponent<EventTrigger>();
+        if (trigger == null) trigger = buttonObj.AddComponent<EventTrigger>();
+
+        trigger.triggers.Clear();
+
+        EventTrigger.Entry entryBeginDrag = new EventTrigger.Entry();
+        entryBeginDrag.eventID = EventTriggerType.BeginDrag;
+        entryBeginDrag.callback.AddListener((data) => { wsManager.OnButtonDragStart((PointerEventData)data); });
+        trigger.triggers.Add(entryBeginDrag);
+
+        EventTrigger.Entry entryDrag = new EventTrigger.Entry();
+        entryDrag.eventID = EventTriggerType.Drag;
+        entryDrag.callback.AddListener((data) => { wsManager.OnButtonDrag((PointerEventData)data); });
+        trigger.triggers.Add(entryDrag);
+
+        EventTrigger.Entry entryEndDrag = new EventTrigger.Entry();
+        entryEndDrag.eventID = EventTriggerType.EndDrag;
+        entryEndDrag.callback.AddListener((data) => { wsManager.OnButtonDragEnd((PointerEventData)data); });
+        trigger.triggers.Add(entryEndDrag);
+    }
+
+
+    private void ClearDynamicButtons()
+    {
+        foreach (GameObject btn in dynamicModelButtons)
+        {
+            if (btn != null) Destroy(btn);
+        }
+        dynamicModelButtons.Clear();
     }
 
     private void OnUndoButtonPressed()

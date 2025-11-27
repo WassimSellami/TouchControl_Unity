@@ -3,7 +3,6 @@ using WebSocketSharp;
 using WebSocketSharp.Server;
 using System;
 using System.Net;
-using static JsonUtilityHelper;
 
 public class WebSocketServerManager : MonoBehaviour
 {
@@ -21,10 +20,12 @@ public class WebSocketServerManager : MonoBehaviour
     {
         public Action<string, bool> LogCallback;
         public Action<string> ProcessCommandCallback;
+        public Action<string> SendInitialDataCallback;
 
         protected override void OnOpen()
         {
             LogCallback?.Invoke($"[Server] Client connected: {ID}", false);
+            SendInitialDataCallback?.Invoke(ID);
         }
 
         protected override void OnMessage(MessageEventArgs e)
@@ -79,6 +80,7 @@ public class WebSocketServerManager : MonoBehaviour
         wsServer.AddWebSocketService<ModelControlService>(Constants.SERVICE_PATH, (serviceInstance) => {
             serviceInstance.LogCallback = LogOnMainThread;
             serviceInstance.ProcessCommandCallback = ProcessReceivedCommand;
+            serviceInstance.SendInitialDataCallback = SendInitialModelData;
         });
 
         try
@@ -122,28 +124,60 @@ public class WebSocketServerManager : MonoBehaviour
         });
     }
 
+    private void SendInitialModelData(string clientID)
+    {
+        if (modelController == null) return;
+
+        UnityMainThreadDispatcher.Instance().Enqueue(() =>
+        {
+            ModelMetadataList metadataList = modelController.GetAllModelsMetadata();
+            string jsonData = JsonUtility.ToJson(metadataList);
+            string message = $"{Constants.MODELS_LIST_UPDATE}:{jsonData}";
+
+            SendToClient(clientID, message);
+        });
+    }
+
+    private void SendToClient(string clientID, string message)
+    {
+        if (wsServer != null && wsServer.IsListening)
+        {
+            var service = wsServer.WebSocketServices[Constants.SERVICE_PATH];
+            if (service != null)
+            {
+                service.Sessions.SendTo(message, clientID);
+                LogOnMainThread($"[Server] Sent to {clientID}: {message.Substring(0, Math.Min(50, message.Length))}...");
+            }
+        }
+    }
+
     public void SendModelSizeUpdate(Vector3 modelSize)
     {
         if (wsServer != null && wsServer.IsListening)
         {
             ModelBoundsSizeData sizeData = new ModelBoundsSizeData { size = modelSize };
             string jsonData = JsonUtility.ToJson(sizeData);
-            string message = $"MODEL_SIZE_UPDATE:{jsonData}";
+            string message = $"{Constants.MODEL_SIZE_UPDATE}:{jsonData}";
 
-            UnityMainThreadDispatcher.Instance().Enqueue(() =>
-            {
-                foreach (var serviceHost in wsServer.WebSocketServices.Hosts)
-                {
-                    if (serviceHost.Sessions.Count > 0)
-                    {
-                        serviceHost.Sessions.Broadcast(message);
-                    }
-                }
-            });
+            BroadcastToAll(message);
         }
         else
         {
             LogOnMainThread("[Server] Not listening to broadcast model size update.", true);
+        }
+    }
+
+    private void BroadcastToAll(string message)
+    {
+        if (wsServer != null && wsServer.IsListening)
+        {
+            foreach (var serviceHost in wsServer.WebSocketServices.Hosts)
+            {
+                if (serviceHost.Sessions.Count > 0)
+                {
+                    serviceHost.Sessions.Broadcast(message);
+                }
+            }
         }
     }
 }

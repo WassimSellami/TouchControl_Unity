@@ -3,6 +3,9 @@ public static class Constants
     // Websocket
     public const string SERVICE_PATH = "/Control";
     public const float MODEL_UPDATE_FPS = 60f;
+    public const string MODELS_LIST_UPDATE = "MODELS_LIST_UPDATE";
+    public const string MODEL_SIZE_UPDATE = "MODEL_SIZE_UPDATE";
+
 
     // input
     public const int ORBIT_TOUCH_COUNT = 1;
@@ -30,9 +33,9 @@ public static class Constants
     public const float AXIS_THICKNESS = 0.03f;
     public const float ARROWHEAD_RADIUS_FACTOR = 2.5f;
     public const float ARROWHEAD_HEIGHT_FACTOR = 3f;
-    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 0.1f;
-    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 800f;
-    public const float MODEL_THUMBNAIL_RESET_VELOCITY = 200f;
+    public const float MODEL_THUMBNAIL_GLIDE_FRICTION = 3f;
+    public const float MODEL_THUMBNAIL_MAX_VELOCITY = 3000f;
+    public const float MODEL_THUMBNAIL_RESET_VELOCITY = 1500f;
 
     // Slice feature
     public const float PLANE_SCALE_FACTOR = 3f;

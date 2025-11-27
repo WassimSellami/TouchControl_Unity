@@ -5,6 +5,8 @@ using System.Linq;
 using System.Collections;
 using UnityEngine.UI;
 using UnityVolumeRendering;
+using System;
+using Unity.VisualScripting;
 
 public class ModelController : MonoBehaviour
 {
@@ -169,9 +171,10 @@ public class ModelController : MonoBehaviour
         rootModel.name = "RootModel";
         allParts.Add(rootModel.name, rootModel);
 
+        CurrentModelBoundsSize = modelData.boundsSize;
 
 #if UNITY_EDITOR
-        if (modelData.boundsSize == Vector3.one)
+        if (CurrentModelBoundsSize == Vector3.one)
         {
             CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
             modelData.boundsSize = CurrentModelBoundsSize;
@@ -652,4 +655,64 @@ public class ModelController : MonoBehaviour
         else rend.material = new Material(Shader.Find("Legacy Shaders/Diffuse"));
         rend.material.color = color;
     }
+
+    public ModelMetadataList GetAllModelsMetadata()
+    {
+        var metadataList = new List<ModelMetadata>();
+
+        foreach (var modelData in availableModels)
+        {
+            var metadata = new ModelMetadata
+            {
+                modelID = modelData.modelID,
+                displayName = modelData.displayName,
+                description = modelData.description,
+                thumbnailBase64 = SpriteToBase64(modelData.thumbnail)
+            };
+            metadataList.Add(metadata);
+        }
+
+        return new ModelMetadataList { models = metadataList.ToArray() };
+    }
+
+    private string SpriteToBase64(Sprite sprite)
+    {
+        if (sprite == null) return "";
+
+        try
+        {
+            Texture2D texture = sprite.texture;
+            RenderTexture tmp = RenderTexture.GetTemporary(
+                texture.width,
+                texture.height,
+                0,
+                RenderTextureFormat.Default,
+                RenderTextureReadWrite.Linear
+            );
+
+            Graphics.Blit(texture, tmp);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = tmp;
+
+            Texture2D readableTexture = new Texture2D(texture.width, texture.height);
+            readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(tmp);
+
+            byte[] bytes = readableTexture.EncodeToPNG();
+            string base64 = Convert.ToBase64String(bytes);
+
+            Destroy(readableTexture);
+
+            return base64;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[ModelController] Error converting sprite to Base64: {ex.Message}");
+            return "";
+        }
+    }
+
 }

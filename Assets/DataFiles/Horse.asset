@@ -16,5 +16,5 @@ MonoBehaviour:
   displayName: Horse
   description: This is a Horse polygonal model
   thumbnail: {fileID: 21300000, guid: 8f4519c0989749e40ad63c058170063f, type: 3}
-  boundsSize: {x: 1, y: 1, z: 1}
+  boundsSize: {x: 0.54998267, y: 1.8560486, z: 2.658414}
   prefab: {fileID: 2874911170236052761, guid: de03c2c7eea080948aac614fd8e5bcff, type: 3}
