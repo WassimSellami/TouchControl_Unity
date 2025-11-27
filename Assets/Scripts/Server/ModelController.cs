@@ -168,7 +168,16 @@ public class ModelController : MonoBehaviour
 
         rootModel.name = "RootModel";
         allParts.Add(rootModel.name, rootModel);
-        CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
+
+
+#if UNITY_EDITOR
+        if (modelData.boundsSize == Vector3.one)
+        {
+            CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
+            modelData.boundsSize = CurrentModelBoundsSize;
+            UnityEditor.EditorUtility.SetDirty(modelData);
+        }
+#endif
 
         SetupReferencePoint(rootModel);
 

@@ -9,11 +9,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: 41ca9cf9246d0a446bef467a706385b2, type: 3}
   m_Name: Tiger
-  m_EditorClassIdentifier: Assembly-CSharp::PolygonalModelData
+  m_EditorClassIdentifier: 
   modelID: 2
   displayName: Tiger
-  description: This is a tiger polygonal model
-  thumbnail: {fileID: 21300000, guid: 7c0004c03e7690c468bf57939b5582a9, type: 3}
-  prefab: {fileID: 3799736142059901398, guid: 95ed355764d404c49b869cab5ae4162d, type: 3}
+  description: This is a Tiger polygonal model
+  thumbnail: {fileID: 21300000, guid: 309014b11f6597944ac5069f8999d359, type: 3}
+  boundsSize: {x: 0.72866535, y: 1.2826622, z: 2.9145815}
+  prefab: {fileID: 3799736142059901398, guid: 64e2e651bbeb1144eac8e4b4c78982aa, type: 3}
