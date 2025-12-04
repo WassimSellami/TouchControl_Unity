@@ -37,6 +37,7 @@ public class MockedModelController : MonoBehaviour
     private float autoRotationDirection = 0f;
 
     private Vector3 originalMockModelScale = Vector3.one;
+    private Vector3 initialModelScale = Vector3.one;
 
     public bool IsAutoRotating => isAutoRotating;
 
@@ -171,9 +172,12 @@ public class MockedModelController : MonoBehaviour
 
         if (mockVisualModel != null)
         {
-            mockVisualModel.transform.localScale = Vector3.one;
+            mockVisualModel.transform.localScale = initialModelScale;
+            mockVisualModel.transform.localPosition = Vector3.zero;
+            mockVisualModel.transform.localRotation = Quaternion.identity;
+
+            mockVisualModel.SetActive(true);
         }
-        originalMockModelScale = Vector3.one;
 
         if (referenceCamera != null)
         {
@@ -235,7 +239,6 @@ public class MockedModelController : MonoBehaviour
 
     public void ApplyServerModelScale(Vector3 serverModelSize)
     {
-
         if (mockVisualModel == null)
         {
             return;
@@ -274,6 +277,7 @@ public class MockedModelController : MonoBehaviour
         Vector3 newScale = Vector3.Scale(mockVisualModel.transform.localScale, requiredScaleFactor);
 
         mockVisualModel.transform.localScale = newScale;
+        initialModelScale = newScale;
 
         mockVisualModel.transform.rotation = cachedRotation;
 
