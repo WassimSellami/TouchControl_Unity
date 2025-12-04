@@ -31,6 +31,10 @@ public class ModelController : MonoBehaviour
     [SerializeField] private GameObject lineRendererPrefab;
     [SerializeField] private bool showPlaneVisualizer = true;
 
+    [Header("Volumetric Settings")]
+    [Tooltip("CRITICAL: Assign the Material with the 'DirectVolumeRenderingShader_SlicePlane' shader here.")]
+    [SerializeField] private Material volumetricDefaultMaterial;
+
     [Header("Axis Visuals (Server)")]
     [SerializeField] private bool showServerAxes = true;
     [SerializeField] private Vector3 serverAxisOriginOffset = new Vector3(0f, 0f, 0f);
@@ -168,21 +172,24 @@ public class ModelController : MonoBehaviour
             rootModel = LoadPrefabModel(polygonalData);
         }
 
-        rootModel.name = "RootModel";
-        allParts.Add(rootModel.name, rootModel);
+        if (rootModel != null)
+        {
+            rootModel.name = "RootModel";
+            allParts.Add(rootModel.name, rootModel);
 
-        CurrentModelBoundsSize = modelData.boundsSize;
+            CurrentModelBoundsSize = modelData.boundsSize;
 
 #if UNITY_EDITOR
-        if (CurrentModelBoundsSize == Vector3.one)
-        {
-            CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
-            modelData.boundsSize = CurrentModelBoundsSize;
-            UnityEditor.EditorUtility.SetDirty(modelData);
-        }
+            if (CurrentModelBoundsSize == Vector3.one)
+            {
+                CurrentModelBoundsSize = CalculateModelBoundsSize(rootModel);
+                modelData.boundsSize = CurrentModelBoundsSize;
+                UnityEditor.EditorUtility.SetDirty(modelData);
+            }
 #endif
 
-        SetupReferencePoint(rootModel);
+            SetupReferencePoint(rootModel);
+        }
 
         SetupVisualHelpers();
     }
@@ -211,6 +218,14 @@ public class ModelController : MonoBehaviour
         VolumeDataset dataset = importer.Import();
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
         volObj.gameObject.transform.SetParent(modelContainer.transform, false);
+
+        // Assign the slicing material if provided, ensuring we start with the correct shader
+        if (volumetricDefaultMaterial != null)
+        {
+            Renderer r = volObj.GetComponent<Renderer>();
+            if (r != null) r.sharedMaterial = volumetricDefaultMaterial;
+        }
+
         return volObj.gameObject;
     }
 
@@ -219,7 +234,6 @@ public class ModelController : MonoBehaviour
         if (data.prefab == null) return null;
         return Instantiate(data.prefab, modelContainer.transform);
     }
-
 
     private void SetupReferencePoint(GameObject rootModel)
     {
@@ -238,7 +252,6 @@ public class ModelController : MonoBehaviour
             refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
         }
     }
-
 
     private void SetupVisualHelpers()
     {
@@ -296,37 +309,76 @@ public class ModelController : MonoBehaviour
         {
             if (allParts.TryGetValue(partID, out GameObject originalPart) && originalPart.activeInHierarchy)
             {
-                SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
-                if (sliceResult != null)
+                // Check for Volumetric Object
+                VolumeRenderedObject volObj = originalPart.GetComponent<VolumeRenderedObject>();
+                if (volObj == null) volObj = originalPart.GetComponentInChildren<VolumeRenderedObject>();
+
+                if (volObj != null)
                 {
-                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
-                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
+                    // === VOLUMETRIC SLICING ===
+                    GameObject upperHull = Instantiate(originalPart, originalPart.transform.parent);
+                    GameObject lowerHull = Instantiate(originalPart, originalPart.transform.parent);
 
-                    if (upperHull != null && lowerHull != null)
+                    upperHull.name = partID + "_U";
+                    lowerHull.name = partID + "_L";
+
+                    // Important: Destroy the script so it doesn't regenerate the mesh or reset materials
+                    Destroy(upperHull.GetComponent<VolumeRenderedObject>());
+                    Destroy(lowerHull.GetComponent<VolumeRenderedObject>());
+
+                    Vector3 localPoint = originalPart.transform.InverseTransformPoint(data.planePoint);
+                    Vector3 localNormal = originalPart.transform.InverseTransformDirection(data.planeNormal).normalized;
+                    Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
+
+                    ApplyVolumeMaterial(upperHull, textureSpacePoint, localNormal);
+                    ApplyVolumeMaterial(lowerHull, textureSpacePoint, -localNormal);
+
+                    allParts.Add(upperHull.name, upperHull);
+                    allParts.Add(lowerHull.name, lowerHull);
+
+                    StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
+
+                    record.Originals.Add(originalPart);
+                    record.NewHulls.Add(upperHull);
+                    record.NewHulls.Add(lowerHull);
+
+                    originalPart.SetActive(false);
+                }
+                else
+                {
+                    // === POLYGONAL SLICING ===
+                    SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
+                    if (sliceResult != null)
                     {
-                        upperHull.name = partID + "_U";
-                        lowerHull.name = partID + "_L";
+                        GameObject upperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
+                        GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
 
-                        if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
+                        if (upperHull != null && lowerHull != null)
                         {
-                            Destroy(upperHull);
-                            Destroy(lowerHull);
-                            continue;
+                            upperHull.name = partID + "_U";
+                            lowerHull.name = partID + "_L";
+
+                            if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
+                            {
+                                Destroy(upperHull);
+                                Destroy(lowerHull);
+                                continue;
+                            }
+
+                            allParts.Add(upperHull.name, upperHull);
+                            allParts.Add(lowerHull.name, lowerHull);
+
+                            SetupHull(upperHull, originalPart);
+                            SetupHull(lowerHull, originalPart);
+
+                            StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
+
+                            record.Originals.Add(originalPart);
+                            record.NewHulls.Add(upperHull);
+                            record.NewHulls.Add(lowerHull);
+
+                            originalPart.SetActive(false);
                         }
-
-                        allParts.Add(upperHull.name, upperHull);
-                        allParts.Add(lowerHull.name, lowerHull);
-
-                        SetupHull(upperHull, originalPart);
-                        SetupHull(lowerHull, originalPart);
-
-                        StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
-
-                        record.Originals.Add(originalPart);
-                        record.NewHulls.Add(upperHull);
-                        record.NewHulls.Add(lowerHull);
-
-                        originalPart.SetActive(false);
                     }
                 }
             }
@@ -334,6 +386,36 @@ public class ModelController : MonoBehaviour
         if (record.Originals.Count > 0)
         {
             undoStack.Push(record);
+        }
+    }
+
+    private void ApplyVolumeMaterial(GameObject volumeObj, Vector3 textureSpacePoint, Vector3 localNormal)
+    {
+        Renderer rend = volumeObj.GetComponent<Renderer>();
+        if (rend == null) rend = volumeObj.GetComponentInChildren<Renderer>();
+
+        if (rend != null && volumetricDefaultMaterial != null)
+        {
+            // 1. Force use of the Slicing Shader Material
+            Material mat = new Material(volumetricDefaultMaterial);
+
+            // 2. Transfer Data Textures from the active instance (if they exist)
+            // This is crucial because the runtime generated the textures, we must keep them.
+            Material existingMat = rend.sharedMaterial;
+            if (existingMat != null)
+            {
+                if (existingMat.HasProperty("_DataTex")) mat.SetTexture("_DataTex", existingMat.GetTexture("_DataTex"));
+                if (existingMat.HasProperty("_GradientTex")) mat.SetTexture("_GradientTex", existingMat.GetTexture("_GradientTex"));
+                if (existingMat.HasProperty("_TFTex")) mat.SetTexture("_TFTex", existingMat.GetTexture("_TFTex"));
+                if (existingMat.HasProperty("_MinVal")) mat.SetFloat("_MinVal", existingMat.GetFloat("_MinVal"));
+                if (existingMat.HasProperty("_MaxVal")) mat.SetFloat("_MaxVal", existingMat.GetFloat("_MaxVal"));
+            }
+
+            // 3. Set Slicing Properties
+            mat.SetVector("_PlanePos", textureSpacePoint);
+            mat.SetVector("_PlaneNormal", localNormal);
+
+            rend.material = mat;
         }
     }
 
@@ -570,7 +652,8 @@ public class ModelController : MonoBehaviour
     private IEnumerator AnimateSeparation(GameObject upperHull, GameObject lowerHull, GameObject original, Vector3 planeNormal, float separationFactor)
     {
         float duration = 0.3f;
-        Bounds originalBounds = original.GetComponent<Renderer>().bounds;
+        Bounds originalBounds = GetBounds(original);
+
         float separationDistance = originalBounds.size.magnitude * separationFactor;
         Vector3 separationVector = planeNormal * (separationDistance * 0.5f);
 
@@ -596,14 +679,28 @@ public class ModelController : MonoBehaviour
         if (lowerHull != null) lowerHull.transform.position = lowerEndPos;
     }
 
+    private Bounds GetBounds(GameObject go)
+    {
+        Bounds bounds = new Bounds(go.transform.position, Vector3.zero);
+        Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+        }
+        else
+        {
+            bounds.size = Vector3.one;
+        }
+        return bounds;
+    }
+
     private Vector3 CalculateModelBoundsSize(GameObject model)
     {
-        if (model == null) return Vector3.one;
-        Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0) return Vector3.one;
-        Bounds bounds = new Bounds(renderers[0].bounds.center, Vector3.zero);
-        foreach (Renderer rend in renderers) { bounds.Encapsulate(rend.bounds); }
-        return bounds.size;
+        return GetBounds(model).size;
     }
 
     void ClearCurrentModelAxisVisuals()
@@ -714,5 +811,4 @@ public class ModelController : MonoBehaviour
             return "";
         }
     }
-
 }

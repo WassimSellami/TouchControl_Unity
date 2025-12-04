@@ -17,10 +17,12 @@
         _SecondaryTFTex("Transfer Function Texture for secondary volume", 2D) = "" {}
         [HideInInspector] _ShadowVolumeTextureSize("Shadow volume dimensions", Vector) = (1, 1, 1)
         [HideInInspector] _TextureSize("Dataset dimensions", Vector) = (1, 1, 1)
-        _PlanePos("Slice Plane Position (Local)", Vector) = (0.5, 0.5, 0.5, 0)
+        
+        // --- Slicing Properties ---
+        _PlanePos("Slice Plane Position (Local 0-1)", Vector) = (0.5, 0.5, 0.5, 0)
         _PlaneNormal("Slice Plane Normal (Local)", Vector) = (0, 1, 0, 0)
+    }
 
-}
     SubShader
     {
         Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }
@@ -97,9 +99,11 @@
 
             float _SamplingRateMultiplier;
 
+            // Slicing uniforms
             float3 _PlanePos;
             float3 _PlaneNormal;
 
+            // Logic to determine if a texture-space position (0 to 1) should be culled
             bool IsCutout(float3 currPos)
             {
                 return dot(currPos - _PlanePos, _PlaneNormal) < 0;
@@ -154,7 +158,7 @@
             {
                 RayInfo ray;
                 ray.direction = getViewRayDir(vertexLocal);
-                ray.startPos = vertexLocal + float3(0.5f, 0.5f, 0.5f);
+                ray.startPos = vertexLocal + float3(0.5f, 0.5f, 0.5f); // Convert local -0.5..0.5 to texture space 0..1
                 // Find intersections with axis aligned boundinng box (the volume)
                 ray.aabbInters = intersectAABB(ray.startPos, ray.direction, float3(0.0, 0.0, 0.0), float3(1.0f, 1.0f, 1.0));
 
@@ -258,10 +262,7 @@
             // Performs lighting calculations, and returns a modified colour.
             float3 calculateLighting(float3 col, float3 normal, float3 lightDir, float3 eyeDir, float specularIntensity)
             {
-                // Invert normal if facing opposite direction of view direction.
-                // Optimised version of: if(dot(normal, eyeDir) < 0.0) normal *= -1.0
                 normal *= (step(0.0, dot(normal, eyeDir)) * 2.0 - 1.0);
-
                 float ndotl = max(dot(normal, lightDir), 0.0f);
                 float3 diffuse = ndotl * col;
                 float3 ambient = AMBIENT_LIGHTING_FACTOR * col;
@@ -282,11 +283,9 @@
 #endif
             }
 
-            // Converts local position to depth value
             float localToDepth(float3 localPos)
             {
                 float4 clipPos = UnityObjectToClipPos(float4(localPos, 1.0f));
-
 #if defined(SHADER_API_GLCORE) || defined(SHADER_API_OPENGL) || defined(SHADER_API_GLES) || defined(SHADER_API_GLES3)
                 return (clipPos.z / clipPos.w) * 0.5 + 0.5;
 #else
@@ -306,7 +305,6 @@
                 return o;
             }
 
-            // Direct Volume Rendering
             frag_out frag_dvr(frag_in i)
             {
                 #define MAX_NUM_STEPS 512
@@ -318,7 +316,6 @@
 
                 float3 lightDir = normalize(ObjSpaceViewDir(float4(float3(0.0f, 0.0f, 0.0f), 0.0f)));
 
-                // Create a small random offset in order to remove artifacts
                 ray.startPos += (JITTER_FACTOR * ray.direction * raymarchInfo.stepSize) * tex2D(_NoiseTex, float2(i.uv.x, i.uv.y)).r;
 
                 float4 col = float4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -328,58 +325,35 @@
                     const float t = iStep * raymarchInfo.numStepsRecip;
                     const float3 currPos = lerp(ray.startPos, ray.endPos, t);
 
-                    // Perform slice culling (cross section plane)
+                    // --- SLICE CULLING ---
                     if (IsCutout(currPos))
                         continue;
-
+                    // ---------------------
 
 #if CUBIC_INTERPOLATION_ON && !defined(MULTIVOLUME_OVERLAY) && !defined(MULTIVOLUME_ISOLATE)
-                    // Optimisation: First get density without tricubic interpolation, before doing an early return
                     if (getTF1DColour(getDensityNoTricubic(currPos)).a == 0.0)
                         continue;
 #endif
-
-                    // Get the dansity/sample value of the current position
                     const float density = getDensity(currPos);
-
-                    // Apply visibility window
                     if (density < _MinVal || density > _MaxVal) continue;
 
-                    // Apply 1D transfer function
 #if !TF2D_ON
                     float4 src = getTF1DColour(density);
 #if !defined(MULTIVOLUME_OVERLAY) && !defined(MULTIVOLUME_ISOLATE)
                     if (src.a == 0.0)
                         continue;
 #endif
-
-#if defined(MULTIVOLUME_OVERLAY) || defined(MULTIVOLUME_ISOLATE)
-                    const float secondaryDensity = getSecondaryDensity(currPos);
-                    float4 secondaryColour = getSecondaryTF1DColour(secondaryDensity);
-#if MULTIVOLUME_OVERLAY
-                    src = secondaryColour.a > 0.0 ? secondaryColour : src;
-#elif MULTIVOLUME_ISOLATE
-                    src.a = secondaryColour.a > 0.0 ? src.a : 0.0;
 #endif
-#endif
-#endif
-
-                    // Calculate gradient (needed for lighting and 2D transfer functions)
 #if defined(TF2D_ON) || defined(LIGHTING_ON)
                     float3 gradient = getGradient(currPos);
                     float gradMag = length(gradient);
-
                     float gradMagNorm = gradMag / 1.75f;
 #endif
-
-                    // Apply 2D transfer function
 #if TF2D_ON
                     float4 src = getTF2DColour(density, gradMagNorm);
                     if (src.a == 0.0)
                         continue;
 #endif
-
-                    // Apply lighting
 #if defined(LIGHTING_ON)
                     float factor = smoothstep(_LightingGradientThresholdStart, _LightingGradientThresholdEnd, gradMag);
                     float3 shaded = calculateLighting(src.rgb, gradient / gradMag, getLightDirection(-ray.direction), -ray.direction, 0.3f);
@@ -389,8 +363,6 @@
                     src.rgb *= (1.0f - shadow);
 #endif
 #endif
-
-                    // Opacity correction
                     float blendFactor = 1.0f / _SamplingRateMultiplier;
                     src.a = 1.0f - pow(1.0f - src.a, blendFactor);
                     src.rgb *= src.a;
@@ -399,8 +371,6 @@
                     if (col.a > 0.15 && t < tDepth) {
                         tDepth = t;
                     }
-
-                    // Early ray termination
 #if defined(RAY_TERMINATE_ON)
                     if (col.a > OPACITY_THRESHOLD) {
                         break;
@@ -408,23 +378,20 @@
 #endif
                 }
 
-                // Write fragment output
                 frag_out output;
                 output.colour = col;
 #if DEPTHWRITE_ON
-                tDepth += (step(col.a, 0.0) * 1000.0); // Write large depth if no hit
+                tDepth += (step(col.a, 0.0) * 1000.0);
                 const float3 depthPos = lerp(ray.startPos, ray.endPos, tDepth) - float3(0.5f, 0.5f, 0.5f);
                 output.depth = localToDepth(depthPos);
 #endif
                 return output;
             }
 
-            // Maximum Intensity Projection mode
             frag_out frag_mip(frag_in i)
             {
                 #define MAX_NUM_STEPS 512
                 const int samplingRate = (int)(MAX_NUM_STEPS * _SamplingRateMultiplier);
-
                 RayInfo ray = getRayBack2Front(i.vertexLocal);
                 RaymarchInfo raymarchInfo = initRaymarch(ray, samplingRate);
 
@@ -446,30 +413,26 @@
                     }
                 }
 
-                // Write fragment output
                 frag_out output;
-                output.colour = float4(1.0f, 1.0f, 1.0f, maxDensity); // maximum intensity
+                output.colour = float4(1.0f, 1.0f, 1.0f, maxDensity);
 #if DEPTHWRITE_ON
                 output.depth = localToDepth(maxDensityPos - float3(0.5f, 0.5f, 0.5f));
 #endif
                 return output;
             }
 
-            // Surface rendering mode
-            // Draws the first point (closest to camera) with a density within the user-defined thresholds.
             frag_out frag_surf(frag_in i)
             {
                 #define MAX_NUM_STEPS 1024
                 const int samplingRate = (int)(MAX_NUM_STEPS * _SamplingRateMultiplier);
-
                 RayInfo ray = getRayFront2Back(i.vertexLocal);
                 RaymarchInfo raymarchInfo = initRaymarch(ray, samplingRate);
 
-                // Create a small random offset in order to remove artifacts
                 ray.startPos = ray.startPos + (JITTER_FACTOR * ray.direction * raymarchInfo.stepSize) * tex2D(_NoiseTex, float2(i.uv.x, i.uv.y)).r;
 
                 float4 col = float4(0,0,0,0);
-                for (int iStep = 0; iStep < raymarchInfo.numSteps; iStep++)
+                int iStep = 0;
+                for (iStep = 0; iStep < raymarchInfo.numSteps; iStep++)
                 {
                     const float t = iStep * raymarchInfo.numStepsRecip;
                     const float3 currPos = lerp(ray.startPos, ray.endPos, t);
@@ -478,27 +441,6 @@
                         continue;
 
                     const float density = getDensity(currPos);
-#if MULTIVOLUME_ISOLATE
-                    const float secondaryDensity = getSecondaryDensity(currPos);
-                    if (secondaryDensity <= 0.0)
-                        continue;
-#elif MULTIVOLUME_OVERLAY
-                    const float secondaryDensity = getSecondaryDensity(currPos);
-                    if (secondaryDensity > 0.0)
-                    {
-                        float4 secondaryColour = getSecondaryTF1DColour(secondaryDensity);
-                        if (secondaryColour.a > 0.0)
-                        {
-                            col = secondaryColour;
-                            float3 gradient = getGradient(currPos);
-                            float gradMag = length(gradient);
-                            float3 normal = gradient / gradMag;
-                            col.rgb = calculateLighting(col.rgb, normal, getLightDirection(-ray.direction), -ray.direction, 0.15);
-                            col.a = 1.0;
-                            break;
-                        }
-                    }
-#endif
                     if (density > _MinVal && density < _MaxVal)
                     {
                         float3 gradient = getGradient(currPos);
@@ -514,12 +456,10 @@
                     }
                 }
 
-                // Write fragment output
                 frag_out output;
                 output.colour = col;
 #if DEPTHWRITE_ON
-                
-                const float tDepth = iStep * raymarchInfo.numStepsRecip + (step(col.a, 0.0) * 1000.0); // Write large depth if no hit
+                const float tDepth = iStep * raymarchInfo.numStepsRecip + (step(col.a, 0.0) * 1000.0);
                 output.depth = localToDepth(lerp(ray.startPos, ray.endPos, tDepth) - float3(0.5f, 0.5f, 0.5f));
 #endif
                 return output;
@@ -533,7 +473,6 @@
             frag_out frag(frag_in i)
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-
 #if MODE_DVR
                 return frag_dvr(i);
 #elif MODE_MIP

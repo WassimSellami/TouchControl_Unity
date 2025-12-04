@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-
 public class CuttingPlaneManager : MonoBehaviour
 {
     [Header("Core Components")]
@@ -9,9 +8,9 @@ public class CuttingPlaneManager : MonoBehaviour
     public GameObject targetModel;
     public Transform modelRootTransform;
     public WebSocketClientManager webSocketClientManager;
-
+    
     [Header("Slicing Options")]
-    public Material crossSectionMaterial;
+public Material crossSectionMaterial;
     public bool showPlaneVisualizer = true;
     [Tooltip("How long the separation animation takes in seconds.")]
 
@@ -32,6 +31,7 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 initialPlanePointForDepth;
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
+
     void Start()
     {
         if (webSocketClientManager == null) webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
@@ -109,14 +109,39 @@ public class CuttingPlaneManager : MonoBehaviour
         if (activeLineRenderer != null) activeLineRenderer.enabled = true;
     }
 
+    public void EndCutGesture(Vector2 endPointScreen)
+    {
+        if (activeLineRenderer != null && mainCamera != null)
+        {
+            float distanceToPlane = Vector3.Distance(mainCamera.transform.position, initialPlanePointForDepth);
+
+            finalEndWorldPosRaw = mainCamera.ScreenToWorldPoint(
+                new Vector3(endPointScreen.x, endPointScreen.y, distanceToPlane));
+        }
+
+        if (Vector2.SqrMagnitude(startPointScreen - endPointScreen) > Constants.MIN_DRAG_DISTANCE_SQUARED)
+        {
+            Vector3 lineVector = finalEndWorldPosRaw - startWorldPos;
+            currentPlaneNormal = Vector3.Cross(lineVector, mainCamera.transform.forward).normalized;
+            currentPlanePoint = (startWorldPos + finalEndWorldPosRaw) * 0.5f;
+
+            PerformSlice();
+            Invoke(nameof(HideLineAndShowPlane), Constants.LINE_DURATION);
+        }
+        else
+        {
+            ResetDrawing();
+        }
+    }
     public void UpdateCutDrag(Vector2 screenPoint)
     {
-        if (activeLineRenderer == null || mainCamera == null) return;
+        if (activeLineRenderer == null || mainCamera == null)
+            return;
 
-        Vector3 depthReference = initialPlanePointForDepth;
-        float distanceToPlane = Vector3.Distance(mainCamera.transform.position, depthReference);
+        float distanceToPlane = Vector3.Distance(mainCamera.transform.position, initialPlanePointForDepth);
 
-        finalEndWorldPosRaw = mainCamera.ScreenToWorldPoint(new Vector3(screenPoint.x, screenPoint.y, distanceToPlane));
+        finalEndWorldPosRaw = mainCamera.ScreenToWorldPoint(
+            new Vector3(screenPoint.x, screenPoint.y, distanceToPlane));
 
         Vector3 cameraForward = mainCamera.transform.forward;
         Vector3 startWorld = startWorldPos + cameraForward * Constants.VISUAL_DEPTH_OFFSET;
@@ -126,22 +151,25 @@ public class CuttingPlaneManager : MonoBehaviour
         activeLineRenderer.SetPosition(0, startWorld);
         activeLineRenderer.SetPosition(1, endWorld);
 
-        if (webSocketClientManager != null) webSocketClientManager.SendLineData(startWorld, endWorld);
+        if (webSocketClientManager != null)
+            webSocketClientManager.SendLineData(startWorld, endWorld);
     }
 
-    public void EndCutGesture(Vector2 endPointScreen)
+
+    private void DrawPlaneVisualizer()
     {
-        if (Vector2.SqrMagnitude(startPointScreen - endPointScreen) > Constants.MIN_DRAG_DISTANCE_SQUARED)
-        {
-            CalculatePlaneNormalByWorldPoints();
-            ProjectPlaneOriginToModelCenter(startWorldPos);
-            PerformSlice();
-            Invoke(nameof(HideLineAndShowPlane), Constants.LINE_DURATION);
-        }
-        else
-        {
-            ResetDrawing();
-        }
+        if (activePlaneVisualizer == null)
+            return;
+
+        if (webSocketClientManager != null)
+            webSocketClientManager.SendVisualCropPlane(currentPlanePoint, currentPlaneNormal, Constants.PLANE_SCALE_FACTOR);
+
+        activePlaneVisualizer.transform.SetPositionAndRotation(
+            currentPlanePoint,
+            Quaternion.LookRotation(currentPlaneNormal));
+
+        activePlaneVisualizer.transform.localScale = Vector3.one * Constants.PLANE_SCALE_FACTOR;
+        activePlaneVisualizer.SetActive(showPlaneVisualizer);
     }
 
     private void PerformSlice()
@@ -150,7 +178,7 @@ public class CuttingPlaneManager : MonoBehaviour
         List<GameObject> partsToSlice = new List<GameObject>();
         foreach (GameObject part in activeModelParts)
         {
-            Renderer partRenderer = part.GetComponent<Renderer>();
+            Renderer partRenderer = part.GetComponentInChildren<Renderer>();
             if (part != null && part.activeInHierarchy && partRenderer != null && DoesPlaneIntersectBounds(slicePlane, partRenderer.bounds))
             {
                 partsToSlice.Add(part);
@@ -179,7 +207,7 @@ public class CuttingPlaneManager : MonoBehaviour
         targetModel.name = "RootModel";
         activeModelParts.Add(targetModel);
 
-        if (targetModel.GetComponent<Renderer>() != null) modelCenterWorld = targetModel.GetComponent<Renderer>().bounds.center;
+        modelCenterWorld = GetCollectiveBounds().center;
 
         if (HistoryManager.Instance != null) HistoryManager.Instance.ClearHistory();
         if (webSocketClientManager != null) webSocketClientManager.SendResetAll();
@@ -238,34 +266,21 @@ public class CuttingPlaneManager : MonoBehaviour
         Ray ray = mainCamera.ScreenPointToRay(screenPoint);
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
-            if (activeModelParts.Contains(hit.collider.gameObject))
+            foreach (var part in activeModelParts)
             {
-                return hit.collider.gameObject;
+                if (hit.collider.gameObject == part || hit.collider.transform.IsChildOf(part.transform))
+                {
+                    return part;
+                }
             }
         }
         return null;
-    }
-
-    private void ProjectPlaneOriginToModelCenter(Vector3 planeDefinitionPoint)
-    {
-        float signedDistance = Vector3.Dot(currentPlaneNormal, modelCenterWorld - planeDefinitionPoint);
-        currentPlanePoint = modelCenterWorld - currentPlaneNormal * signedDistance;
     }
 
     private void HideLineAndShowPlane()
     {
         ResetDrawing();
         DrawPlaneVisualizer();
-    }
-
-    private void DrawPlaneVisualizer()
-    {
-        if (activePlaneVisualizer == null) return;
-        if (webSocketClientManager != null) webSocketClientManager.SendVisualCropPlane(currentPlaneNormal, currentPlaneNormal, Constants.PLANE_SCALE_FACTOR);
-
-        activePlaneVisualizer.transform.SetPositionAndRotation(currentPlanePoint, Quaternion.LookRotation(currentPlaneNormal));
-        activePlaneVisualizer.transform.localScale = Vector3.one * Constants.PLANE_SCALE_FACTOR;
-        activePlaneVisualizer.SetActive(showPlaneVisualizer);
     }
 
     private void CalculatePlaneNormalByWorldPoints()
@@ -300,11 +315,11 @@ public class CuttingPlaneManager : MonoBehaviour
         Vector3 extents = bounds.extents;
 
         Vector3[] corners = {
-            center + new Vector3(extents.x, extents.y, extents.z), center + new Vector3(extents.x, extents.y, -extents.z),
-            center + new Vector3(extents.x, -extents.y, extents.z), center + new Vector3(extents.x, -extents.y, -extents.z),
-            center + new Vector3(-extents.x, extents.y, extents.z), center + new Vector3(-extents.x, extents.y, -extents.z),
-            center + new Vector3(-extents.x, -extents.y, extents.z), center + new Vector3(-extents.x, -extents.y, -extents.z)
-        };
+        center + new Vector3(extents.x, extents.y, extents.z), center + new Vector3(extents.x, extents.y, -extents.z),
+        center + new Vector3(extents.x, -extents.y, extents.z), center + new Vector3(extents.x, -extents.y, -extents.z),
+        center + new Vector3(-extents.x, extents.y, extents.z), center + new Vector3(-extents.x, extents.y, -extents.z),
+        center + new Vector3(-extents.x, -extents.y, extents.z), center + new Vector3(-extents.x, -extents.y, -extents.z)
+    };
 
         bool firstSide = plane.GetSide(corners[0]);
         for (int i = 1; i < corners.Length; i++)
@@ -316,22 +331,26 @@ public class CuttingPlaneManager : MonoBehaviour
 
     private Bounds GetCollectiveBounds()
     {
-        if (activeModelParts.Count == 0) return new Bounds(transform.position, Vector3.zero);
-        Bounds collectiveBounds = new Bounds();
+        Bounds collectiveBounds = new Bounds(targetModel.transform.position, Vector3.zero);
         bool first = true;
+
         foreach (var part in activeModelParts)
         {
             if (part != null && part.activeInHierarchy)
             {
-                Renderer r = part.GetComponent<Renderer>();
-                if (r != null)
+                Renderer[] renderers = part.GetComponentsInChildren<Renderer>();
+
+                foreach (var r in renderers)
                 {
                     if (first)
                     {
                         collectiveBounds = r.bounds;
                         first = false;
                     }
-                    else collectiveBounds.Encapsulate(r.bounds);
+                    else
+                    {
+                        collectiveBounds.Encapsulate(r.bounds);
+                    }
                 }
             }
         }

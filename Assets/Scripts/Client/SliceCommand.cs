@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using EzySlice;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,20 +7,25 @@ using System;
 public class SliceCommand : ICommand
 {
     public string ActionID { get; private set; }
+
     private List<GameObject> originals;
     private List<GameObject> newHulls = new List<GameObject>();
-    private Vector3 planePoint;
-    private Vector3 planeNormal;
+    private Vector3 planePoint;   // WORLD space
+    private Vector3 planeNormal;  // WORLD space
     private CuttingPlaneManager sliceManager;
     private WebSocketClientManager webSocketClientManager;
     private bool hasBeenExecuted = false;
 
-    public SliceCommand(List<GameObject> objectsToSlice, Vector3 point, Vector3 normal, CuttingPlaneManager manager, WebSocketClientManager wsManager)
+    public SliceCommand(List<GameObject> objectsToSlice,
+                        Vector3 point,
+                        Vector3 normal,
+                        CuttingPlaneManager manager,
+                        WebSocketClientManager wsManager)
     {
         ActionID = Guid.NewGuid().ToString();
         originals = objectsToSlice;
-        planePoint = point;
-        planeNormal = normal;
+        planePoint = point;    // assume world
+        planeNormal = normal;  // assume world
         sliceManager = manager;
         webSocketClientManager = wsManager;
     }
@@ -35,11 +40,10 @@ public class SliceCommand : ICommand
                 {
                     hull.SetActive(true);
                     if (!sliceManager.activeModelParts.Contains(hull))
-                    {
                         sliceManager.activeModelParts.Add(hull);
-                    }
                 }
             }
+
             foreach (var original in originals)
             {
                 if (original != null)
@@ -48,76 +52,86 @@ public class SliceCommand : ICommand
                     sliceManager.activeModelParts.Remove(original);
                 }
             }
+
+            return;
         }
-        else
+
+        List<string> originalPartIDs = new List<string>();
+        List<GameObject> successfullySlicedOriginals = new List<GameObject>();
+
+        foreach (var originalPart in originals)
         {
-            List<string> originalPartIDs = new List<string>();
-            List<GameObject> successfullySlicedOriginals = new List<GameObject>();
+            if (originalPart == null) continue;
 
-            foreach (var originalPart in originals)
+            // planePoint and planeNormal are world‑space here
+            SlicedHull sliceResult = originalPart.Slice(
+                planePoint,
+                planeNormal,
+                sliceManager.crossSectionMaterial
+            );
+
+            if (sliceResult != null)
             {
-                if (originalPart == null) continue;
+                GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
+                GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
 
-                SlicedHull sliceResult = originalPart.Slice(planePoint, planeNormal, sliceManager.crossSectionMaterial);
-                if (sliceResult != null)
+                if (upperHull != null && lowerHull != null)
                 {
-                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
-                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
+                    upperHull.name = originalPart.name + "_U";
+                    lowerHull.name = originalPart.name + "_L";
 
-                    if (upperHull != null && lowerHull != null)
-                    {
-                        upperHull.name = originalPart.name + "_U";
-                        lowerHull.name = originalPart.name + "_L";
+                    var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
+                    upperInfo.sourceActionID = ActionID;
+                    upperInfo.side = "Upper";
 
-                        var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
-                        upperInfo.sourceActionID = ActionID;
-                        upperInfo.side = "Upper";
+                    var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
+                    lowerInfo.sourceActionID = ActionID;
+                    lowerInfo.side = "Lower";
 
-                        var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
-                        lowerInfo.sourceActionID = ActionID;
-                        lowerInfo.side = "Lower";
+                    SetupHull(upperHull, originalPart);
+                    SetupHull(lowerHull, originalPart);
 
-                        SetupHull(upperHull, originalPart);
-                        SetupHull(lowerHull, originalPart);
+                    sliceManager.StartCoroutine(
+                        AnimateSeparation(upperHull, lowerHull, originalPart)
+                    );
 
-                        sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
+                    newHulls.Add(upperHull);
+                    newHulls.Add(lowerHull);
+                    sliceManager.activeModelParts.Add(upperHull);
+                    sliceManager.activeModelParts.Add(lowerHull);
 
-                        newHulls.Add(upperHull);
-                        newHulls.Add(lowerHull);
-                        sliceManager.activeModelParts.Add(upperHull);
-                        sliceManager.activeModelParts.Add(lowerHull);
-
-                        originalPartIDs.Add(originalPart.name);
-                        successfullySlicedOriginals.Add(originalPart);
-                    }
+                    originalPartIDs.Add(originalPart.name);
+                    successfullySlicedOriginals.Add(originalPart);
                 }
             }
-
-            foreach (var successfulOriginal in successfullySlicedOriginals)
-            {
-                if (successfulOriginal != null)
-                {
-                    successfulOriginal.SetActive(false);
-                    sliceManager.activeModelParts.Remove(successfulOriginal);
-                }
-            }
-
-            if (webSocketClientManager != null && originalPartIDs.Count > 0)
-            {
-                var sliceData = new SliceActionData
-                {
-                    actionID = this.ActionID,
-                    planePoint = this.planePoint,
-                    planeNormal = this.planeNormal,
-                    separationFactor = Constants.SEPARATION_FACTOR,
-                    targetPartIDs = originalPartIDs.ToArray()
-                };
-                webSocketClientManager.SendExecuteSlice(sliceData);
-            }
-
-            hasBeenExecuted = true;
         }
+
+        foreach (var successfulOriginal in successfullySlicedOriginals)
+        {
+            if (successfulOriginal != null)
+            {
+                successfulOriginal.SetActive(false);
+                sliceManager.activeModelParts.Remove(successfulOriginal);
+            }
+        }
+
+        if (webSocketClientManager != null && originalPartIDs.Count > 0)
+        {
+            var sliceData = new SliceActionData
+            {
+                actionID = this.ActionID,
+                planePoint = this.planePoint,       // world space
+                planeNormal = this.planeNormal,     // world space
+                separationFactor = Constants.SEPARATION_FACTOR,
+                targetPartIDs = originalPartIDs.ToArray()
+            };
+
+            webSocketClientManager.SendExecuteSlice(sliceData);
+        }
+
+        hasBeenExecuted = true;
     }
+
 
     public void Undo()
     {

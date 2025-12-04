@@ -644,6 +644,7 @@ MonoBehaviour:
   planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
   lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
   showPlaneVisualizer: 0
+  volumetricDefaultMaterial: {fileID: 2100000, guid: 7f98494fc3acfb94d9d6d47c0f9ff5ed, type: 2}
   showServerAxes: 1
   serverAxisOriginOffset: {x: 0, y: 0, z: 0}
   wiggleAxis: {x: 1, y: 1, z: 1}
