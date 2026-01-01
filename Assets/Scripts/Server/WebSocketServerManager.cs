@@ -73,6 +73,18 @@ public class WebSocketServerManager : MonoBehaviour
             serverCamera.transform.rotation = rotation;
         }
     }
+    public void BroadcastModelLoaded(string modelId)
+    {
+        if (wsServer == null || !wsServer.IsListening)
+        {
+            LogOnMainThread("Server not listening to broadcast model loaded.", true);
+            return;
+        }
+
+        string message = "MODELID," + modelId;
+        BroadcastToAll(message);
+    }
+
 
     private void StartWebSocketServer()
     {

@@ -6,7 +6,7 @@ public class InputManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField]
-    private MockedModelController targetModelController;
+    private ModelViewportController targetModelController;
     [SerializeField]
     private EventSystem eventSystem;
     [SerializeField]

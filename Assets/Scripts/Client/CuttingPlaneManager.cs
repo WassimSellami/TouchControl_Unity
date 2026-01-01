@@ -1,11 +1,10 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 public class CuttingPlaneManager : MonoBehaviour
 {
     [Header("Core Components")]
     public Camera mainCamera;
-    public GameObject targetModel;
     public Transform modelRootTransform;
     public WebSocketClientManager webSocketClientManager;
     
@@ -21,6 +20,11 @@ public Material crossSectionMaterial;
     [HideInInspector]
     public List<GameObject> activeModelParts = new List<GameObject>();
 
+    [SerializeField]
+    private ModelViewportController modelViewportController;
+
+    private GameObject targetModel;
+
     private GameObject activePlaneVisualizer;
     private LineRenderer activeLineRenderer;
 
@@ -34,11 +38,34 @@ public Material crossSectionMaterial;
 
     void Start()
     {
-        if (webSocketClientManager == null) webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
-        if (mainCamera == null) mainCamera = Camera.main;
-        if (targetModel == null) { Debug.LogError("Target Model GameObject not assigned."); return; }
-        if (targetModel.GetComponent<Collider>() == null) targetModel.AddComponent<MeshCollider>();
-        if (modelRootTransform == null) modelRootTransform = targetModel.transform.parent ?? new GameObject("ModelRoot").transform;
+        if (webSocketClientManager == null)
+            webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
+
+        if (mainCamera == null)
+            mainCamera = Camera.main;
+
+        if (modelViewportController == null)
+            modelViewportController = FindObjectOfType<ModelViewportController>();
+
+        if (modelViewportController == null)
+        {
+            Debug.LogError("CuttingPlaneManager: ModelViewportController not found in scene!");
+            return;
+        }
+
+        targetModel = modelViewportController.gameObject;
+
+        if (targetModel == null)
+        {
+            Debug.LogError("CuttingPlaneManager: Target Model GameObject not assigned.");
+            return;
+        }
+
+        if (targetModel.GetComponent<Collider>() == null)
+            targetModel.AddComponent<MeshCollider>();
+
+        if (modelRootTransform == null)
+            modelRootTransform = targetModel.transform.parent ?? new GameObject("ModelRoot").transform;
 
         if (planeVisualizerPrefab != null)
         {
@@ -60,6 +87,7 @@ public Material crossSectionMaterial;
 
         ResetCrop();
     }
+
 
     public void ShowSliceIconAtPosition(Vector2 screenPoint)
     {
@@ -194,18 +222,39 @@ public Material crossSectionMaterial;
 
     public void ResetCrop()
     {
+        Transform worldContainer = targetModel.transform.Find("WorldContainer");
+        Transform modelContainer = worldContainer != null ? worldContainer.Find("ModelContainer") : null;
+        GameObject originalMesh = null;
+
+        if (modelContainer != null && modelContainer.childCount > 0)
+        {
+            originalMesh = modelContainer.GetChild(0).gameObject;
+        }
+
         foreach (GameObject part in activeModelParts.ToList())
         {
-            if (part != targetModel)
-            {
-                Destroy(part);
-            }
+            if (part == null) continue;
+
+            if (originalMesh != null && part == originalMesh) continue;
+
+            if (part == targetModel) continue;
+
+            Destroy(part);
         }
+
         activeModelParts.Clear();
 
-        targetModel.SetActive(true);
-        targetModel.name = "RootModel";
-        activeModelParts.Add(targetModel);
+        if (originalMesh != null)
+        {
+            originalMesh.SetActive(true);
+            originalMesh.name = "RootModel";
+            activeModelParts.Add(originalMesh);
+        }
+        else
+        {
+            targetModel.SetActive(true);
+            activeModelParts.Add(targetModel);
+        }
 
         modelCenterWorld = GetCollectiveBounds().center;
 

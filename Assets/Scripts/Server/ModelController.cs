@@ -8,7 +8,7 @@ using UnityVolumeRendering;
 using System;
 using Unity.VisualScripting;
 
-public class ModelController : MonoBehaviour
+public class ModelController : MonoBehaviour, IModelViewportController
 {
     private enum ActionType { Slice, Destroy }
     private class ActionRecord
@@ -512,24 +512,21 @@ public class ModelController : MonoBehaviour
     {
         ClearHistory();
 
-        var partsToRemove = allParts.Keys.Where(key => rootModel != null && key != rootModel.name).ToList();
-        foreach (var key in partsToRemove)
+        if (rootModel == null || modelContainer == null) return;
+        foreach (Transform child in modelContainer.transform)
         {
-            if (allParts.TryGetValue(key, out GameObject part))
+            if (child.gameObject != rootModel)
             {
-                Destroy(part);
+                Destroy(child.gameObject);
             }
-            allParts.Remove(key);
         }
 
-        if (rootModel != null)
-        {
-            rootModel.SetActive(true);
-            if (!allParts.ContainsKey(rootModel.name))
-            {
-                allParts.Add(rootModel.name, rootModel);
-            }
-        }
+        allParts.Clear();
+
+        rootModel.SetActive(true);
+        rootModel.name = "RootModel";
+
+        allParts.Add(rootModel.name, rootModel);
 
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
@@ -811,4 +808,78 @@ public class ModelController : MonoBehaviour
             return "";
         }
     }
+    public bool IsAutoRotating => false; // Server doesn't auto-rotate like client
+
+    public void StartContinuousRotation(float direction)
+    {
+        // Server doesn't support continuous rotation for now
+        // This could be extended later if needed
+    }
+
+    public void StopContinuousRotation()
+    {
+        // Server doesn't support continuous rotation for now
+    }
+
+    public void ProcessOrbit(Vector2 screenDelta)
+    {
+        // Server doesn't directly handle orbit input
+        // Orbit is handled by WebSocket client input
+        // This exists for interface compatibility
+    }
+
+    public void ProcessPan(Vector2 screenDelta)
+    {
+        // Server doesn't directly handle pan input
+        // Pan is handled by WebSocket client input
+        // This exists for interface compatibility
+    }
+
+    public void ProcessZoom(float zoomAmount)
+    {
+        // Server doesn't directly handle zoom input
+        // Zoom is handled by WebSocket client input
+        // This exists for interface compatibility
+    }
+
+    public void ProcessRoll(float angleDelta)
+    {
+        // Server doesn't directly handle roll input
+        // Roll is handled by WebSocket client input
+        // This exists for interface compatibility
+    }
+
+    public void ResetOrbitLock()
+    {
+        // Server doesn't track orbit lock state
+        // This exists for interface compatibility
+    }
+
+    public void SetModelVisibility(bool isVisible)
+    {
+        if (rootModel != null)
+            rootModel.SetActive(isVisible);
+    }
+
+    public void TriggerPresetViewRotation(float direction)
+    {
+        // Server doesn't support preset view rotation for now
+        // This could be extended later if needed
+    }
+
+    // Note: ApplyWorldTransform and ResetState already exist in ModelController
+    // ApplyWorldTransform is at line ~195
+    // ResetState doesn't exist, so add this:
+
+    public void ResetState()
+    {
+        // Server reset functionality
+        UnloadCurrentModel();
+
+        // Reset transform
+        transform.position = Vector3.zero;
+        transform.rotation = Quaternion.identity;
+        transform.localScale = Vector3.one;
+    }
+
 }

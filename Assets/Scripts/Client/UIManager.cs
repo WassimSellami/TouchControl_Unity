@@ -22,7 +22,7 @@ public class UIManager : MonoBehaviour
 
     [Header("System References")]
     [SerializeField]
-    private MockedModelController mockedModelController;
+    private ModelViewportController mockedModelController;
     [SerializeField]
     private InputManager inputManagerRef;
     [SerializeField]

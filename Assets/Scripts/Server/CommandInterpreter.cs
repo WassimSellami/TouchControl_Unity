@@ -105,13 +105,18 @@ public class CommandInterpreter : MonoBehaviour
 
     private void ProcessLoadModelCommand(string args)
     {
-        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        if (ModelController == null || string.IsNullOrEmpty(args))
+            return;
+
         ModelController.LoadNewModel(args);
+
         if (WebSocketServerManager != null)
         {
+            WebSocketServerManager.BroadcastModelLoaded(args);
             WebSocketServerManager.SendModelSizeUpdate(ModelController.CurrentModelBoundsSize);
         }
     }
+
 
     private void ProcessUnloadModelCommand()
     {
