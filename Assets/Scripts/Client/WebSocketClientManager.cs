@@ -5,7 +5,6 @@ using System;
 using WebSocketSharp;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
-using System.Xml;
 
 public class WebSocketClientManager : MonoBehaviour
 {

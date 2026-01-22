@@ -208,14 +208,38 @@ public class ModelController : MonoBehaviour, IModelViewportController
 
     private GameObject LoadVolumetricModel(VolumetricModelData data)
     {
+        string filePath = data.rawFilePath;
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            string streamingPath = System.IO.Path.Combine(Application.streamingAssetsPath, System.IO.Path.GetFileName(filePath));
+            if (System.IO.File.Exists(streamingPath))
+            {
+                filePath = streamingPath;
+            }
+            else
+            {
+                Debug.LogError($"Volumetric file not found at: {filePath} OR {streamingPath}");
+                return null;
+            }
+        }
+
         RawDatasetImporter importer = new RawDatasetImporter(
-            data.rawFilePath,
+            filePath,
             data.dimX, data.dimY, data.dimZ,
             data.contentFormat,
             data.endianness,
             data.bytesToSkip
         );
+
         VolumeDataset dataset = importer.Import();
+
+        if (dataset == null)
+        {
+            Debug.LogError("Failed to import dataset. File may be corrupted or dimensions incorrect.");
+            return null;
+        }
+
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
         volObj.gameObject.transform.SetParent(modelContainer.transform, false);
 

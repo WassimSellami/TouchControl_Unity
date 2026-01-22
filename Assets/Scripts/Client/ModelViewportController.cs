@@ -1,9 +1,9 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine.UI;
 using UnityVolumeRendering;
-using EzySlice;
+using System.IO;
+using UnityEngine.Networking;
 
 public class ModelViewportController : MonoBehaviour, IModelViewportController
 {
@@ -285,8 +285,43 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
 
     private GameObject LoadVolumetricModel(VolumetricModelData data)
     {
+        string filePath = data.rawFilePath;
+
+        // ANDROID FIX: Extract file from APK to readable storage
+        if (Application.platform == RuntimePlatform.Android)
+        {
+            string fileName = System.IO.Path.GetFileName(data.rawFilePath);
+            string persistentPath = System.IO.Path.Combine(Application.persistentDataPath, fileName);
+
+            if (!System.IO.File.Exists(persistentPath))
+            {
+                // FIX: Use manual string concatenation to enforce forward slashes.
+                // Path.Combine can add backslashes on Windows, which breaks Android URLs.
+                string sourcePath = Application.streamingAssetsPath + "/" + fileName;
+
+                Debug.Log($"Attempting to download from: {sourcePath}"); // Debug log
+
+                UnityWebRequest request = UnityWebRequest.Get(sourcePath);
+                var operation = request.SendWebRequest();
+
+                while (!operation.isDone) { } // Block until done
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    System.IO.File.WriteAllBytes(persistentPath, request.downloadHandler.data);
+                }
+                else
+                {
+                    Debug.LogError($"Failed to copy volumetric file from {sourcePath}: {request.error}");
+                    return null;
+                }
+            }
+            filePath = persistentPath;
+        }
+
+        // Normal Loading Logic
         var importer = new RawDatasetImporter(
-            data.rawFilePath,
+            filePath,
             data.dimX, data.dimY, data.dimZ,
             data.contentFormat,
             data.endianness,
@@ -294,6 +329,12 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
         );
 
         VolumeDataset dataset = importer.Import();
+        if (dataset == null)
+        {
+            Debug.LogError("Failed to import volumetric dataset.");
+            return null;
+        }
+
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
         volObj.gameObject.transform.SetParent(modelContainer.transform, false);
 
