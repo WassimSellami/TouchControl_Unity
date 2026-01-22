@@ -1130,7 +1130,7 @@ MonoBehaviour:
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
   ipAddressInput: {fileID: 698393692}
-  defaultIpAddress: 192.168.1.55
+  defaultIpAddress: 192.168.0.35
   serverPort: 8070
   connectButton: {fileID: 885532448}
   connectButtonText: {fileID: 488383159}

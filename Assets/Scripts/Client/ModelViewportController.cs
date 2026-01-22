@@ -41,7 +41,6 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
     private bool isAutoRotating = false;
     private float autoRotationDirection = 0f;
 
-    // ======= HIERARCHY CONTAINERS (same as ModelController) =======
     private GameObject worldContainer;
     private GameObject modelContainer;
     private GameObject rootModel;
@@ -50,6 +49,7 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
     private Dictionary<string, ModelData> modelDataLookup = new Dictionary<string, ModelData>();
 
     public bool IsAutoRotating => isAutoRotating;
+    public string CurrentModelID { get; private set; }
 
     private AnimationCurve PRESET_VIEW_EASE_CURVE = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
@@ -67,14 +67,12 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
             initialCameraRotation = referenceCamera.transform.rotation;
         }
 
-        // Build lookup for models
         foreach (var modelData in availableModels)
         {
             if (!string.IsNullOrEmpty(modelData.modelID))
                 modelDataLookup[modelData.modelID] = modelData;
         }
 
-        // Create axis materials if not assigned
         if (redAxisMaterial == null)
             redAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.red };
         if (greenAxisMaterial == null)
@@ -100,8 +98,6 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
     }
-
-    // ======= IModelViewportController Implementation =======
 
     public void StartContinuousRotation(float direction)
     {
@@ -235,8 +231,6 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
         }
     }
 
-    // ======= MODEL LOADING (same pattern as ModelController) =======
-
     public void LoadNewModel(string modelId)
     {
         if (!modelDataLookup.TryGetValue(modelId, out ModelData modelData))
@@ -245,14 +239,20 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
             return;
         }
 
-        // Clear old model
         if (worldContainer != null)
+        {
+            worldContainer.name = "WorldContainer_Destroying";
             Destroy(worldContainer);
+        }
 
-        // Create containers
+        axesCreated = false;
+        axisVisuals.Clear();
+
         SetupContainers();
+        CurrentModelID = modelId;
 
-        // Load model based on type
+        GameObject rootModel = null;
+
         if (modelData is VolumetricModelData volumetricData)
         {
             rootModel = LoadVolumetricModel(volumetricData);
@@ -265,6 +265,7 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
         if (rootModel != null)
         {
             rootModel.name = "RootModel";
+            this.rootModel = rootModel;
             SetupReferencePoint(rootModel);
             EnsureAxisVisualsAreCreated();
         }

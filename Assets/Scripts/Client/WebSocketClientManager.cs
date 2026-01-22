@@ -634,7 +634,7 @@ public class WebSocketClientManager : MonoBehaviour
         if (modelViewportController != null)
             modelViewportController.ResetState();
 
-        CuttingPlaneManager cuttingPlaneManager = FindObjectOfType<CuttingPlaneManager>();
+        CuttingPlaneManager cuttingPlaneManager = UnityEngine.Object.FindFirstObjectByType<CuttingPlaneManager>();
         if (cuttingPlaneManager != null)
             cuttingPlaneManager.ResetCrop();
 

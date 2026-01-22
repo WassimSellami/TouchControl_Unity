@@ -135,7 +135,7 @@ public class ModelController : MonoBehaviour, IModelViewportController
         allParts.Clear();
         undoStack.Clear();
         redoStack.Clear();
-        currentModelAxisVisuals.Clear();
+        ClearCurrentModelAxisVisuals();
 
         modelReferencePoint = null;
         rootModel = null;
@@ -219,7 +219,6 @@ public class ModelController : MonoBehaviour, IModelViewportController
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
         volObj.gameObject.transform.SetParent(modelContainer.transform, false);
 
-        // Assign the slicing material if provided, ensuring we start with the correct shader
         if (volumetricDefaultMaterial != null)
         {
             Renderer r = volObj.GetComponent<Renderer>();
@@ -260,13 +259,18 @@ public class ModelController : MonoBehaviour, IModelViewportController
             activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
             activePlaneVisualizer.SetActive(false);
         }
+
         if (lineRendererPrefab != null)
         {
             activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
             activeLineRenderer.enabled = false;
         }
-        CreateServerAxisVisuals(axesContainer.transform);
-        if (axesContainer != null) axesContainer.SetActive(true);
+
+        if (axesContainer != null)
+        {
+            axesContainer.SetActive(true);
+            CreateServerAxisVisuals(axesContainer.transform);
+        }
     }
 
     private void ClearRedoStack()
@@ -309,20 +313,17 @@ public class ModelController : MonoBehaviour, IModelViewportController
         {
             if (allParts.TryGetValue(partID, out GameObject originalPart) && originalPart.activeInHierarchy)
             {
-                // Check for Volumetric Object
                 VolumeRenderedObject volObj = originalPart.GetComponent<VolumeRenderedObject>();
                 if (volObj == null) volObj = originalPart.GetComponentInChildren<VolumeRenderedObject>();
 
                 if (volObj != null)
                 {
-                    // === VOLUMETRIC SLICING ===
                     GameObject upperHull = Instantiate(originalPart, originalPart.transform.parent);
                     GameObject lowerHull = Instantiate(originalPart, originalPart.transform.parent);
 
                     upperHull.name = partID + "_U";
                     lowerHull.name = partID + "_L";
 
-                    // Important: Destroy the script so it doesn't regenerate the mesh or reset materials
                     Destroy(upperHull.GetComponent<VolumeRenderedObject>());
                     Destroy(lowerHull.GetComponent<VolumeRenderedObject>());
 
@@ -346,7 +347,6 @@ public class ModelController : MonoBehaviour, IModelViewportController
                 }
                 else
                 {
-                    // === POLYGONAL SLICING ===
                     SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
                     if (sliceResult != null)
                     {
@@ -396,11 +396,7 @@ public class ModelController : MonoBehaviour, IModelViewportController
 
         if (rend != null && volumetricDefaultMaterial != null)
         {
-            // 1. Force use of the Slicing Shader Material
             Material mat = new Material(volumetricDefaultMaterial);
-
-            // 2. Transfer Data Textures from the active instance (if they exist)
-            // This is crucial because the runtime generated the textures, we must keep them.
             Material existingMat = rend.sharedMaterial;
             if (existingMat != null)
             {
@@ -512,21 +508,36 @@ public class ModelController : MonoBehaviour, IModelViewportController
     {
         ClearHistory();
 
-        if (rootModel == null || modelContainer == null) return;
-        foreach (Transform child in modelContainer.transform)
+        if (modelContainer == null) return;
+
+        for (int i = modelContainer.transform.childCount - 1; i >= 0; i--)
         {
-            if (child.gameObject != rootModel)
+            GameObject child = modelContainer.transform.GetChild(i).gameObject;
+
+            if (rootModel != null && child == rootModel) continue;
+
+            if (child.name == "RootModel")
             {
-                Destroy(child.gameObject);
+                rootModel = child;
+                continue;
             }
+
+            Destroy(child);
         }
 
-        allParts.Clear();
+        if (rootModel != null)
+        {
+            rootModel.SetActive(true);
+            rootModel.name = "RootModel";
 
-        rootModel.SetActive(true);
-        rootModel.name = "RootModel";
+            foreach (Transform t in rootModel.transform)
+            {
+                t.gameObject.SetActive(true);
+            }
 
-        allParts.Add(rootModel.name, rootModel);
+            allParts.Clear();
+            allParts.Add(rootModel.name, rootModel);
+        }
 
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
     }
@@ -808,7 +819,7 @@ public class ModelController : MonoBehaviour, IModelViewportController
             return "";
         }
     }
-    public bool IsAutoRotating => false; // Server doesn't auto-rotate like client
+    public bool IsAutoRotating => false;
 
     public void StartContinuousRotation(float direction)
     {
@@ -867,16 +878,11 @@ public class ModelController : MonoBehaviour, IModelViewportController
         // This could be extended later if needed
     }
 
-    // Note: ApplyWorldTransform and ResetState already exist in ModelController
-    // ApplyWorldTransform is at line ~195
-    // ResetState doesn't exist, so add this:
 
     public void ResetState()
     {
-        // Server reset functionality
         UnloadCurrentModel();
 
-        // Reset transform
         transform.position = Vector3.zero;
         transform.rotation = Quaternion.identity;
         transform.localScale = Vector3.one;

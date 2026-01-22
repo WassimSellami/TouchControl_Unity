@@ -204,10 +204,15 @@ public Material crossSectionMaterial;
     {
         UnityEngine.Plane slicePlane = new UnityEngine.Plane(currentPlaneNormal, currentPlanePoint);
         List<GameObject> partsToSlice = new List<GameObject>();
+
+        activeModelParts.RemoveAll(p => p == null);
+
         foreach (GameObject part in activeModelParts)
         {
+            if (part == null || !part.activeInHierarchy) continue;
+
             Renderer partRenderer = part.GetComponentInChildren<Renderer>();
-            if (part != null && part.activeInHierarchy && partRenderer != null && DoesPlaneIntersectBounds(slicePlane, partRenderer.bounds))
+            if (partRenderer != null && DoesPlaneIntersectBounds(slicePlane, partRenderer.bounds))
             {
                 partsToSlice.Add(part);
             }
@@ -219,9 +224,10 @@ public Material crossSectionMaterial;
             HistoryManager.Instance.ExecuteCommand(sliceCommand);
         }
     }
-
     public void ResetCrop()
     {
+        activeModelParts.RemoveAll(x => x == null);
+
         Transform worldContainer = targetModel.transform.Find("WorldContainer");
         Transform modelContainer = worldContainer != null ? worldContainer.Find("ModelContainer") : null;
         GameObject originalMesh = null;
@@ -231,13 +237,13 @@ public Material crossSectionMaterial;
             originalMesh = modelContainer.GetChild(0).gameObject;
         }
 
-        foreach (GameObject part in activeModelParts.ToList())
+        for (int i = activeModelParts.Count - 1; i >= 0; i--)
         {
-            if (part == null) continue;
-
-            if (originalMesh != null && part == originalMesh) continue;
+            GameObject part = activeModelParts[i];
 
             if (part == targetModel) continue;
+
+            if (originalMesh != null && part == originalMesh) continue;
 
             Destroy(part);
         }
@@ -263,7 +269,6 @@ public Material crossSectionMaterial;
 
         ResetClipping();
     }
-
     public void DestroyModelPart(GameObject partToDestroy)
     {
         if (partToDestroy == null) return;
