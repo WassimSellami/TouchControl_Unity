@@ -1,16 +1,19 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
+using UnityVolumeRendering;
+
 public class CuttingPlaneManager : MonoBehaviour
 {
     [Header("Core Components")]
     public Camera mainCamera;
     public Transform modelRootTransform;
     public WebSocketClientManager webSocketClientManager;
-    
+
     [Header("Slicing Options")]
-public Material crossSectionMaterial;
+    public Material crossSectionMaterial;
+    public Material volumetricSlicingMaterial;
     public bool showPlaneVisualizer = true;
-    [Tooltip("How long the separation animation takes in seconds.")]
 
     [Header("Visuals Prefabs")]
     public GameObject lineRendererPrefab;
@@ -23,7 +26,6 @@ public Material crossSectionMaterial;
     private ModelViewportController modelViewportController;
 
     private GameObject targetModel;
-
     private GameObject activePlaneVisualizer;
     private LineRenderer activeLineRenderer;
 
@@ -86,7 +88,6 @@ public Material crossSectionMaterial;
 
         ResetCrop();
     }
-
 
     public void ShowSliceIconAtPosition(Vector2 screenPoint)
     {
@@ -152,7 +153,15 @@ public Material crossSectionMaterial;
             currentPlaneNormal = Vector3.Cross(lineVector, mainCamera.transform.forward).normalized;
             currentPlanePoint = (startWorldPos + finalEndWorldPosRaw) * 0.5f;
 
-            PerformSlice();
+            try
+            {
+                PerformSlice();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("Slice failed: " + ex.Message);
+            }
+
             Invoke(nameof(HideLineAndShowPlane), Constants.LINE_DURATION);
         }
         else
@@ -160,6 +169,7 @@ public Material crossSectionMaterial;
             ResetDrawing();
         }
     }
+
     public void UpdateCutDrag(Vector2 screenPoint)
     {
         if (activeLineRenderer == null || mainCamera == null)
@@ -181,7 +191,6 @@ public Material crossSectionMaterial;
         if (webSocketClientManager != null)
             webSocketClientManager.SendLineData(startWorld, endWorld);
     }
-
 
     private void DrawPlaneVisualizer()
     {
@@ -210,6 +219,10 @@ public Material crossSectionMaterial;
         {
             if (part == null || !part.activeInHierarchy) continue;
 
+            bool isVolumetric = part.GetComponent<VolumeRenderedObject>() != null || part.GetComponentInChildren<VolumeRenderedObject>() != null;
+
+            if (!isVolumetric && part.GetComponent<MeshFilter>() == null) continue;
+
             Renderer partRenderer = part.GetComponentInChildren<Renderer>();
             if (partRenderer != null && DoesPlaneIntersectBounds(slicePlane, partRenderer.bounds))
             {
@@ -223,51 +236,82 @@ public Material crossSectionMaterial;
             HistoryManager.Instance.ExecuteCommand(sliceCommand);
         }
     }
+
     public void ResetCrop()
     {
         activeModelParts.RemoveAll(x => x == null);
 
-        Transform worldContainer = targetModel.transform.Find("WorldContainer");
-        Transform modelContainer = worldContainer != null ? worldContainer.Find("ModelContainer") : null;
-        GameObject originalMesh = null;
-
-        if (modelContainer != null && modelContainer.childCount > 0)
-        {
-            originalMesh = modelContainer.GetChild(0).gameObject;
-        }
-
         for (int i = activeModelParts.Count - 1; i >= 0; i--)
         {
             GameObject part = activeModelParts[i];
-
-            if (part == targetModel) continue;
-
-            if (originalMesh != null && part == originalMesh) continue;
-
-            Destroy(part);
+            if (part != targetModel)
+            {
+                Destroy(part);
+                activeModelParts.RemoveAt(i);
+            }
         }
 
-        activeModelParts.Clear();
+        Transform worldContainer = targetModel.transform.Find("WorldContainer");
+        Transform modelContainer = worldContainer != null ? worldContainer.Find("ModelContainer") : null;
 
-        if (originalMesh != null)
+        if (modelContainer != null && modelContainer.childCount > 0)
         {
-            originalMesh.SetActive(true);
-            originalMesh.name = "RootModel";
-            activeModelParts.Add(originalMesh);
+            GameObject loadedRoot = modelContainer.GetChild(0).gameObject;
+            loadedRoot.SetActive(true);
+
+            MeshFilter[] filters = loadedRoot.GetComponentsInChildren<MeshFilter>(true);
+
+            if (filters.Length > 0)
+            {
+                foreach (var mf in filters)
+                {
+                    GameObject meshObj = mf.gameObject;
+
+                    if (meshObj.GetComponent<Collider>() == null)
+                    {
+                        MeshCollider mc = meshObj.AddComponent<MeshCollider>();
+                        mc.convex = false;
+                    }
+
+                    if (meshObj == loadedRoot || meshObj.transform.parent == loadedRoot)
+                    {
+                        meshObj.name = "RootModel";
+                    }
+
+                    activeModelParts.Add(meshObj);
+                }
+            }
+            else
+            {
+                VolumeRenderedObject volObj = loadedRoot.GetComponentInChildren<VolumeRenderedObject>();
+                if (volObj != null)
+                {
+                    GameObject volGo = volObj.gameObject;
+                    if (volGo.GetComponent<Collider>() == null)
+                    {
+                        BoxCollider bc = volGo.AddComponent<BoxCollider>();
+                    }
+                    volGo.name = "RootModel";
+                    activeModelParts.Add(volGo);
+                }
+                else
+                {
+                    activeModelParts.Add(loadedRoot);
+                }
+            }
         }
         else
         {
-            targetModel.SetActive(true);
             activeModelParts.Add(targetModel);
         }
 
         modelCenterWorld = GetCollectiveBounds().center;
-
         if (HistoryManager.Instance != null) HistoryManager.Instance.ClearHistory();
         if (webSocketClientManager != null) webSocketClientManager.SendResetAll();
 
         ResetClipping();
     }
+
     public void DestroyModelPart(GameObject partToDestroy)
     {
         if (partToDestroy == null) return;
@@ -317,7 +361,7 @@ public Material crossSectionMaterial;
         if (mainCamera == null) return null;
 
         Ray ray = mainCamera.ScreenPointToRay(screenPoint);
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        if (Physics.Raycast(ray, out UnityEngine.RaycastHit hit))
         {
             foreach (var part in activeModelParts)
             {
@@ -334,12 +378,6 @@ public Material crossSectionMaterial;
     {
         ResetDrawing();
         DrawPlaneVisualizer();
-    }
-
-    private void CalculatePlaneNormalByWorldPoints()
-    {
-        Vector3 lineVector = finalEndWorldPosRaw - startWorldPos;
-        currentPlaneNormal = Vector3.Cross(lineVector, mainCamera.transform.forward).normalized;
     }
 
     private void ResetDrawing()
@@ -368,11 +406,11 @@ public Material crossSectionMaterial;
         Vector3 extents = bounds.extents;
 
         Vector3[] corners = {
-        center + new Vector3(extents.x, extents.y, extents.z), center + new Vector3(extents.x, extents.y, -extents.z),
-        center + new Vector3(extents.x, -extents.y, extents.z), center + new Vector3(extents.x, -extents.y, -extents.z),
-        center + new Vector3(-extents.x, extents.y, extents.z), center + new Vector3(-extents.x, extents.y, -extents.z),
-        center + new Vector3(-extents.x, -extents.y, extents.z), center + new Vector3(-extents.x, -extents.y, -extents.z)
-    };
+            center + new Vector3(extents.x, extents.y, extents.z), center + new Vector3(extents.x, extents.y, -extents.z),
+            center + new Vector3(extents.x, -extents.y, extents.z), center + new Vector3(extents.x, -extents.y, -extents.z),
+            center + new Vector3(-extents.x, extents.y, extents.z), center + new Vector3(-extents.x, extents.y, -extents.z),
+            center + new Vector3(-extents.x, -extents.y, extents.z), center + new Vector3(-extents.x, -extents.y, -extents.z)
+        };
 
         bool firstSide = plane.GetSide(corners[0]);
         for (int i = 1; i < corners.Length; i++)

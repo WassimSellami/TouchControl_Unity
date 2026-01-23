@@ -3,6 +3,7 @@ using EzySlice;
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using UnityVolumeRendering;
 
 public class SliceCommand : ICommand
 {
@@ -10,8 +11,8 @@ public class SliceCommand : ICommand
 
     private List<GameObject> originals;
     private List<GameObject> newHulls = new List<GameObject>();
-    private Vector3 planePoint;   // WORLD space
-    private Vector3 planeNormal;  // WORLD space
+    private Vector3 planePoint;
+    private Vector3 planeNormal;
     private CuttingPlaneManager sliceManager;
     private WebSocketClientManager webSocketClientManager;
     private bool hasBeenExecuted = false;
@@ -24,8 +25,8 @@ public class SliceCommand : ICommand
     {
         ActionID = Guid.NewGuid().ToString();
         originals = objectsToSlice;
-        planePoint = point;    // assume world
-        planeNormal = normal;  // assume world
+        planePoint = point;
+        planeNormal = normal;
         sliceManager = manager;
         webSocketClientManager = wsManager;
     }
@@ -52,7 +53,6 @@ public class SliceCommand : ICommand
                     sliceManager.activeModelParts.Remove(original);
                 }
             }
-
             return;
         }
 
@@ -63,45 +63,80 @@ public class SliceCommand : ICommand
         {
             if (originalPart == null) continue;
 
-            // planePoint and planeNormal are world‑space here
-            SlicedHull sliceResult = originalPart.Slice(
-                planePoint,
-                planeNormal,
-                sliceManager.crossSectionMaterial
-            );
+            VolumeRenderedObject volObj = originalPart.GetComponent<VolumeRenderedObject>();
+            if (volObj == null) volObj = originalPart.GetComponentInChildren<VolumeRenderedObject>();
 
-            if (sliceResult != null)
+            if (volObj != null)
             {
-                GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
-                GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
+                GameObject upperHull = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
+                GameObject lowerHull = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
 
-                if (upperHull != null && lowerHull != null)
+                upperHull.name = originalPart.name + "_U";
+                lowerHull.name = originalPart.name + "_L";
+
+                UnityEngine.Object.Destroy(upperHull.GetComponent<VolumeRenderedObject>());
+                UnityEngine.Object.Destroy(lowerHull.GetComponent<VolumeRenderedObject>());
+
+                Vector3 localPoint = originalPart.transform.InverseTransformPoint(planePoint);
+                Vector3 localNormal = originalPart.transform.InverseTransformDirection(planeNormal).normalized;
+                Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
+
+                ApplyVolumeMaterial(upperHull, textureSpacePoint, localNormal);
+                ApplyVolumeMaterial(lowerHull, textureSpacePoint, -localNormal);
+
+                var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
+                upperInfo.sourceActionID = ActionID;
+                upperInfo.side = "Upper";
+
+                var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
+                lowerInfo.sourceActionID = ActionID;
+                lowerInfo.side = "Lower";
+
+                sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
+
+                newHulls.Add(upperHull);
+                newHulls.Add(lowerHull);
+                sliceManager.activeModelParts.Add(upperHull);
+                sliceManager.activeModelParts.Add(lowerHull);
+
+                originalPartIDs.Add(originalPart.name);
+                successfullySlicedOriginals.Add(originalPart);
+            }
+            else
+            {
+                SlicedHull sliceResult = originalPart.Slice(planePoint, planeNormal, sliceManager.crossSectionMaterial);
+
+                if (sliceResult != null)
                 {
-                    upperHull.name = originalPart.name + "_U";
-                    lowerHull.name = originalPart.name + "_L";
+                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
+                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
 
-                    var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
-                    upperInfo.sourceActionID = ActionID;
-                    upperInfo.side = "Upper";
+                    if (upperHull != null && lowerHull != null)
+                    {
+                        upperHull.name = originalPart.name + "_U";
+                        lowerHull.name = originalPart.name + "_L";
 
-                    var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
-                    lowerInfo.sourceActionID = ActionID;
-                    lowerInfo.side = "Lower";
+                        var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
+                        upperInfo.sourceActionID = ActionID;
+                        upperInfo.side = "Upper";
 
-                    SetupHull(upperHull, originalPart);
-                    SetupHull(lowerHull, originalPart);
+                        var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
+                        lowerInfo.sourceActionID = ActionID;
+                        lowerInfo.side = "Lower";
 
-                    sliceManager.StartCoroutine(
-                        AnimateSeparation(upperHull, lowerHull, originalPart)
-                    );
+                        SetupHull(upperHull, originalPart);
+                        SetupHull(lowerHull, originalPart);
 
-                    newHulls.Add(upperHull);
-                    newHulls.Add(lowerHull);
-                    sliceManager.activeModelParts.Add(upperHull);
-                    sliceManager.activeModelParts.Add(lowerHull);
+                        sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
 
-                    originalPartIDs.Add(originalPart.name);
-                    successfullySlicedOriginals.Add(originalPart);
+                        newHulls.Add(upperHull);
+                        newHulls.Add(lowerHull);
+                        sliceManager.activeModelParts.Add(upperHull);
+                        sliceManager.activeModelParts.Add(lowerHull);
+
+                        originalPartIDs.Add(originalPart.name);
+                        successfullySlicedOriginals.Add(originalPart);
+                    }
                 }
             }
         }
@@ -120,8 +155,8 @@ public class SliceCommand : ICommand
             var sliceData = new SliceActionData
             {
                 actionID = this.ActionID,
-                planePoint = this.planePoint,       // world space
-                planeNormal = this.planeNormal,     // world space
+                planePoint = this.planePoint,
+                planeNormal = this.planeNormal,
                 separationFactor = Constants.SEPARATION_FACTOR,
                 targetPartIDs = originalPartIDs.ToArray()
             };
@@ -132,6 +167,31 @@ public class SliceCommand : ICommand
         hasBeenExecuted = true;
     }
 
+    private void ApplyVolumeMaterial(GameObject volumeObj, Vector3 textureSpacePoint, Vector3 localNormal)
+    {
+        Renderer rend = volumeObj.GetComponent<Renderer>();
+        if (rend == null) rend = volumeObj.GetComponentInChildren<Renderer>();
+
+        if (rend != null && sliceManager.volumetricSlicingMaterial != null)
+        {
+            Material mat = new Material(sliceManager.volumetricSlicingMaterial);
+
+            Material existingMat = rend.sharedMaterial;
+            if (existingMat != null)
+            {
+                if (existingMat.HasProperty("_DataTex")) mat.SetTexture("_DataTex", existingMat.GetTexture("_DataTex"));
+                if (existingMat.HasProperty("_GradientTex")) mat.SetTexture("_GradientTex", existingMat.GetTexture("_GradientTex"));
+                if (existingMat.HasProperty("_TFTex")) mat.SetTexture("_TFTex", existingMat.GetTexture("_TFTex"));
+                if (existingMat.HasProperty("_MinVal")) mat.SetFloat("_MinVal", existingMat.GetFloat("_MinVal"));
+                if (existingMat.HasProperty("_MaxVal")) mat.SetFloat("_MaxVal", existingMat.GetFloat("_MaxVal"));
+            }
+
+            mat.SetVector("_PlanePos", textureSpacePoint);
+            mat.SetVector("_PlaneNormal", localNormal);
+
+            rend.material = mat;
+        }
+    }
 
     public void Undo()
     {
