@@ -3,7 +3,6 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using WebSocketSharp;
-using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
 public class WebSocketClientManager : MonoBehaviour
@@ -14,7 +13,7 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private ModelViewportController modelViewportController;
     [SerializeField] private Camera referenceCamera;
     [SerializeField] private TMP_InputField ipAddressInput;
-    [SerializeField] private string defaultIpAddress = "192.168.1.55";
+    [SerializeField] private string defaultIpAddress = "192.168.0.35";
     [SerializeField] private int serverPort = 8070;
 
     [Header("UI Elements")]
@@ -29,18 +28,15 @@ public class WebSocketClientManager : MonoBehaviour
     [Header("Available Models")]
     [SerializeField] private ModelData[] availableModelDataList;
 
-    private GameObject modelViewPanelCachedRef;
     private WebSocket ws;
     private bool isAttemptingConnection = false;
     private bool isMockConnected = false;
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
 
-    public Dictionary<GameObject, Vector3> buttonOriginalPositions = new Dictionary<GameObject, Vector3>();
-    private GameObject currentDraggedButton = null;
-    private GameObject glidingButton = null;
-    private Vector2 buttonVelocity = Vector2.zero;
-    private Vector2 lastButtonPosition;
+
+    private ModelTransformStateData lastSentState;
+
 
     public bool IsConnected =>
         autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
@@ -49,7 +45,6 @@ public class WebSocketClientManager : MonoBehaviour
 
     void Start()
     {
-        // Validation
         if (uiManager == null)
         {
             Debug.LogError("WSClientManager: UIManager not assigned!");
@@ -98,14 +93,8 @@ public class WebSocketClientManager : MonoBehaviour
             return;
         }
 
-        if (uiManager.modelViewPanel != null)
-            modelViewPanelCachedRef = uiManager.modelViewPanel;
-        else
-            Debug.LogError("WSClientManager: UIManager's modelViewPanel is null.");
-
         modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
 
-        // Initialize with local model database
         InitializeLocalModelList();
 
         if (autoConnectMode)
@@ -128,7 +117,6 @@ public class WebSocketClientManager : MonoBehaviour
             UpdateConnectionUI(ConnectionState.IdleWaiting);
         }
 
-        // Setup button dragging for model thumbnails
         foreach (Button loadModelButton in loadModelButtons)
         {
             if (loadModelButton != null)
@@ -138,8 +126,6 @@ public class WebSocketClientManager : MonoBehaviour
                     Debug.LogWarning($"Button {loadModelButton.name} does not have a tag. It will not function as a model loader.");
                     continue;
                 }
-
-                SetupButtonDrag(loadModelButton.gameObject);
             }
         }
 
@@ -201,64 +187,9 @@ public class WebSocketClientManager : MonoBehaviour
     }
 
 
-    private void SetupButtonDrag(GameObject buttonObj)
-    {
-        EventTrigger trigger = buttonObj.GetComponent<EventTrigger>();
-        if (trigger == null)
-            trigger = buttonObj.AddComponent<EventTrigger>();
-
-        EventTrigger.Entry entryBeginDrag = new EventTrigger.Entry();
-        entryBeginDrag.eventID = EventTriggerType.BeginDrag;
-        entryBeginDrag.callback.AddListener((data) => OnButtonDragStart((PointerEventData)data));
-        trigger.triggers.Add(entryBeginDrag);
-
-        EventTrigger.Entry entryDrag = new EventTrigger.Entry();
-        entryDrag.eventID = EventTriggerType.Drag;
-        entryDrag.callback.AddListener((data) => OnButtonDrag((PointerEventData)data));
-        trigger.triggers.Add(entryDrag);
-
-        EventTrigger.Entry entryEndDrag = new EventTrigger.Entry();
-        entryEndDrag.eventID = EventTriggerType.EndDrag;
-        entryEndDrag.callback.AddListener((data) => OnButtonDragEnd((PointerEventData)data));
-        trigger.triggers.Add(entryEndDrag);
-    }
-
-    public void OnButtonDragStart(PointerEventData eventData)
-    {
-        glidingButton = null;
-        currentDraggedButton = eventData.pointerPress;
-        lastButtonPosition = eventData.position;
-        buttonVelocity = Vector2.zero;
-
-        if (!buttonOriginalPositions.ContainsKey(currentDraggedButton))
-            buttonOriginalPositions[currentDraggedButton] = currentDraggedButton.transform.position;
-    }
-
-    public void OnButtonDrag(PointerEventData eventData)
-    {
-        if (currentDraggedButton != null)
-        {
-            currentDraggedButton.transform.position = eventData.position;
-            buttonVelocity = (eventData.position - lastButtonPosition) / Time.deltaTime;
-            lastButtonPosition = eventData.position;
-        }
-    }
-
-    public void OnButtonDragEnd(PointerEventData eventData)
-    {
-        if (currentDraggedButton != null)
-        {
-            glidingButton = currentDraggedButton;
-            currentDraggedButton = null;
-        }
-    }
-
     void Update()
     {
-        if (glidingButton != null)
-            HandleGlidingButton();
-
-        if (IsConnected && modelViewportController != null && modelViewPanelCachedRef != null && modelViewPanelCachedRef.activeInHierarchy)
+        if (IsConnected && modelViewportController != null && uiManager != null && uiManager.modelViewPanel.activeInHierarchy)
         {
             timeSinceLastModelUpdate += Time.deltaTime;
             if (timeSinceLastModelUpdate >= modelUpdateInterval)
@@ -267,44 +198,6 @@ public class WebSocketClientManager : MonoBehaviour
                 timeSinceLastModelUpdate = 0f;
             }
         }
-    }
-
-    private void HandleGlidingButton()
-    {
-        glidingButton.transform.position += (Vector3)buttonVelocity * Time.deltaTime;
-        buttonVelocity = Vector2.Lerp(buttonVelocity, Vector2.zero, Constants.MODEL_THUMBNAIL_GLIDE_FRICTION * Time.deltaTime);
-
-        RectTransform buttonRect = glidingButton.GetComponent<RectTransform>();
-        Vector3[] corners = new Vector3[4];
-        buttonRect.GetWorldCorners(corners);
-
-        float minX = corners[0].x;
-        float maxX = corners[2].x;
-        float minY = corners[0].y;
-        float maxY = corners[1].y;
-
-        bool isOffScreen = maxX < 0 || minX > Screen.width || maxY < 0 || minY > Screen.height;
-        if (isOffScreen)
-        {
-            OnLoadModelSelected(glidingButton.name);
-            ResetAndStopGlidingButton();
-            return;
-        }
-
-        buttonVelocity = Vector2.ClampMagnitude(buttonVelocity, Constants.MODEL_THUMBNAIL_MAX_VELOCITY);
-
-        if (buttonVelocity.sqrMagnitude < Constants.MODEL_THUMBNAIL_RESET_VELOCITY)
-            ResetAndStopGlidingButton();
-    }
-
-    private void ResetAndStopGlidingButton()
-    {
-        if (glidingButton == null)
-            return;
-
-        glidingButton.transform.position = buttonOriginalPositions[glidingButton];
-        glidingButton = null;
-        buttonVelocity = Vector2.zero;
     }
 
     public void AttemptConnect()
@@ -349,23 +242,30 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void SendModelTransformState()
     {
-        if (!IsConnected || modelViewportController == null)
-            return;
+        if (!IsConnected || modelViewportController == null || autoConnectMode) return;
 
-        if (autoConnectMode)
-            return;
+        Transform tr = modelViewportController.transform;
 
-        Transform modelTransform = modelViewportController.transform;
+        if (lastSentState != null &&
+            Vector3.SqrMagnitude(tr.localPosition - lastSentState.localPosition) < 0.0001f &&
+            Quaternion.Angle(tr.localRotation, lastSentState.localRotation) < 0.1f &&
+            Vector3.SqrMagnitude(tr.localScale - lastSentState.localScale) < 0.0001f)
+        {
+            return;
+        }
+
         ModelTransformStateData state = new ModelTransformStateData
         {
-            localPosition = modelTransform.localPosition,
-            localRotation = modelTransform.localRotation,
-            localScale = modelTransform.localScale
+            localPosition = tr.localPosition,
+            localRotation = tr.localRotation,
+            localScale = tr.localScale
         };
 
+        lastSentState = state;
         string jsonData = JsonUtility.ToJson(state);
         SendMessageToServer($"{Constants.UPDATE_MODEL_TRANSFORM}:{jsonData}");
     }
+
 
     private void SendCameraTransformState()
     {
@@ -606,7 +506,7 @@ public class WebSocketClientManager : MonoBehaviour
             uiManager.ShowConnectionPanel();
     }
 
-    private void OnLoadModelSelected(string modelId)
+    public void OnLoadModelSelected(string modelId)
     {
         if (!IsConnected)
             return;

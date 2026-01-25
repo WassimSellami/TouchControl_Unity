@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using static JsonUtilityHelper;
 
 public class CommandInterpreter : MonoBehaviour
 {

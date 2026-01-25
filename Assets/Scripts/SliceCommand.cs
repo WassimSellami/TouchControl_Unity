@@ -81,8 +81,8 @@ public class SliceCommand : ICommand
                 Vector3 localNormal = originalPart.transform.InverseTransformDirection(planeNormal).normalized;
                 Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
 
-                ApplyVolumeMaterial(upperHull, textureSpacePoint, localNormal);
-                ApplyVolumeMaterial(lowerHull, textureSpacePoint, -localNormal);
+                RenderUtils.ApplyVolumeMaterial(upperHull, sliceManager.volumetricSlicingMaterial, textureSpacePoint, localNormal);
+                RenderUtils.ApplyVolumeMaterial(lowerHull, sliceManager.volumetricSlicingMaterial, textureSpacePoint, -localNormal);
 
                 var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
                 upperInfo.sourceActionID = ActionID;
@@ -166,33 +166,6 @@ public class SliceCommand : ICommand
 
         hasBeenExecuted = true;
     }
-
-    private void ApplyVolumeMaterial(GameObject volumeObj, Vector3 textureSpacePoint, Vector3 localNormal)
-    {
-        Renderer rend = volumeObj.GetComponent<Renderer>();
-        if (rend == null) rend = volumeObj.GetComponentInChildren<Renderer>();
-
-        if (rend != null && sliceManager.volumetricSlicingMaterial != null)
-        {
-            Material mat = new Material(sliceManager.volumetricSlicingMaterial);
-
-            Material existingMat = rend.sharedMaterial;
-            if (existingMat != null)
-            {
-                if (existingMat.HasProperty("_DataTex")) mat.SetTexture("_DataTex", existingMat.GetTexture("_DataTex"));
-                if (existingMat.HasProperty("_GradientTex")) mat.SetTexture("_GradientTex", existingMat.GetTexture("_GradientTex"));
-                if (existingMat.HasProperty("_TFTex")) mat.SetTexture("_TFTex", existingMat.GetTexture("_TFTex"));
-                if (existingMat.HasProperty("_MinVal")) mat.SetFloat("_MinVal", existingMat.GetFloat("_MinVal"));
-                if (existingMat.HasProperty("_MaxVal")) mat.SetFloat("_MaxVal", existingMat.GetFloat("_MaxVal"));
-            }
-
-            mat.SetVector("_PlanePos", textureSpacePoint);
-            mat.SetVector("_PlaneNormal", localNormal);
-
-            rend.material = mat;
-        }
-    }
-
     public void Undo()
     {
         foreach (var hull in newHulls)

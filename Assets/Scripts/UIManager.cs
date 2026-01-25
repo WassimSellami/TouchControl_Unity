@@ -74,60 +74,27 @@ public class UIManager : MonoBehaviour
     public void PopulateModelButtons(List<ModelMetadata> models, WebSocketClientManager wsManager)
     {
         ClearDynamicButtons();
+        if (modelButtonsContainer == null || modelButtonPrefab == null) return;
 
-        if (modelButtonsContainer == null || modelButtonPrefab == null)
+        foreach (var meta in models)
         {
-            Debug.LogWarning("[UIManager] modelButtonsContainer or modelButtonPrefab not assigned. Cannot populate buttons dynamically.");
-            return;
-        }
+            GameObject btn = Instantiate(modelButtonPrefab, modelButtonsContainer);
+            btn.name = meta.modelID;
 
-        foreach (var modelMetadata in models)
-        {
-            GameObject buttonObj = Instantiate(modelButtonPrefab, modelButtonsContainer);
-            buttonObj.name = modelMetadata.modelID;
+            Image img = btn.GetComponent<Image>();
+            if (img != null && !string.IsNullOrEmpty(meta.thumbnailBase64))
+                img.sprite = wsManager.Base64ToSprite(meta.thumbnailBase64);
 
-            Image buttonImage = buttonObj.GetComponent<Image>();
-            if (buttonImage != null && !string.IsNullOrEmpty(modelMetadata.thumbnailBase64))
-            {
-                Sprite thumbnail = wsManager.Base64ToSprite(modelMetadata.thumbnailBase64);
-                if (thumbnail != null) buttonImage.sprite = thumbnail;
-            }
+            TMP_Text txt = btn.GetComponentInChildren<TMP_Text>();
+            if (txt != null) txt.text = meta.displayName;
 
-            TMP_Text buttonText = buttonObj.GetComponentInChildren<TMP_Text>();
-            if (buttonText != null)
-            {
-                buttonText.text = modelMetadata.displayName;
-            }
+            var dragComp = btn.AddComponent<DraggableModelIcon>();
+            dragComp.ModelID = meta.modelID;
+            dragComp.OnModelDropped = wsManager.OnLoadModelSelected;
 
-            SetupButtonDrag(buttonObj, wsManager);
-
-            dynamicModelButtons.Add(buttonObj);
+            dynamicModelButtons.Add(btn);
         }
     }
-
-    private void SetupButtonDrag(GameObject buttonObj, WebSocketClientManager wsManager)
-    {
-        EventTrigger trigger = buttonObj.GetComponent<EventTrigger>();
-        if (trigger == null) trigger = buttonObj.AddComponent<EventTrigger>();
-
-        trigger.triggers.Clear();
-
-        EventTrigger.Entry entryBeginDrag = new EventTrigger.Entry();
-        entryBeginDrag.eventID = EventTriggerType.BeginDrag;
-        entryBeginDrag.callback.AddListener((data) => { wsManager.OnButtonDragStart((PointerEventData)data); });
-        trigger.triggers.Add(entryBeginDrag);
-
-        EventTrigger.Entry entryDrag = new EventTrigger.Entry();
-        entryDrag.eventID = EventTriggerType.Drag;
-        entryDrag.callback.AddListener((data) => { wsManager.OnButtonDrag((PointerEventData)data); });
-        trigger.triggers.Add(entryDrag);
-
-        EventTrigger.Entry entryEndDrag = new EventTrigger.Entry();
-        entryEndDrag.eventID = EventTriggerType.EndDrag;
-        entryEndDrag.callback.AddListener((data) => { wsManager.OnButtonDragEnd((PointerEventData)data); });
-        trigger.triggers.Add(entryEndDrag);
-    }
-
 
     private void ClearDynamicButtons()
     {

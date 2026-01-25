@@ -5,7 +5,7 @@ using UnityVolumeRendering;
 using System.IO;
 using UnityEngine.Networking;
 
-public class ModelViewportController : MonoBehaviour, IModelViewportController
+public class ModelViewportController : MonoBehaviour, IModelManipulator
 {
     [Header("References")]
     [SerializeField] private Camera referenceCamera;
@@ -251,22 +251,13 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
         SetupContainers();
         CurrentModelID = modelId;
 
-        GameObject rootModel = null;
+        GameObject root = ModelLoader.Load(modelData, modelContainer.transform);
 
-        if (modelData is VolumetricModelData volumetricData)
+        if (root != null)
         {
-            rootModel = LoadVolumetricModel(volumetricData);
-        }
-        else if (modelData is PolygonalModelData polygonalData)
-        {
-            rootModel = LoadPrefabModel(polygonalData);
-        }
-
-        if (rootModel != null)
-        {
-            rootModel.name = "RootModel";
-            this.rootModel = rootModel;
-            SetupReferencePoint(rootModel);
+            root.name = "RootModel";
+            this.rootModel = root;
+            SetupReferencePoint(root);
             EnsureAxisVisualsAreCreated();
         }
     }
@@ -283,78 +274,6 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
         axesContainer.transform.SetParent(worldContainer.transform, false);
     }
 
-    private GameObject LoadVolumetricModel(VolumetricModelData data)
-    {
-        string filePath = data.rawFilePath;
-
-        // ANDROID FIX: Extract file from APK to readable storage
-        if (Application.platform == RuntimePlatform.Android)
-        {
-            string fileName = System.IO.Path.GetFileName(data.rawFilePath);
-            string persistentPath = System.IO.Path.Combine(Application.persistentDataPath, fileName);
-
-            if (!System.IO.File.Exists(persistentPath))
-            {
-                // FIX: Use manual string concatenation to enforce forward slashes.
-                // Path.Combine can add backslashes on Windows, which breaks Android URLs.
-                string sourcePath = Application.streamingAssetsPath + "/" + fileName;
-
-                Debug.Log($"Attempting to download from: {sourcePath}"); // Debug log
-
-                UnityWebRequest request = UnityWebRequest.Get(sourcePath);
-                var operation = request.SendWebRequest();
-
-                while (!operation.isDone) { } // Block until done
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    System.IO.File.WriteAllBytes(persistentPath, request.downloadHandler.data);
-                }
-                else
-                {
-                    Debug.LogError($"Failed to copy volumetric file from {sourcePath}: {request.error}");
-                    return null;
-                }
-            }
-            filePath = persistentPath;
-        }
-
-        // Normal Loading Logic
-        var importer = new RawDatasetImporter(
-            filePath,
-            data.dimX, data.dimY, data.dimZ,
-            data.contentFormat,
-            data.endianness,
-            data.bytesToSkip
-        );
-
-        VolumeDataset dataset = importer.Import();
-        if (dataset == null)
-        {
-            Debug.LogError("Failed to import volumetric dataset.");
-            return null;
-        }
-
-        VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
-        volObj.gameObject.transform.SetParent(modelContainer.transform, false);
-
-        if (volumetricDefaultMaterial != null)
-        {
-            Renderer r = volObj.GetComponent<Renderer>();
-            if (r != null)
-                r.sharedMaterial = volumetricDefaultMaterial;
-        }
-
-        return volObj.gameObject;
-    }
-
-    private GameObject LoadPrefabModel(PolygonalModelData data)
-    {
-        if (data.prefab == null)
-            return null;
-
-        return Instantiate(data.prefab, modelContainer.transform);
-    }
 
     private void SetupReferencePoint(GameObject rootModelObj)
     {
@@ -392,81 +311,18 @@ public class ModelViewportController : MonoBehaviour, IModelViewportController
 
     private void CreateAxisVisuals()
     {
-        foreach (Transform child in axesContainer.transform)
-            Destroy(child.gameObject);
-
+        foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
         axisVisuals.Clear();
 
-        CreateSingleAxisVisual(
+        // Use Helper
+        axisVisuals = AxisGenerator.CreateAxes(
             axesContainer.transform,
-            Vector3.right,
             Constants.AXIS_LENGTH,
             Constants.AXIS_THICKNESS,
-            redAxisMaterial,
-            "XAxis_Client"
+            axisOriginOffset,
+            redAxisMaterial, greenAxisMaterial, blueAxisMaterial
         );
 
-        CreateSingleAxisVisual(
-            axesContainer.transform,
-            Vector3.up,
-            Constants.AXIS_LENGTH,
-            Constants.AXIS_THICKNESS,
-            greenAxisMaterial,
-            "YAxis_Client"
-        );
-
-        CreateSingleAxisVisual(
-            axesContainer.transform,
-            Vector3.forward,
-            Constants.AXIS_LENGTH,
-            Constants.AXIS_THICKNESS,
-            blueAxisMaterial,
-            "ZAxis_Client"
-        );
-    }
-
-    private void CreateSingleAxisVisual(
-        Transform parentForAxes,
-        Vector3 direction,
-        float length,
-        float thickness,
-        Material axisMat,
-        string baseName
-    )
-    {
-        float capHeight = thickness * Constants.ARROWHEAD_HEIGHT_FACTOR;
-        float shaftActualLength = Mathf.Max(thickness * 2f, length - capHeight);
-
-        // Create shaft
-        GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentForAxes, false);
-        Destroy(shaft.GetComponent<CapsuleCollider>());
-
-        shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
-        shaft.transform.localPosition = axisOriginOffset + direction * (shaftActualLength / 2f);
-        shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-
-        if (shaft.GetComponent<Renderer>() != null && axisMat != null)
-            shaft.GetComponent<Renderer>().material = axisMat;
-
-        axisVisuals.Add(shaft);
-
-        // Create arrowhead
-        GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentForAxes, false);
-        Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-
-        float capRadius = thickness * Constants.ARROWHEAD_RADIUS_FACTOR;
-        arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
-        arrowheadCap.transform.localPosition = axisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
-        arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-
-        if (arrowheadCap.GetComponent<Renderer>() != null && axisMat != null)
-            arrowheadCap.GetComponent<Renderer>().material = axisMat;
-
-        axisVisuals.Add(arrowheadCap);
     }
 
     private IEnumerator AnimatePresetViewRotation(float direction)

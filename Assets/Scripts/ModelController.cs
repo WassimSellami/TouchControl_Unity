@@ -1,14 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
 using EzySlice;
-using System.Linq;
 using System.Collections;
 using UnityEngine.UI;
 using UnityVolumeRendering;
 using System;
-using Unity.VisualScripting;
 
-public class ModelController : MonoBehaviour, IModelViewportController
+public class ModelController : MonoBehaviour, IModelViewer
 {
     private enum ActionType { Slice, Destroy }
     private class ActionRecord
@@ -113,6 +111,13 @@ public class ModelController : MonoBehaviour, IModelViewportController
         }
     }
 
+    // ADDED: Missing interface implementation
+    public void SetModelVisibility(bool isVisible)
+    {
+        if (rootModel != null)
+            rootModel.SetActive(isVisible);
+    }
+
     public void UnloadCurrentModel()
     {
         if (worldContainer != null)
@@ -161,19 +166,11 @@ public class ModelController : MonoBehaviour, IModelViewportController
         SetupContainers();
         CurrentModelID = modelId;
 
-        GameObject rootModel = null;
+        GameObject root = ModelLoader.Load(modelData, modelContainer.transform);
 
-        if (modelData is VolumetricModelData volumetricData)
+        if (root != null)
         {
-            rootModel = LoadVolumetricModel(volumetricData);
-        }
-        else if (modelData is PolygonalModelData polygonalData)
-        {
-            rootModel = LoadPrefabModel(polygonalData);
-        }
-
-        if (rootModel != null)
-        {
+            rootModel = root; // Fixed: assign to class variable
             rootModel.name = "RootModel";
             allParts.Add(rootModel.name, rootModel);
 
@@ -187,10 +184,8 @@ public class ModelController : MonoBehaviour, IModelViewportController
                 UnityEditor.EditorUtility.SetDirty(modelData);
             }
 #endif
-
             SetupReferencePoint(rootModel);
         }
-
         SetupVisualHelpers();
     }
 
@@ -204,58 +199,6 @@ public class ModelController : MonoBehaviour, IModelViewportController
 
         axesContainer = new GameObject("AxesContainer");
         axesContainer.transform.SetParent(worldContainer.transform, false);
-    }
-
-    private GameObject LoadVolumetricModel(VolumetricModelData data)
-    {
-        string filePath = data.rawFilePath;
-
-        if (!System.IO.File.Exists(filePath))
-        {
-            string streamingPath = System.IO.Path.Combine(Application.streamingAssetsPath, System.IO.Path.GetFileName(filePath));
-            if (System.IO.File.Exists(streamingPath))
-            {
-                filePath = streamingPath;
-            }
-            else
-            {
-                Debug.LogError($"Volumetric file not found at: {filePath} OR {streamingPath}");
-                return null;
-            }
-        }
-
-        RawDatasetImporter importer = new RawDatasetImporter(
-            filePath,
-            data.dimX, data.dimY, data.dimZ,
-            data.contentFormat,
-            data.endianness,
-            data.bytesToSkip
-        );
-
-        VolumeDataset dataset = importer.Import();
-
-        if (dataset == null)
-        {
-            Debug.LogError("Failed to import dataset. File may be corrupted or dimensions incorrect.");
-            return null;
-        }
-
-        VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
-        volObj.gameObject.transform.SetParent(modelContainer.transform, false);
-
-        if (volumetricDefaultMaterial != null)
-        {
-            Renderer r = volObj.GetComponent<Renderer>();
-            if (r != null) r.sharedMaterial = volumetricDefaultMaterial;
-        }
-
-        return volObj.gameObject;
-    }
-
-    private GameObject LoadPrefabModel(PolygonalModelData data)
-    {
-        if (data.prefab == null) return null;
-        return Instantiate(data.prefab, modelContainer.transform);
     }
 
     private void SetupReferencePoint(GameObject rootModel)
@@ -293,7 +236,17 @@ public class ModelController : MonoBehaviour, IModelViewportController
         if (axesContainer != null)
         {
             axesContainer.SetActive(true);
-            CreateServerAxisVisuals(axesContainer.transform);
+            Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red };
+            Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green };
+            Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
+
+            currentModelAxisVisuals = AxisGenerator.CreateAxes(
+                axesContainer.transform,
+                Constants.AXIS_LENGTH,
+                Constants.AXIS_THICKNESS,
+                serverAxisOriginOffset,
+                matX, matY, matZ
+            );
         }
     }
 
@@ -355,8 +308,8 @@ public class ModelController : MonoBehaviour, IModelViewportController
                     Vector3 localNormal = originalPart.transform.InverseTransformDirection(data.planeNormal).normalized;
                     Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
 
-                    ApplyVolumeMaterial(upperHull, textureSpacePoint, localNormal);
-                    ApplyVolumeMaterial(lowerHull, textureSpacePoint, -localNormal);
+                    RenderUtils.ApplyVolumeMaterial(upperHull, volumetricDefaultMaterial, textureSpacePoint, localNormal);
+                    RenderUtils.ApplyVolumeMaterial(lowerHull, volumetricDefaultMaterial, textureSpacePoint, -localNormal);
 
                     allParts.Add(upperHull.name, upperHull);
                     allParts.Add(lowerHull.name, lowerHull);
@@ -413,31 +366,7 @@ public class ModelController : MonoBehaviour, IModelViewportController
         }
     }
 
-    private void ApplyVolumeMaterial(GameObject volumeObj, Vector3 textureSpacePoint, Vector3 localNormal)
-    {
-        Renderer rend = volumeObj.GetComponent<Renderer>();
-        if (rend == null) rend = volumeObj.GetComponentInChildren<Renderer>();
-
-        if (rend != null && volumetricDefaultMaterial != null)
-        {
-            Material mat = new Material(volumetricDefaultMaterial);
-            Material existingMat = rend.sharedMaterial;
-            if (existingMat != null)
-            {
-                if (existingMat.HasProperty("_DataTex")) mat.SetTexture("_DataTex", existingMat.GetTexture("_DataTex"));
-                if (existingMat.HasProperty("_GradientTex")) mat.SetTexture("_GradientTex", existingMat.GetTexture("_GradientTex"));
-                if (existingMat.HasProperty("_TFTex")) mat.SetTexture("_TFTex", existingMat.GetTexture("_TFTex"));
-                if (existingMat.HasProperty("_MinVal")) mat.SetFloat("_MinVal", existingMat.GetFloat("_MinVal"));
-                if (existingMat.HasProperty("_MaxVal")) mat.SetFloat("_MaxVal", existingMat.GetFloat("_MaxVal"));
-            }
-
-            // 3. Set Slicing Properties
-            mat.SetVector("_PlanePos", textureSpacePoint);
-            mat.SetVector("_PlaneNormal", localNormal);
-
-            rend.material = mat;
-        }
-    }
+    // REMOVED: ApplyVolumeCut method (use RenderUtils instead)
 
     public void ExecuteDestroy(DestroyActionData data)
     {
@@ -741,50 +670,6 @@ public class ModelController : MonoBehaviour, IModelViewportController
         currentModelAxisVisuals.Clear();
     }
 
-    void CreateServerAxisVisuals(Transform axesParentTransform)
-    {
-        if (!showServerAxes || axesParentTransform == null) return;
-        ClearCurrentModelAxisVisuals();
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.right, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.red, "X_Axis_Server");
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.up, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.green, "Y_Axis_Server");
-        CreateSingleServerAxisVisual(axesParentTransform, Vector3.forward, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Color.blue, "Z_Axis_Server");
-    }
-
-    void CreateSingleServerAxisVisual(Transform parentRef, Vector3 direction, float length, float thickness, Color color, string baseName)
-    {
-        float capHeight = thickness * Constants.ARROWHEAD_HEIGHT_FACTOR;
-        float shaftActualLength = Mathf.Max(thickness / 2f, length - capHeight);
-        GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        shaft.name = baseName + "_Shaft";
-        shaft.transform.SetParent(parentRef, false);
-        Destroy(shaft.GetComponent<CapsuleCollider>());
-        shaft.transform.localScale = new Vector3(thickness, shaftActualLength / 2f, thickness);
-        shaft.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength / 2f);
-        shaft.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        ApplyServerMaterial(shaft.GetComponent<Renderer>(), color);
-        currentModelAxisVisuals.Add(shaft);
-
-        GameObject arrowheadCap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        arrowheadCap.name = baseName + "_HeadCap";
-        arrowheadCap.transform.SetParent(parentRef, false);
-        Destroy(arrowheadCap.GetComponent<CapsuleCollider>());
-        float capRadius = thickness * Constants.ARROWHEAD_RADIUS_FACTOR;
-        arrowheadCap.transform.localScale = new Vector3(capRadius, capHeight / 2f, capRadius);
-        arrowheadCap.transform.localPosition = serverAxisOriginOffset + direction * (shaftActualLength + capHeight / 2f);
-        arrowheadCap.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
-        ApplyServerMaterial(arrowheadCap.GetComponent<Renderer>(), color);
-        currentModelAxisVisuals.Add(arrowheadCap);
-    }
-
-    void ApplyServerMaterial(Renderer rend, Color color)
-    {
-        if (rend == null) return;
-        Shader unlitColorShader = Shader.Find("Unlit/Color");
-        if (unlitColorShader != null) rend.material = new Material(unlitColorShader);
-        else rend.material = new Material(Shader.Find("Legacy Shaders/Diffuse"));
-        rend.material.color = color;
-    }
-
     public ModelMetadataList GetAllModelsMetadata()
     {
         var metadataList = new List<ModelMetadata>();
@@ -843,65 +728,6 @@ public class ModelController : MonoBehaviour, IModelViewportController
             return "";
         }
     }
-    public bool IsAutoRotating => false;
-
-    public void StartContinuousRotation(float direction)
-    {
-        // Server doesn't support continuous rotation for now
-        // This could be extended later if needed
-    }
-
-    public void StopContinuousRotation()
-    {
-        // Server doesn't support continuous rotation for now
-    }
-
-    public void ProcessOrbit(Vector2 screenDelta)
-    {
-        // Server doesn't directly handle orbit input
-        // Orbit is handled by WebSocket client input
-        // This exists for interface compatibility
-    }
-
-    public void ProcessPan(Vector2 screenDelta)
-    {
-        // Server doesn't directly handle pan input
-        // Pan is handled by WebSocket client input
-        // This exists for interface compatibility
-    }
-
-    public void ProcessZoom(float zoomAmount)
-    {
-        // Server doesn't directly handle zoom input
-        // Zoom is handled by WebSocket client input
-        // This exists for interface compatibility
-    }
-
-    public void ProcessRoll(float angleDelta)
-    {
-        // Server doesn't directly handle roll input
-        // Roll is handled by WebSocket client input
-        // This exists for interface compatibility
-    }
-
-    public void ResetOrbitLock()
-    {
-        // Server doesn't track orbit lock state
-        // This exists for interface compatibility
-    }
-
-    public void SetModelVisibility(bool isVisible)
-    {
-        if (rootModel != null)
-            rootModel.SetActive(isVisible);
-    }
-
-    public void TriggerPresetViewRotation(float direction)
-    {
-        // Server doesn't support preset view rotation for now
-        // This could be extended later if needed
-    }
-
 
     public void ResetState()
     {
@@ -911,5 +737,4 @@ public class ModelController : MonoBehaviour, IModelViewportController
         transform.rotation = Quaternion.identity;
         transform.localScale = Vector3.one;
     }
-
 }
