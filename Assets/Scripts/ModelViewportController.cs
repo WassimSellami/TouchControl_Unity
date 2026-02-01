@@ -1,16 +1,12 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using UnityVolumeRendering;
-using System.IO;
-using UnityEngine.Networking;
 
 public class ModelViewportController : MonoBehaviour, IModelManipulator
 {
     [Header("References")]
     [SerializeField] private Camera referenceCamera;
     [SerializeField] private List<ModelData> availableModels = new List<ModelData>();
-    [SerializeField] private Material volumetricDefaultMaterial;
 
     [Header("Axis Visuals")]
     [SerializeField] private Vector3 axisOriginOffset = new Vector3(0f, 0f, 0f);
@@ -18,10 +14,12 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     [SerializeField] private Material greenAxisMaterial;
     [SerializeField] private Material blueAxisMaterial;
 
+    [Header("Volumetric Settings")]
+    [SerializeField] private Material volumetricSliceMaterial;
+
     [Header("Auto Rotation")]
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
 
-    // Internal state
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     private Vector3 initialScale;
@@ -251,7 +249,7 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         SetupContainers();
         CurrentModelID = modelId;
 
-        GameObject root = ModelLoader.Load(modelData, modelContainer.transform);
+        GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
 
         if (root != null)
         {
@@ -282,17 +280,7 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         if (modelReferencePoint == null)
             modelReferencePoint = rootModelObj.transform;
 
-        bool isVolumetricData = rootModelObj.GetComponent<VolumeRenderedObject>() != null;
-
-        if (isVolumetricData)
-        {
-            refPointLocalPosition = new Vector3(-0.6f, -0.4f, -0.5f);
-        }
-        else
-        {
-            refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
-        }
-
+        refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
         refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
     }
 
@@ -314,7 +302,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
         axisVisuals.Clear();
 
-        // Use Helper
         axisVisuals = AxisGenerator.CreateAxes(
             axesContainer.transform,
             Constants.AXIS_LENGTH,

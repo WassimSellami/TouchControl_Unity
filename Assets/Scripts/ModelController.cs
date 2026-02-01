@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using EzySlice;
 using System.Collections;
 using UnityEngine.UI;
-using UnityVolumeRendering;
 using System;
 
 public class ModelController : MonoBehaviour, IModelViewer
@@ -29,13 +28,12 @@ public class ModelController : MonoBehaviour, IModelViewer
     [SerializeField] private GameObject lineRendererPrefab;
     [SerializeField] private bool showPlaneVisualizer = true;
 
-    [Header("Volumetric Settings")]
-    [Tooltip("CRITICAL: Assign the Material with the 'DirectVolumeRenderingShader_SlicePlane' shader here.")]
-    [SerializeField] private Material volumetricDefaultMaterial;
-
     [Header("Axis Visuals (Server)")]
     [SerializeField] private bool showServerAxes = true;
     [SerializeField] private Vector3 serverAxisOriginOffset = new Vector3(0f, 0f, 0f);
+
+    [Header("Volumetric Settings")]
+    [SerializeField] private Material volumetricSliceMaterial;
 
     [Header("Shaking Effect")]
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
@@ -111,7 +109,6 @@ public class ModelController : MonoBehaviour, IModelViewer
         }
     }
 
-    // ADDED: Missing interface implementation
     public void SetModelVisibility(bool isVisible)
     {
         if (rootModel != null)
@@ -166,11 +163,11 @@ public class ModelController : MonoBehaviour, IModelViewer
         SetupContainers();
         CurrentModelID = modelId;
 
-        GameObject root = ModelLoader.Load(modelData, modelContainer.transform);
+        GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
 
         if (root != null)
         {
-            rootModel = root; // Fixed: assign to class variable
+            rootModel = root;
             rootModel.name = "RootModel";
             allParts.Add(rootModel.name, rootModel);
 
@@ -206,17 +203,8 @@ public class ModelController : MonoBehaviour, IModelViewer
         modelReferencePoint = rootModel.transform.Find("ref");
         if (modelReferencePoint == null) modelReferencePoint = rootModel.transform;
 
-        bool isVolumetricData = rootModel.GetComponent<VolumeRenderedObject>() != null;
-
-        if (isVolumetricData)
-        {
-            refPointLocalPosition = new Vector3(-0.6f, -0.4f, -0.5f);
-        }
-        else
-        {
-            refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
-            refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
-        }
+        refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
+        refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
     }
 
     private void SetupVisualHelpers()
@@ -290,72 +278,37 @@ public class ModelController : MonoBehaviour, IModelViewer
         {
             if (allParts.TryGetValue(partID, out GameObject originalPart) && originalPart.activeInHierarchy)
             {
-                VolumeRenderedObject volObj = originalPart.GetComponent<VolumeRenderedObject>();
-                if (volObj == null) volObj = originalPart.GetComponentInChildren<VolumeRenderedObject>();
-
-                if (volObj != null)
+                SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
+                if (sliceResult != null)
                 {
-                    GameObject upperHull = Instantiate(originalPart, originalPart.transform.parent);
-                    GameObject lowerHull = Instantiate(originalPart, originalPart.transform.parent);
+                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
+                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
 
-                    upperHull.name = partID + "_U";
-                    lowerHull.name = partID + "_L";
-
-                    Destroy(upperHull.GetComponent<VolumeRenderedObject>());
-                    Destroy(lowerHull.GetComponent<VolumeRenderedObject>());
-
-                    Vector3 localPoint = originalPart.transform.InverseTransformPoint(data.planePoint);
-                    Vector3 localNormal = originalPart.transform.InverseTransformDirection(data.planeNormal).normalized;
-                    Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
-
-                    RenderUtils.ApplyVolumeMaterial(upperHull, volumetricDefaultMaterial, textureSpacePoint, localNormal);
-                    RenderUtils.ApplyVolumeMaterial(lowerHull, volumetricDefaultMaterial, textureSpacePoint, -localNormal);
-
-                    allParts.Add(upperHull.name, upperHull);
-                    allParts.Add(lowerHull.name, lowerHull);
-
-                    StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
-
-                    record.Originals.Add(originalPart);
-                    record.NewHulls.Add(upperHull);
-                    record.NewHulls.Add(lowerHull);
-
-                    originalPart.SetActive(false);
-                }
-                else
-                {
-                    SlicedHull sliceResult = originalPart.Slice(data.planePoint, data.planeNormal, crossSectionMaterial);
-                    if (sliceResult != null)
+                    if (upperHull != null && lowerHull != null)
                     {
-                        GameObject upperHull = sliceResult.CreateUpperHull(originalPart, crossSectionMaterial);
-                        GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, crossSectionMaterial);
+                        upperHull.name = partID + "_U";
+                        lowerHull.name = partID + "_L";
 
-                        if (upperHull != null && lowerHull != null)
+                        if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
                         {
-                            upperHull.name = partID + "_U";
-                            lowerHull.name = partID + "_L";
-
-                            if (allParts.ContainsKey(upperHull.name) || allParts.ContainsKey(lowerHull.name))
-                            {
-                                Destroy(upperHull);
-                                Destroy(lowerHull);
-                                continue;
-                            }
-
-                            allParts.Add(upperHull.name, upperHull);
-                            allParts.Add(lowerHull.name, lowerHull);
-
-                            SetupHull(upperHull, originalPart);
-                            SetupHull(lowerHull, originalPart);
-
-                            StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
-
-                            record.Originals.Add(originalPart);
-                            record.NewHulls.Add(upperHull);
-                            record.NewHulls.Add(lowerHull);
-
-                            originalPart.SetActive(false);
+                            Destroy(upperHull);
+                            Destroy(lowerHull);
+                            continue;
                         }
+
+                        allParts.Add(upperHull.name, upperHull);
+                        allParts.Add(lowerHull.name, lowerHull);
+
+                        SetupHull(upperHull, originalPart);
+                        SetupHull(lowerHull, originalPart);
+
+                        StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
+
+                        record.Originals.Add(originalPart);
+                        record.NewHulls.Add(upperHull);
+                        record.NewHulls.Add(lowerHull);
+
+                        originalPart.SetActive(false);
                     }
                 }
             }
@@ -365,8 +318,6 @@ public class ModelController : MonoBehaviour, IModelViewer
             undoStack.Push(record);
         }
     }
-
-    // REMOVED: ApplyVolumeCut method (use RenderUtils instead)
 
     public void ExecuteDestroy(DestroyActionData data)
     {

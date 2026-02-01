@@ -63,81 +63,13 @@ public class SliceCommand : ICommand
         {
             if (originalPart == null) continue;
 
-            VolumeRenderedObject volObj = originalPart.GetComponent<VolumeRenderedObject>();
-            if (volObj == null) volObj = originalPart.GetComponentInChildren<VolumeRenderedObject>();
-
-            if (volObj != null)
+            if (originalPart.GetComponentInChildren<VolumeRenderedObject>() != null)
             {
-                GameObject upperHull = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
-                GameObject lowerHull = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
-
-                upperHull.name = originalPart.name + "_U";
-                lowerHull.name = originalPart.name + "_L";
-
-                UnityEngine.Object.Destroy(upperHull.GetComponent<VolumeRenderedObject>());
-                UnityEngine.Object.Destroy(lowerHull.GetComponent<VolumeRenderedObject>());
-
-                Vector3 localPoint = originalPart.transform.InverseTransformPoint(planePoint);
-                Vector3 localNormal = originalPart.transform.InverseTransformDirection(planeNormal).normalized;
-                Vector3 textureSpacePoint = localPoint + new Vector3(0.5f, 0.5f, 0.5f);
-
-                RenderUtils.ApplyVolumeMaterial(upperHull, sliceManager.volumetricSlicingMaterial, textureSpacePoint, localNormal);
-                RenderUtils.ApplyVolumeMaterial(lowerHull, sliceManager.volumetricSlicingMaterial, textureSpacePoint, -localNormal);
-
-                var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
-                upperInfo.sourceActionID = ActionID;
-                upperInfo.side = "Upper";
-
-                var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
-                lowerInfo.sourceActionID = ActionID;
-                lowerInfo.side = "Lower";
-
-                sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
-
-                newHulls.Add(upperHull);
-                newHulls.Add(lowerHull);
-                sliceManager.activeModelParts.Add(upperHull);
-                sliceManager.activeModelParts.Add(lowerHull);
-
-                originalPartIDs.Add(originalPart.name);
-                successfullySlicedOriginals.Add(originalPart);
+                ExecuteVolumetricSlice(originalPart, ref successfullySlicedOriginals, ref originalPartIDs);
             }
             else
             {
-                SlicedHull sliceResult = originalPart.Slice(planePoint, planeNormal, sliceManager.crossSectionMaterial);
-
-                if (sliceResult != null)
-                {
-                    GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
-                    GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
-
-                    if (upperHull != null && lowerHull != null)
-                    {
-                        upperHull.name = originalPart.name + "_U";
-                        lowerHull.name = originalPart.name + "_L";
-
-                        var upperInfo = upperHull.AddComponent<ModelComponentInfo>();
-                        upperInfo.sourceActionID = ActionID;
-                        upperInfo.side = "Upper";
-
-                        var lowerInfo = lowerHull.AddComponent<ModelComponentInfo>();
-                        lowerInfo.sourceActionID = ActionID;
-                        lowerInfo.side = "Lower";
-
-                        SetupHull(upperHull, originalPart);
-                        SetupHull(lowerHull, originalPart);
-
-                        sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
-
-                        newHulls.Add(upperHull);
-                        newHulls.Add(lowerHull);
-                        sliceManager.activeModelParts.Add(upperHull);
-                        sliceManager.activeModelParts.Add(lowerHull);
-
-                        originalPartIDs.Add(originalPart.name);
-                        successfullySlicedOriginals.Add(originalPart);
-                    }
-                }
+                ExecuteMeshSlice(originalPart, ref successfullySlicedOriginals, ref originalPartIDs);
             }
         }
 
@@ -166,6 +98,81 @@ public class SliceCommand : ICommand
 
         hasBeenExecuted = true;
     }
+
+    private void ExecuteVolumetricSlice(GameObject originalPart, ref List<GameObject> successfullySlicedOriginals, ref List<string> originalPartIDs)
+    {
+        GameObject partA = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
+        GameObject partB = UnityEngine.Object.Instantiate(originalPart, originalPart.transform.parent);
+
+        partA.name = originalPart.name + "_A";
+        partB.name = originalPart.name + "_B";
+
+        Renderer volRenderer = originalPart.GetComponentInChildren<Renderer>();
+        if (volRenderer == null) return;
+
+        Vector3 localHitPos = volRenderer.transform.InverseTransformPoint(planePoint);
+        Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f);
+
+        ApplyVolumeCut(partA, textureSpacePos, planeNormal, false);
+        ApplyVolumeCut(partB, textureSpacePos, planeNormal, true);
+
+        sliceManager.StartCoroutine(AnimateSeparation(partA, partB, originalPart));
+
+        newHulls.Add(partA);
+        newHulls.Add(partB);
+        sliceManager.activeModelParts.Add(partA);
+        sliceManager.activeModelParts.Add(partB);
+
+        originalPartIDs.Add(originalPart.name);
+        successfullySlicedOriginals.Add(originalPart);
+    }
+
+    private void ApplyVolumeCut(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
+    {
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+        foreach (Renderer rend in renderers)
+        {
+            if (!rend.gameObject.name.Contains("Shaft") && !rend.gameObject.name.Contains("Head"))
+            {
+                Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal);
+                if (invertNormal) localNormal = -localNormal;
+
+                rend.material.SetVector("_PlanePos", texturePoint);
+                rend.material.SetVector("_PlaneNormal", localNormal);
+            }
+        }
+    }
+
+    private void ExecuteMeshSlice(GameObject originalPart, ref List<GameObject> successfullySlicedOriginals, ref List<string> originalPartIDs)
+    {
+        SlicedHull sliceResult = originalPart.Slice(planePoint, planeNormal, sliceManager.crossSectionMaterial);
+
+        if (sliceResult != null)
+        {
+            GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
+            GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
+
+            if (upperHull != null && lowerHull != null)
+            {
+                upperHull.name = originalPart.name + "_U";
+                lowerHull.name = originalPart.name + "_L";
+
+                SetupHull(upperHull, originalPart);
+                SetupHull(lowerHull, originalPart);
+
+                sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
+
+                newHulls.Add(upperHull);
+                newHulls.Add(lowerHull);
+                sliceManager.activeModelParts.Add(upperHull);
+                sliceManager.activeModelParts.Add(lowerHull);
+
+                originalPartIDs.Add(originalPart.name);
+                successfullySlicedOriginals.Add(originalPart);
+            }
+        }
+    }
+
     public void Undo()
     {
         foreach (var hull in newHulls)
@@ -211,7 +218,10 @@ public class SliceCommand : ICommand
     private IEnumerator AnimateSeparation(GameObject upperHull, GameObject lowerHull, GameObject original)
     {
         float duration = Constants.SEPARATION_ANIMATION_DURATION;
-        Bounds originalBounds = original.GetComponent<Renderer>().bounds;
+        Renderer rend = original.GetComponentInChildren<Renderer>();
+        if (rend == null) yield break;
+
+        Bounds originalBounds = rend.bounds;
         float separationDistance = originalBounds.size.magnitude * Constants.SEPARATION_FACTOR;
         Vector3 separationVector = planeNormal * (separationDistance * 0.5f);
 

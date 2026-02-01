@@ -1125,7 +1125,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 0
+  autoConnectMode: 1
   uiManager: {fileID: 751785403}
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
@@ -1446,7 +1446,6 @@ MonoBehaviour:
   modelRootTransform: {fileID: 980018136}
   webSocketClientManager: {fileID: 838438841}
   crossSectionMaterial: {fileID: 2100000, guid: c73021a10d2dca34399a569c8e603b60, type: 2}
-  volumetricSlicingMaterial: {fileID: 2100000, guid: 7f98494fc3acfb94d9d6d47c0f9ff5ed, type: 2}
   showPlaneVisualizer: 0
   lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
   planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
@@ -1516,12 +1515,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2121bead4c975a64c9fca424fc7678fc, type: 2}
   - {fileID: 11400000, guid: 96bfcac6514fa3746a1ea4b6e1b2c3d0, type: 2}
   - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  volumetricDefaultMaterial: {fileID: 2100000, guid: 7f98494fc3acfb94d9d6d47c0f9ff5ed, type: 2}
   axisOriginOffset: {x: 0, y: 0, z: 0}
   redAxisMaterial: {fileID: 2100000, guid: c43d4c43a365b1349a683e671b8b1c5e, type: 2}
   greenAxisMaterial: {fileID: 2100000, guid: 4b8fadb3294ea45489446653acdd0524, type: 2}
   blueAxisMaterial: {fileID: 2100000, guid: 6755b73d59d2ca443a73e9c5579a7ecd, type: 2}
-  wiggleAxis: {x: 1, y: 1, z: 1}
+  volumetricSliceMaterial: {fileID: 2100000, guid: 7f98494fc3acfb94d9d6d47c0f9ff5ed, type: 2}
+  wiggleAxis: {x: 0, y: 1, z: 0}
 --- !u!1 &999598337
 GameObject:
   m_ObjectHideFlags: 0
