@@ -13,11 +13,16 @@ public class VolumetricSceneController : MonoBehaviour
     public Endianness endianness = Endianness.LittleEndian;
     public int bytesToSkip = 0;
 
-    [Header("Slice Settings")]
+    [Header("Interaction Settings")]
     public Material sliceMaterial;
-    public float separationDistance = 0.2f;
+    public float separationDistance = 0.4f;
+    public float minSwipeDistance = 20f;
+    public float zoomSensitivity = 0.01f;
+    public float scaleMin = 0.1f;
+    public float scaleMax = 5.0f;
 
     private VolumeRenderedObject loadedVolumeObj;
+    private Vector2 touchStartPos;
 
     void Start()
     {
@@ -26,10 +31,54 @@ public class VolumetricSceneController : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        HandleInput();
+    }
+
+    private void HandleInput()
+    {
+        if (Input.touchCount == 1)
         {
-            ExecuteSlice();
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                touchStartPos = touch.position;
+            }
+            else if (touch.phase == TouchPhase.Ended)
+            {
+                Vector2 touchEndPos = touch.position;
+                Vector2 swipeVector = touchEndPos - touchStartPos;
+                if (swipeVector.magnitude > minSwipeDistance)
+                {
+                    TryExecuteSlice(touchStartPos, touchEndPos, swipeVector);
+                }
+            }
         }
+        else if (Input.touchCount == 2)
+        {
+            Touch touch0 = Input.GetTouch(0);
+            Touch touch1 = Input.GetTouch(1);
+
+            Vector2 touch0PrevPos = touch0.position - touch0.deltaPosition;
+            Vector2 touch1PrevPos = touch1.position - touch1.deltaPosition;
+
+            float prevDistance = (touch0PrevPos - touch1PrevPos).magnitude;
+            float currentDistance = (touch0.position - touch1.position).magnitude;
+
+            float zoomAmount = currentDistance - prevDistance;
+            ProcessZoom(zoomAmount);
+        }
+    }
+
+    private void ProcessZoom(float zoomAmount)
+    {
+        float scaleChange = 1.0f + zoomAmount * zoomSensitivity;
+        Vector3 newScale = transform.localScale * scaleChange;
+
+        newScale.x = Mathf.Clamp(newScale.x, scaleMin, scaleMax);
+        newScale.y = Mathf.Clamp(newScale.y, scaleMin, scaleMax);
+        newScale.z = Mathf.Clamp(newScale.z, scaleMin, scaleMax);
+
+        transform.localScale = newScale;
     }
 
     void LoadVolume()
@@ -43,60 +92,81 @@ public class VolumetricSceneController : MonoBehaviour
         VolumeDataset dataset = importer.Import();
         loadedVolumeObj = VolumeObjectFactory.CreateObject(dataset);
 
+        GameObject rendererObj = loadedVolumeObj.transform.GetChild(0).gameObject;
+        if (rendererObj.GetComponent<BoxCollider>() == null)
+            rendererObj.AddComponent<BoxCollider>();
+
         loadedVolumeObj.transform.SetParent(transform);
         loadedVolumeObj.transform.localPosition = Vector3.zero;
 
-        if (sliceMaterial != null)
-        {
-            Renderer rend = loadedVolumeObj.GetComponent<Renderer>();
-            if (rend == null) rend = loadedVolumeObj.GetComponentInChildren<Renderer>();
-            if (rend != null) rend.sharedMaterial = sliceMaterial;
-        }
+        ApplyMaterialRecursive(loadedVolumeObj.gameObject);
+    }
 
-        Renderer r2 = loadedVolumeObj.GetComponent<Renderer>();
-        if (r2 == null) r2 = loadedVolumeObj.GetComponentInChildren<Renderer>();
-        if (r2 != null)
+    void ApplyMaterialRecursive(GameObject root)
+    {
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+        foreach (Renderer rend in renderers)
         {
-            r2.material.SetVector("_PlaneNormal", Vector3.zero);
-            r2.material.SetVector("_PlanePos", new Vector3(-100, -100, -100));
+            if (sliceMaterial != null) rend.sharedMaterial = sliceMaterial;
+            rend.sharedMaterial.SetVector("_PlanePos", new Vector3(-10, -10, -10));
+            rend.sharedMaterial.SetVector("_PlaneNormal", Vector3.up);
         }
     }
 
-    void ExecuteSlice()
+    void TryExecuteSlice(Vector2 start, Vector2 end, Vector2 swipeVector)
     {
         if (loadedVolumeObj == null) return;
 
+        Vector2 midPoint = (start + end) / 2f;
+        Ray ray = Camera.main.ScreenPointToRay(midPoint);
+        UnityEngine.RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit))
+        {
+            ExecuteSliceAtPoint(hit.point, swipeVector, hit.collider.gameObject);
+        }
+    }
+
+    void ExecuteSliceAtPoint(Vector3 worldHitPoint, Vector2 swipeVector, GameObject hitTarget)
+    {
         GameObject originalGO = loadedVolumeObj.gameObject;
-        GameObject rightGO = Instantiate(originalGO, transform);
-        GameObject leftGO = Instantiate(originalGO, transform);
+        Vector2 swipeDir = swipeVector.normalized;
+        Vector2 cutDir2D = new Vector2(-swipeDir.y, swipeDir.x);
 
-        rightGO.name = "Volume_Right";
-        leftGO.name = "Volume_Left";
+        Vector3 worldNormal = (Camera.main.transform.right * cutDir2D.x) + (Camera.main.transform.up * cutDir2D.y);
+        worldNormal.Normalize();
 
-        Vector3 slicePointLocal = new Vector3(0.5f, 0.5f, 0.5f);
-        Vector3 sliceNormalLocal = Vector3.right;
+        Vector3 localHitPos = hitTarget.transform.InverseTransformPoint(worldHitPoint);
+        Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f);
 
-        ApplyVolumeCut(rightGO, slicePointLocal, sliceNormalLocal);
-        ApplyVolumeCut(leftGO, slicePointLocal, -sliceNormalLocal);
+        GameObject partA = Instantiate(originalGO, transform);
+        GameObject partB = Instantiate(originalGO, transform);
 
-        Vector3 worldDir = rightGO.transform.right.normalized;
+        partA.name = "Volume_Side_A";
+        partB.name = "Volume_Side_B";
 
-        rightGO.transform.position += worldDir * separationDistance;
-        leftGO.transform.position -= worldDir * separationDistance;
+        ApplyCutToHierarchy(partA, textureSpacePos, worldNormal, false);
+        ApplyCutToHierarchy(partB, textureSpacePos, worldNormal, true);
+
+        partA.transform.position += worldNormal * separationDistance;
+        partB.transform.position -= worldNormal * separationDistance;
 
         originalGO.SetActive(false);
         loadedVolumeObj = null;
     }
 
-    void ApplyVolumeCut(GameObject rootObj, Vector3 pointLocal, Vector3 normalLocal)
+    void ApplyCutToHierarchy(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
     {
-        Renderer rend = rootObj.GetComponent<Renderer>();
-        if (rend == null) rend = rootObj.GetComponentInChildren<Renderer>();
-        if (rend == null) return;
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+        foreach (Renderer rend in renderers)
+        {
+            Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal);
+            if (invertNormal) localNormal = -localNormal;
 
-        Material mat = new Material(rend.sharedMaterial);
-        mat.SetVector("_PlanePos", pointLocal);
-        mat.SetVector("_PlaneNormal", normalLocal);
-        rend.material = mat;
+            Material mat = new Material(rend.sharedMaterial);
+            mat.SetVector("_PlanePos", texturePoint);
+            mat.SetVector("_PlaneNormal", localNormal);
+            rend.material = mat;
+        }
     }
 }
