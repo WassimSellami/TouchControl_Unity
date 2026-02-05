@@ -22,7 +22,6 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private Image indicatorImage;
     [SerializeField] private Sprite defaultIndicatorSprite;
-    [SerializeField] private Button[] loadModelButtons;
     [SerializeField] private Button backButtonFromModelView;
 
     [Header("Available Models")]
@@ -115,18 +114,6 @@ public class WebSocketClientManager : MonoBehaviour
             connectButton.onClick.AddListener(AttemptConnect);
             uiManager.ShowConnectionPanel();
             UpdateConnectionUI(ConnectionState.IdleWaiting);
-        }
-
-        foreach (Button loadModelButton in loadModelButtons)
-        {
-            if (loadModelButton != null)
-            {
-                if (string.IsNullOrEmpty(loadModelButton.gameObject.name))
-                {
-                    Debug.LogWarning($"Button {loadModelButton.name} does not have a tag. It will not function as a model loader.");
-                    continue;
-                }
-            }
         }
 
         if (backButtonFromModelView != null)

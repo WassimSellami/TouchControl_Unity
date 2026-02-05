@@ -1,4 +1,6 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityVolumeRendering;
@@ -18,6 +20,13 @@ public class CuttingPlaneManager : MonoBehaviour
     public GameObject lineRendererPrefab;
     public GameObject planeVisualizerPrefab;
 
+    [Header("Client UI Feedback (2D)")]
+    [SerializeField] private RectTransform uiCanvasRect;
+    [SerializeField] private Image feedbackIcon;
+    [SerializeField] private Sprite trashIconSprite;
+    [SerializeField] private Sprite sliceIconSprite;
+    private float iconVerticalOffsetPercent = 0.15f;
+
     [HideInInspector]
     public List<GameObject> activeModelParts = new List<GameObject>();
 
@@ -35,6 +44,9 @@ public class CuttingPlaneManager : MonoBehaviour
     private Vector3 initialPlanePointForDepth;
     private Vector3 finalEndWorldPosRaw;
     private Vector3 modelCenterWorld;
+
+    private Dictionary<GameObject, Coroutine> localShakingCoroutines = new Dictionary<GameObject, Coroutine>();
+    private Dictionary<GameObject, Quaternion> localOriginalRotations = new Dictionary<GameObject, Quaternion>();
 
     void Start()
     {
@@ -73,23 +85,35 @@ public class CuttingPlaneManager : MonoBehaviour
             }
         }
 
+        if (feedbackIcon != null)
+        {
+            feedbackIcon.gameObject.SetActive(false);
+            feedbackIcon.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            feedbackIcon.raycastTarget = false;
+        }
+
         ResetCrop();
     }
 
     public void ShowSliceIconAtPosition(Vector2 screenPoint)
     {
-        if (webSocketClientManager == null) return;
-        modelCenterWorld = GetCollectiveBounds().center;
-        UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
-        Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
-        Vector3 worldPoint;
-        if (centerPlane.Raycast(rayOrigin, out float enter)) worldPoint = rayOrigin.GetPoint(enter);
-        else worldPoint = rayOrigin.GetPoint(Constants.PLANE_DEPTH);
-        webSocketClientManager.SendShowSliceIcon(worldPoint);
+        ShowLocalFeedbackIcon(screenPoint, sliceIconSprite);
+
+        if (webSocketClientManager != null)
+        {
+            modelCenterWorld = GetCollectiveBounds().center;
+            UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
+            Ray rayOrigin = mainCamera.ScreenPointToRay(screenPoint);
+            if (centerPlane.Raycast(rayOrigin, out float enter))
+            {
+                webSocketClientManager.SendShowSliceIcon(rayOrigin.GetPoint(enter));
+            }
+        }
     }
 
     public void HideSliceIcon()
     {
+        HideLocalFeedbackIcon();
         if (webSocketClientManager != null) webSocketClientManager.SendHideSliceIcon();
     }
 
@@ -211,6 +235,7 @@ public class CuttingPlaneManager : MonoBehaviour
     public void DestroyModelPart(GameObject partToDestroy)
     {
         if (partToDestroy == null) return;
+        StopShake(partToDestroy);
         ICommand destroyCommand = new DestroyCommand(partToDestroy, activeModelParts, webSocketClientManager);
         HistoryManager.Instance.ExecuteCommand(destroyCommand);
         if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false);
@@ -218,7 +243,11 @@ public class CuttingPlaneManager : MonoBehaviour
 
     public void StartShake(GameObject partToShake, Vector2 screenPoint)
     {
-        if (partToShake != null && webSocketClientManager != null)
+        if (partToShake == null) return;
+
+        ShowLocalFeedbackIcon(screenPoint, trashIconSprite);
+
+        if (webSocketClientManager != null)
         {
             modelCenterWorld = GetCollectiveBounds().center;
             UnityEngine.Plane centerPlane = new UnityEngine.Plane(-mainCamera.transform.forward, modelCenterWorld);
@@ -229,14 +258,78 @@ public class CuttingPlaneManager : MonoBehaviour
             var shakeData = new DestroyActionData { targetPartID = partToShake.name, worldPosition = worldPoint };
             webSocketClientManager.SendStartShake(shakeData);
         }
+
+        if (!localShakingCoroutines.ContainsKey(partToShake))
+        {
+            localOriginalRotations[partToShake] = partToShake.transform.localRotation;
+            localShakingCoroutines[partToShake] = StartCoroutine(LocalShakeCoroutine(partToShake));
+        }
     }
 
     public void StopShake(GameObject partToShake)
     {
-        if (partToShake != null && webSocketClientManager != null)
+        if (partToShake == null) return;
+
+        if (webSocketClientManager != null)
         {
             var shakeData = new DestroyActionData { targetPartID = partToShake.name };
             webSocketClientManager.SendStopShake(shakeData);
+        }
+
+        if (localShakingCoroutines.TryGetValue(partToShake, out Coroutine coroutine))
+        {
+            StopCoroutine(coroutine);
+            localShakingCoroutines.Remove(partToShake);
+
+            if (localOriginalRotations.TryGetValue(partToShake, out Quaternion rot))
+            {
+                partToShake.transform.localRotation = rot;
+                localOriginalRotations.Remove(partToShake);
+            }
+        }
+
+        HideLocalFeedbackIcon();
+    }
+
+    private void ShowLocalFeedbackIcon(Vector2 screenPoint, Sprite icon)
+    {
+        if (feedbackIcon == null || uiCanvasRect == null) return;
+
+        Vector2 adjustedScreenPoint = new Vector2(screenPoint.x, screenPoint.y + (Screen.height * iconVerticalOffsetPercent));
+
+        feedbackIcon.sprite = icon;
+        feedbackIcon.gameObject.SetActive(true);
+
+        Canvas canvas = feedbackIcon.canvas;
+        if (canvas.renderMode == UnityEngine.RenderMode.ScreenSpaceOverlay)
+        {
+            feedbackIcon.transform.position = adjustedScreenPoint;
+        }
+        else
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                uiCanvasRect,
+                adjustedScreenPoint,
+                canvas.worldCamera,
+                out Vector2 localPoint);
+            feedbackIcon.rectTransform.anchoredPosition = localPoint;
+        }
+    }
+
+    private void HideLocalFeedbackIcon()
+    {
+        if (feedbackIcon != null) feedbackIcon.gameObject.SetActive(false);
+    }
+
+    private IEnumerator LocalShakeCoroutine(GameObject target)
+    {
+        Transform t = target.transform;
+        Quaternion startRot = t.localRotation;
+        while (true)
+        {
+            float angle = Mathf.Sin(Time.time * Constants.WIGGLE_SPEED) * Constants.WIGGLE_ANGLE;
+            t.localRotation = startRot * Quaternion.AngleAxis(angle, Vector3.up);
+            yield return null;
         }
     }
 
@@ -259,6 +352,7 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (activeLineRenderer != null) { activeLineRenderer.positionCount = 0; activeLineRenderer.enabled = false; }
         if (webSocketClientManager != null) { webSocketClientManager.SendHideLine(); webSocketClientManager.SendHideSliceIcon(); }
+        HideLocalFeedbackIcon();
     }
     public void ResetClipping() { ResetDrawing(); if (activePlaneVisualizer != null) activePlaneVisualizer.SetActive(false); }
 
