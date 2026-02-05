@@ -1125,7 +1125,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 1
+  autoConnectMode: 0
   uiManager: {fileID: 751785403}
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
@@ -1137,7 +1137,6 @@ MonoBehaviour:
   statusText: {fileID: 2104096725}
   indicatorImage: {fileID: 2057345905}
   defaultIndicatorSprite: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
-  loadModelButtons: []
   backButtonFromModelView: {fileID: 1621385748}
   availableModelDataList:
   - {fileID: 11400000, guid: 96bfcac6514fa3746a1ea4b6e1b2c3d0, type: 2}
@@ -1453,7 +1452,6 @@ MonoBehaviour:
   feedbackIcon: {fileID: 2071411676}
   trashIconSprite: {fileID: 21300000, guid: 2ec3bfc8dd1dc334da08e0a925c1a038, type: 3}
   sliceIconSprite: {fileID: 21300000, guid: b657f011063c522429e694bd00b97810, type: 3}
-  iconVerticalOffsetPercent: 0.12
   activeModelParts: []
   modelViewportController: {fileID: 980018137}
 --- !u!4 &966730137
