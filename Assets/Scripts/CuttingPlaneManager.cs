@@ -25,7 +25,6 @@ public class CuttingPlaneManager : MonoBehaviour
     [SerializeField] private Image feedbackIcon;
     [SerializeField] private Sprite trashIconSprite;
     [SerializeField] private Sprite sliceIconSprite;
-    private float iconVerticalOffsetPercent = 0.15f;
 
     [HideInInspector]
     public List<GameObject> activeModelParts = new List<GameObject>();
@@ -295,7 +294,7 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (feedbackIcon == null || uiCanvasRect == null) return;
 
-        Vector2 adjustedScreenPoint = new Vector2(screenPoint.x, screenPoint.y + (Screen.height * iconVerticalOffsetPercent));
+        Vector2 adjustedScreenPoint = new Vector2(screenPoint.x, screenPoint.y + (Screen.height * Constants.ICON_VERTICAL_OFFSET_PERCENT));
 
         feedbackIcon.sprite = icon;
         feedbackIcon.gameObject.SetActive(true);

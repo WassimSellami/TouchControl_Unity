@@ -17,9 +17,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     [Header("Volumetric Settings")]
     [SerializeField] private Material volumetricSliceMaterial;
 
-    [Header("Auto Rotation")]
-    [SerializeField] private Vector3 wiggleAxis = Vector3.up;
-
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     private Vector3 initialScale;

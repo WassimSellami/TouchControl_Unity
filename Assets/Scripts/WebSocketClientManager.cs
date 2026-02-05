@@ -13,8 +13,8 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private ModelViewportController modelViewportController;
     [SerializeField] private Camera referenceCamera;
     [SerializeField] private TMP_InputField ipAddressInput;
-    [SerializeField] private string defaultIpAddress = "192.168.0.35";
-    [SerializeField] private int serverPort = 8070;
+    [SerializeField] private string defaultIpAddress = Constants.DEFAULT_IP_ADDRESS;
+    [SerializeField] private int serverPort = Constants.DEFAULT_PORT;
 
     [Header("UI Elements")]
     [SerializeField] private Button connectButton;
@@ -398,9 +398,6 @@ public class WebSocketClientManager : MonoBehaviour
         UpdateConnectionUI(ConnectionState.Connected);
         isAttemptingConnection = false;
 
-        // Models are already loaded from local database in Initialize()
-        // No need to request from server
-
         if (uiManager != null)
             uiManager.ShowMainMenuPanel();
     }
@@ -429,7 +426,6 @@ public class WebSocketClientManager : MonoBehaviour
         try
         {
             ModelBoundsSizeData sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(args);
-            // Apply server's model scale if needed
         }
         catch (Exception ex)
         {

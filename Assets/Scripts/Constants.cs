@@ -2,10 +2,9 @@ public static class Constants
 {
     // Websocket
     public const string SERVICE_PATH = "/Control";
+    public const string DEFAULT_IP_ADDRESS= "192.168.0.35";
+    public const int DEFAULT_PORT= 8070;
     public const float MODEL_UPDATE_FPS = 60f;
-    public const string MODELS_LIST_UPDATE = "MODELS_LIST_UPDATE";
-    public const string MODEL_SIZE_UPDATE = "MODEL_SIZE_UPDATE";
-
 
     // input
     public const int ORBIT_TOUCH_COUNT = 1;
@@ -45,6 +44,7 @@ public static class Constants
     public const float LINE_DURATION = 0.5f;
     public const float VISUAL_DEPTH_OFFSET = 0.005f;
     public const float MIN_DRAG_DISTANCE_SQUARED = 4f;
+    public const float ICON_VERTICAL_OFFSET_PERCENT = 0.15f;
 
     // server
     public const float WIGGLE_ANGLE = 1f;
@@ -68,6 +68,8 @@ public static class Constants
     public const string HIDE_CUT_LINE = "HIDE_CUT_LINE";
     public const string SHOW_SLICE_ICON = "SHOW_SLICE_ICON";
     public const string HIDE_SLICE_ICON = "HIDE_SLICE_ICON";
+    public const string MODELS_LIST_UPDATE = "MODELS_LIST_UPDATE";
+    public const string MODEL_SIZE_UPDATE = "MODEL_SIZE_UPDATE";
 }
 
 

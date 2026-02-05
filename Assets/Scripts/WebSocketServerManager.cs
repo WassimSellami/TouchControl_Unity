@@ -7,7 +7,7 @@ using System.Net;
 public class WebSocketServerManager : MonoBehaviour
 {
     [Header("Server Configuration")]
-    [SerializeField] private int serverPort = 8070;
+    [SerializeField] private int serverPort = Constants.DEFAULT_PORT;
 
     [Header("Object Control")]
     [SerializeField] private ModelController modelController;
@@ -100,7 +100,7 @@ public class WebSocketServerManager : MonoBehaviour
             wsServer.Start();
             if (wsServer.IsListening)
             {
-                LogOnMainThread($"[Server] Listening on ws://YOUR_IP:{wsServer.Port}{Constants.SERVICE_PATH}");
+                LogOnMainThread($"[Server] Listening on ws://{Constants.DEFAULT_IP_ADDRESS}:{wsServer.Port}{Constants.SERVICE_PATH}");
             }
             else
             {
