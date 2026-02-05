@@ -113,8 +113,8 @@ public class SliceCommand : ICommand
         Vector3 localHitPos = volRenderer.transform.InverseTransformPoint(planePoint);
         Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f);
 
-        ApplyVolumeCut(partA, textureSpacePos, planeNormal, false);
-        ApplyVolumeCut(partB, textureSpacePos, planeNormal, true);
+        SliceUtility.ApplyVolumeCut(partA, textureSpacePos, planeNormal, false);
+        SliceUtility.ApplyVolumeCut(partB, textureSpacePos, planeNormal, true);
 
         sliceManager.StartCoroutine(AnimateSeparation(partA, partB, originalPart));
 
@@ -127,51 +127,29 @@ public class SliceCommand : ICommand
         successfullySlicedOriginals.Add(originalPart);
     }
 
-    private void ApplyVolumeCut(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
-    {
-        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
-        foreach (Renderer rend in renderers)
-        {
-            if (!rend.gameObject.name.Contains("Shaft") && !rend.gameObject.name.Contains("Head"))
-            {
-                Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal);
-                if (invertNormal) localNormal = -localNormal;
-
-                rend.material.SetVector("_PlanePos", texturePoint);
-                rend.material.SetVector("_PlaneNormal", localNormal);
-            }
-        }
-    }
-
     private void ExecuteMeshSlice(GameObject originalPart, ref List<GameObject> successfullySlicedOriginals, ref List<string> originalPartIDs)
     {
-        SlicedHull sliceResult = originalPart.Slice(planePoint, planeNormal, sliceManager.crossSectionMaterial);
+        var result = SliceUtility.ExecuteMeshSlice(
+            originalPart,
+            planePoint,
+            planeNormal,
+            sliceManager.crossSectionMaterial,
+            sliceManager,
+            sliceManager.modelRootTransform
+        );
 
-        if (sliceResult != null)
+        if (result.isValid)
         {
-            GameObject upperHull = sliceResult.CreateUpperHull(originalPart, sliceManager.crossSectionMaterial);
-            GameObject lowerHull = sliceResult.CreateLowerHull(originalPart, sliceManager.crossSectionMaterial);
+            newHulls.Add(result.upperHull);
+            newHulls.Add(result.lowerHull);
+            sliceManager.activeModelParts.Add(result.upperHull);
+            sliceManager.activeModelParts.Add(result.lowerHull);
 
-            if (upperHull != null && lowerHull != null)
-            {
-                upperHull.name = originalPart.name + "_U";
-                lowerHull.name = originalPart.name + "_L";
-
-                SetupHull(upperHull, originalPart);
-                SetupHull(lowerHull, originalPart);
-
-                sliceManager.StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart));
-
-                newHulls.Add(upperHull);
-                newHulls.Add(lowerHull);
-                sliceManager.activeModelParts.Add(upperHull);
-                sliceManager.activeModelParts.Add(lowerHull);
-
-                originalPartIDs.Add(originalPart.name);
-                successfullySlicedOriginals.Add(originalPart);
-            }
+            originalPartIDs.Add(originalPart.name);
+            successfullySlicedOriginals.Add(originalPart);
         }
     }
+
 
     public void Undo()
     {

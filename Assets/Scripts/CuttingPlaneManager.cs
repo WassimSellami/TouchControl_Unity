@@ -260,8 +260,11 @@ public class CuttingPlaneManager : MonoBehaviour
 
         if (!localShakingCoroutines.ContainsKey(partToShake))
         {
-            localOriginalRotations[partToShake] = partToShake.transform.localRotation;
-            localShakingCoroutines[partToShake] = StartCoroutine(LocalShakeCoroutine(partToShake));
+            Quaternion originalRot = partToShake.transform.localRotation;
+            localOriginalRotations[partToShake] = originalRot;
+            localShakingCoroutines[partToShake] = StartCoroutine(
+                InteractionUtility.ShakeCoroutine(partToShake.transform, originalRot, Vector3.up)
+            );
         }
     }
 
@@ -294,25 +297,8 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (feedbackIcon == null || uiCanvasRect == null) return;
 
-        Vector2 adjustedScreenPoint = new Vector2(screenPoint.x, screenPoint.y + (Screen.height * Constants.ICON_VERTICAL_OFFSET_PERCENT));
-
         feedbackIcon.sprite = icon;
-        feedbackIcon.gameObject.SetActive(true);
-
-        Canvas canvas = feedbackIcon.canvas;
-        if (canvas.renderMode == UnityEngine.RenderMode.ScreenSpaceOverlay)
-        {
-            feedbackIcon.transform.position = adjustedScreenPoint;
-        }
-        else
-        {
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                uiCanvasRect,
-                adjustedScreenPoint,
-                canvas.worldCamera,
-                out Vector2 localPoint);
-            feedbackIcon.rectTransform.anchoredPosition = localPoint;
-        }
+        InteractionUtility.PositionIcon(feedbackIcon, screenPoint, uiCanvasRect, feedbackIcon.canvas.worldCamera);
     }
 
     private void HideLocalFeedbackIcon()
