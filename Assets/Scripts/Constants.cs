@@ -38,8 +38,8 @@ public static class Constants
 
     // Slice feature
     public const float PLANE_SCALE_FACTOR = 3f;
-    public const float SEPARATION_FACTOR = 0.1f;
-    public const float SEPARATION_ANIMATION_DURATION = 0.5f;
+    public const float SEPARATION_FACTOR = 0.2f;
+    public const float SEPARATION_ANIMATION_DURATION = 0.7f;
     public const float PLANE_DEPTH = 10f;
     public const float LINE_DURATION = 0.5f;
     public const float VISUAL_DEPTH_OFFSET = 0.005f;
@@ -47,8 +47,8 @@ public static class Constants
     public const float ICON_VERTICAL_OFFSET_PERCENT = 0.15f;
 
     // server
-    public const float WIGGLE_ANGLE = 1f;
-    public const float WIGGLE_SPEED = 30f;
+    public const float WIGGLE_ANGLE = 5f;
+    public const float WIGGLE_SPEED = 50f;
 
    
     //commands
