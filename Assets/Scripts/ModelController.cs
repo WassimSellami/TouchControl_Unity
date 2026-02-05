@@ -92,6 +92,33 @@ public class ModelController : MonoBehaviour, IModelViewer
     }
     void ClearCurrentModelAxisVisuals() { foreach (GameObject vis in currentModelAxisVisuals) if (vis != null) Destroy(vis); currentModelAxisVisuals.Clear(); }
 
+    private void ExecuteVolumetricSlice(GameObject originalPart, SliceActionData data, ActionRecord record)
+    {
+        GameObject partA = Instantiate(originalPart, originalPart.transform.parent);
+        GameObject partB = Instantiate(originalPart, originalPart.transform.parent);
+        partA.name = originalPart.name + "_A";
+        partB.name = originalPart.name + "_B";
+
+        Renderer volRend = originalPart.GetComponentInChildren<Renderer>();
+        if (volRend == null) return;
+
+        Vector3 localHitPos = volRend.transform.InverseTransformPoint(data.planePoint);
+        Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f);
+
+        ApplyVolumeCut(partA, textureSpacePos, data.planeNormal, false);
+        ApplyVolumeCut(partB, textureSpacePos, data.planeNormal, true);
+
+        if (!allParts.ContainsKey(partA.name)) allParts.Add(partA.name, partA);
+        if (!allParts.ContainsKey(partB.name)) allParts.Add(partB.name, partB);
+
+        StartCoroutine(AnimateSeparation(partA, partB, originalPart, data.planeNormal, data.separationFactor));
+
+        record.Originals.Add(originalPart);
+        record.NewHulls.Add(partA);
+        record.NewHulls.Add(partB);
+        originalPart.SetActive(false);
+    }
+
     private void ExecuteMeshSlice(GameObject originalPart, SliceActionData data, ActionRecord record)
     {
         var result = SliceUtility.ExecuteMeshSlice(
@@ -105,8 +132,8 @@ public class ModelController : MonoBehaviour, IModelViewer
 
         if (result.isValid)
         {
-            allParts.Add(result.upperHull.name, result.upperHull);
-            allParts.Add(result.lowerHull.name, result.lowerHull);
+            if (!allParts.ContainsKey(result.upperHull.name)) allParts.Add(result.upperHull.name, result.upperHull);
+            if (!allParts.ContainsKey(result.lowerHull.name)) allParts.Add(result.lowerHull.name, result.lowerHull);
 
             record.Originals.Add(originalPart);
             record.NewHulls.Add(result.upperHull);
@@ -116,27 +143,6 @@ public class ModelController : MonoBehaviour, IModelViewer
         }
     }
 
-    private void ExecuteVolumetricSlice(GameObject originalPart, SliceActionData data, ActionRecord record)
-    {
-        GameObject upperHull = Instantiate(originalPart, originalPart.transform.parent);
-        GameObject lowerHull = Instantiate(originalPart, originalPart.transform.parent);
-        upperHull.name = originalPart.name + "_U"; lowerHull.name = originalPart.name + "_L";
-
-        Renderer volRend = originalPart.GetComponentInChildren<Renderer>();
-        if (volRend == null) return;
-
-        Vector3 localHitPos = volRend.transform.InverseTransformPoint(data.planePoint);
-        Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f);
-
-        ApplyVolumeCut(upperHull, textureSpacePos, data.planeNormal, false);
-        ApplyVolumeCut(lowerHull, textureSpacePos, data.planeNormal, true);
-
-        allParts.Add(upperHull.name, upperHull); allParts.Add(lowerHull.name, lowerHull);
-        StartCoroutine(AnimateSeparation(upperHull, lowerHull, originalPart, data.planeNormal, data.separationFactor));
-
-        record.Originals.Add(originalPart); record.NewHulls.Add(upperHull); record.NewHulls.Add(lowerHull);
-        originalPart.SetActive(false);
-    }
 
     private Bounds GetBounds(GameObject go) { Renderer[] rends = go.GetComponentsInChildren<Renderer>(); if (rends.Length == 0) return new Bounds(go.transform.position, Vector3.one); Bounds b = rends[0].bounds; for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds); return b; }
 
@@ -187,7 +193,7 @@ public class ModelController : MonoBehaviour, IModelViewer
         if (screenPoint.z < 0) return;
 
         feedbackIconImage.sprite = icon;
-        InteractionUtility.PositionIcon(feedbackIconImage, (Vector2)screenPoint, uiCanvasRectTransform, null);
+        InteractionUtility.PositionIcon(feedbackIconImage, (Vector2)screenPoint, uiCanvasRectTransform, null, false);
     }
 
     private string SpriteToBase64(Sprite sprite)

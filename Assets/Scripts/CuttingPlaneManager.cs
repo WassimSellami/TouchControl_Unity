@@ -22,7 +22,7 @@ public class CuttingPlaneManager : MonoBehaviour
 
     [Header("Client UI Feedback (2D)")]
     [SerializeField] private RectTransform uiCanvasRect;
-    [SerializeField] private Image feedbackIcon;
+    [SerializeField] private Image feedbackIconImage;
     [SerializeField] private Sprite trashIconSprite;
     [SerializeField] private Sprite sliceIconSprite;
 
@@ -84,11 +84,11 @@ public class CuttingPlaneManager : MonoBehaviour
             }
         }
 
-        if (feedbackIcon != null)
+        if (feedbackIconImage != null)
         {
-            feedbackIcon.gameObject.SetActive(false);
-            feedbackIcon.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            feedbackIcon.raycastTarget = false;
+            feedbackIconImage.gameObject.SetActive(false);
+            feedbackIconImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            feedbackIconImage.raycastTarget = false;
         }
 
         ResetCrop();
@@ -295,15 +295,15 @@ public class CuttingPlaneManager : MonoBehaviour
 
     private void ShowLocalFeedbackIcon(Vector2 screenPoint, Sprite icon)
     {
-        if (feedbackIcon == null || uiCanvasRect == null) return;
+        if (feedbackIconImage == null || uiCanvasRect == null) return;
 
-        feedbackIcon.sprite = icon;
-        InteractionUtility.PositionIcon(feedbackIcon, screenPoint, uiCanvasRect, feedbackIcon.canvas.worldCamera);
+        feedbackIconImage.sprite = icon;
+        InteractionUtility.PositionIcon(feedbackIconImage, screenPoint, uiCanvasRect, feedbackIconImage.canvas.worldCamera, true);
     }
 
     private void HideLocalFeedbackIcon()
     {
-        if (feedbackIcon != null) feedbackIcon.gameObject.SetActive(false);
+        if (feedbackIconImage != null) feedbackIconImage.gameObject.SetActive(false);
     }
 
     private IEnumerator LocalShakeCoroutine(GameObject target)

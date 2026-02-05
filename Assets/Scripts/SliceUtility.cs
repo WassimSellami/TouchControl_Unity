@@ -125,12 +125,12 @@ public static class SliceUtility
     /// Orchestrates a mesh slice: creates hulls, configures them, and starts separation animation.
     /// </summary>
     public static SliceResult ExecuteMeshSlice(
-        GameObject originalPart,
-        Vector3 planePoint,
-        Vector3 planeNormal,
-        Material crossSectionMaterial,
-        MonoBehaviour coroutineRunner,
-        Transform parent)
+    GameObject originalPart,
+    Vector3 planePoint,
+    Vector3 planeNormal,
+    Material crossSectionMaterial,
+    MonoBehaviour coroutineRunner,
+    Transform parent)
     {
         SlicedHull hull = originalPart.Slice(planePoint, planeNormal, crossSectionMaterial);
 
@@ -141,13 +141,12 @@ public static class SliceUtility
 
         if (upper != null && lower != null)
         {
-            upper.name = originalPart.name + "_U";
-            lower.name = originalPart.name + "_L";
+            upper.name = originalPart.name + "_A";
+            lower.name = originalPart.name + "_B";
 
             SetupHull(upper, parent);
             SetupHull(lower, parent);
 
-            // Trigger the shared animation logic
             coroutineRunner.StartCoroutine(PerformSeparation(
                 upper, lower, planeNormal, Constants.SEPARATION_FACTOR, Constants.SEPARATION_ANIMATION_DURATION));
 
@@ -156,6 +155,4 @@ public static class SliceUtility
 
         return new SliceResult { isValid = false };
     }
-
-
 }

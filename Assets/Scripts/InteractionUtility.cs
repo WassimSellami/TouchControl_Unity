@@ -26,17 +26,15 @@ public static class InteractionUtility
     /// <param name="screenPoint">The base screen position (e.g. from mouse or WorldToScreenPoint).</param>
     /// <param name="uiCanvasRect">The RectTransform of the parent Canvas.</param>
     /// <param name="canvasCamera">The camera used for the canvas (null if ScreenSpaceOverlay).</param>
-    public static void PositionIcon(Image icon, Vector2 screenPoint, RectTransform uiCanvasRect, Camera canvasCamera)
+    public static void PositionIcon(Image icon, Vector2 screenPoint, RectTransform uiCanvasRect, Camera canvasCamera, bool applyOffset = true)
     {
         if (icon == null || uiCanvasRect == null) return;
 
-        // Calculate offset based on screen height
-        float offsetPx = Screen.height * Constants.ICON_VERTICAL_OFFSET_PERCENT;
+        float offsetPx = applyOffset ? (Screen.height * Constants.ICON_VERTICAL_OFFSET_PERCENT) : 0f;
         Vector2 adjustedScreenPoint = new Vector2(screenPoint.x, screenPoint.y + offsetPx);
 
         icon.gameObject.SetActive(true);
 
-        // Handle different Canvas render modes
         if (icon.canvas.renderMode == RenderMode.ScreenSpaceOverlay)
         {
             icon.transform.position = adjustedScreenPoint;
