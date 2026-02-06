@@ -1,4 +1,4 @@
-        using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
@@ -7,42 +7,28 @@ using UnityEngine.EventSystems;
 public class UIManager : MonoBehaviour
 {
     [Header("UI Panels")]
-    [SerializeField]
-    public GameObject connectionPanel;
-    [SerializeField]
-    public GameObject mainMenuPanel;
-    [SerializeField]
-    public GameObject modelViewPanel;
+    [SerializeField] public GameObject connectionPanel;
+    [SerializeField] public GameObject mainMenuPanel;
+    [SerializeField] public GameObject modelViewPanel;
+    [SerializeField] public GameObject infoPanel;
 
     [Header("Model Button Setup")]
-    [SerializeField]
-    private Transform modelButtonsContainer;
-    [SerializeField]
-    private GameObject modelButtonPrefab;
+    [SerializeField] private Transform modelButtonsContainer;
+    [SerializeField] private GameObject modelButtonPrefab;
 
     [Header("System References")]
-    [SerializeField]
-    private ModelViewportController mockedModelController;
-    [SerializeField]
-    private InputManager inputManagerRef;
-    [SerializeField]
-    private CuttingPlaneManager cuttingPlaneManager;
-    [SerializeField]
-    private HistoryManager historyManager;
+    [SerializeField] private ModelViewportController mockedModelController;
+    [SerializeField] private InputManager inputManagerRef;
+    [SerializeField] private CuttingPlaneManager cuttingPlaneManager;
+    [SerializeField] private HistoryManager historyManager;
 
     [Header("Buttons")]
-    [SerializeField]
-    private Button backButtonToMainMenu;
-    [SerializeField]
-    private Button ResetViewButton;
-    [SerializeField]
-    private Button ResetCropButton;
-    [SerializeField]
-    private Button undoButton;
-    [SerializeField]
-    private Button redoButton;
-    [SerializeField]
-    private Button infoButton;
+    [SerializeField] private Button backButtonToMainMenu;
+    [SerializeField] private Button ResetViewButton;
+    [SerializeField] private Button ResetCropButton;
+    [SerializeField] private Button undoButton;
+    [SerializeField] private Button redoButton;
+    [SerializeField] private Button infoButton;
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
 
@@ -58,19 +44,30 @@ public class UIManager : MonoBehaviour
     void Start()
     {
         if (backButtonToMainMenu != null) backButtonToMainMenu.onClick.AddListener(ShowMainMenuPanel);
-        else Debug.LogWarning("[UIManager] backButtonToMainMenu is not assigned.");
-
         if (ResetViewButton != null) ResetViewButton.onClick.AddListener(OnResetViewButtonPressed);
-        else Debug.LogWarning("[UIManager] ResetViewButton is not assigned.");
-
         if (ResetCropButton != null) ResetCropButton.onClick.AddListener(OnResetCropButtonPressed);
-        else Debug.LogWarning("[UIManager] ResetCropButton is not assigned.");
-
         if (undoButton != null) undoButton.onClick.AddListener(OnUndoButtonPressed);
-        else Debug.LogWarning("[UIManager] UndoButton is not assigned.");
-
         if (redoButton != null) redoButton.onClick.AddListener(OnRedoButtonPressed);
-        else Debug.LogWarning("[UIManager] RedoButton is not assigned.");
+
+        // Wire up the Info Button
+        if (infoButton != null) infoButton.onClick.AddListener(ToggleInfoPanel);
+        else Debug.LogWarning("[UIManager] InfoButton is not assigned.");
+    }
+
+    private void ToggleInfoPanel()
+    {
+        if (infoPanel != null)
+        {
+            bool isOpening = !infoPanel.activeSelf;
+            infoPanel.SetActive(isOpening);
+
+            // If the info panel is OPEN, disable the InputManager
+            // If the info panel is CLOSED, enable the InputManager
+            if (inputManagerRef != null)
+            {
+                inputManagerRef.enabled = !isOpening;
+            }
+        }
     }
 
     public void PopulateModelButtons(List<ModelMetadata> models, WebSocketClientManager wsManager)
@@ -120,7 +117,6 @@ public class UIManager : MonoBehaviour
     private void OnResetCropButtonPressed()
     {
         if (cuttingPlaneManager != null) cuttingPlaneManager.ResetCrop();
-        else Debug.LogWarning("[UIManager] CuttingPlaneManager is null, cannot reset crop.");
     }
 
     private void HideAllPanelsAndPopups()
@@ -128,6 +124,7 @@ public class UIManager : MonoBehaviour
         if (connectionPanel != null) connectionPanel.SetActive(false);
         if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
         if (modelViewPanel != null) modelViewPanel.SetActive(false);
+        if (infoPanel != null) infoPanel.SetActive(false); // Hide info on screen changes
     }
 
     private void DeactivateInteractionSystems()
@@ -172,7 +169,6 @@ public class UIManager : MonoBehaviour
             mockedModelController.SetModelVisibility(true);
             mockedModelController.EnsureAxisVisualsAreCreated();
         }
-        else Debug.LogWarning("[UIManager] MockedModelController is null, cannot activate model visuals.");
 
         if (inputManagerRef != null) inputManagerRef.enabled = true;
     }
@@ -180,6 +176,5 @@ public class UIManager : MonoBehaviour
     private void OnResetViewButtonPressed()
     {
         if (mockedModelController != null) mockedModelController.ResetState();
-        else Debug.LogWarning("[UIManager] MockedModelController is null, cannot reset model view state.");
     }
 }
