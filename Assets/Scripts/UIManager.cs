@@ -1,4 +1,4 @@
-using UnityEngine;
+        using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
@@ -41,6 +41,8 @@ public class UIManager : MonoBehaviour
     private Button undoButton;
     [SerializeField]
     private Button redoButton;
+    [SerializeField]
+    private Button infoButton;
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
 

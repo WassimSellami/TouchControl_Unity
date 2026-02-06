@@ -32,6 +32,7 @@ public class WebSocketClientManager : MonoBehaviour
     private bool isMockConnected = false;
     private float timeSinceLastModelUpdate = 0f;
     private float modelUpdateInterval;
+    private Coroutine connectionTimeoutCoroutine;
 
 
     private ModelTransformStateData lastSentState;
@@ -213,6 +214,9 @@ public class WebSocketClientManager : MonoBehaviour
         try
         {
             ws.ConnectAsync();
+            // Start the timeout timer
+            if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+            connectionTimeoutCoroutine = StartCoroutine(ConnectionTimeoutSequence(10f));
         }
         catch (Exception ex)
         {
@@ -395,11 +399,22 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnWebSocketOpen()
     {
+        if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+
         UpdateConnectionUI(ConnectionState.Connected);
         isAttemptingConnection = false;
 
         if (uiManager != null)
             uiManager.ShowMainMenuPanel();
+    }
+
+    private void OnWebSocketError(string errorMessage)
+    {
+        if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+
+        UpdateConnectionUI(ConnectionState.Failed);
+        isAttemptingConnection = false;
+        PerformDisconnectionCleanup();
     }
 
     private void OnWebSocketMessage(string data)
@@ -451,13 +466,6 @@ public class WebSocketClientManager : MonoBehaviour
             Debug.LogError($"Error converting Base64 to Sprite: {ex.Message}");
             return null;
         }
-    }
-
-    private void OnWebSocketError(string errorMessage)
-    {
-        UpdateConnectionUI(ConnectionState.Failed);
-        isAttemptingConnection = false;
-        PerformDisconnectionCleanup();
     }
 
     private void OnWebSocketClose(string reason, ushort code)
@@ -550,15 +558,15 @@ public class WebSocketClientManager : MonoBehaviour
                 break;
 
             case ConnectionState.Connected:
-                message = "Connected to Server (Active/Simulated)";
+                message = "Connected to Server";
                 indicatorColor = Color.green;
                 buttonText = "Connect";
                 break;
 
             case ConnectionState.Failed:
-                message = "Connection failed. Try again.";
+                message = "Connection failed or timed out.";
                 indicatorColor = Color.red;
-                buttonText = "Try Again";
+                buttonText = "Reconnect";
                 break;
 
             case ConnectionState.Disconnected:
@@ -601,6 +609,20 @@ public class WebSocketClientManager : MonoBehaviour
             if (ws.ReadyState != WebSocketState.Closed)
                 ws.CloseAsync();
             ws = null;
+        }
+    }
+    private System.Collections.IEnumerator ConnectionTimeoutSequence(float timeout)
+    {
+        yield return new WaitForSecondsRealtime(timeout);
+
+        if (isAttemptingConnection && !IsConnected)
+        {
+            OnWebSocketError("Connection timed out.");
+            if (ws != null)
+            {
+                ws.Close();
+                ws = null;
+            }
         }
     }
 }
