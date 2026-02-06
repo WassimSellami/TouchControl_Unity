@@ -20,6 +20,7 @@ public class InputManager : MonoBehaviour
     private GameObject potentialInteractionTarget = null;
     private bool isShakingSent = false;
 
+    private Vector2 singleTouchVelocity;
     private Vector2 previousOrbitPosition;
     private Vector2 previousPanCentroid;
     private float previousZoomDistance;
@@ -105,6 +106,7 @@ public class InputManager : MonoBehaviour
             isShakingSent = false;
             startPressPosition = currentRawPosition;
             previousOrbitPosition = currentRawPosition;
+            singleTouchVelocity = Vector2.zero;
             if (cuttingPlaneManager != null) potentialInteractionTarget = cuttingPlaneManager.GetModelPartAtScreenPoint(currentRawPosition);
         }
 
@@ -151,7 +153,17 @@ public class InputManager : MonoBehaviour
         if (phase == TouchPhase.Moved)
         {
             if (isCutActive) cuttingPlaneManager.UpdateCutDrag(currentRawPosition);
-            else if (isOrbiting) HandleOrbitGestureInternal(currentRawPosition, phase);
+            else if (isOrbiting)
+            {
+                Vector2 frameVelocity = (previousOrbitPosition - currentRawPosition) / Time.deltaTime;
+
+                if (frameVelocity.sqrMagnitude > 0.1f)
+                {
+                    singleTouchVelocity = Vector2.Lerp(singleTouchVelocity, frameVelocity, 0.5f);
+                }
+
+                HandleOrbitGestureInternal(currentRawPosition, phase);
+            }
         }
 
         if (phase == TouchPhase.Ended || phase == TouchPhase.Canceled)
@@ -168,28 +180,23 @@ public class InputManager : MonoBehaviour
                     HandleTap(startPressPosition);
                 }
             }
-            else if (isHolding && longPressAchieved && potentialInteractionTarget != null) cuttingPlaneManager.DestroyModelPart(potentialInteractionTarget);
-            else if (isCutActive) cuttingPlaneManager.EndCutGesture(currentRawPosition);
-            else if (isOrbiting) HandleOrbitGestureInternal(currentRawPosition, phase);
-            ResetGestureStates();
-        }
-    }
-
-    private void HandleTap(Vector2 tapPosition)
-    {
-        if (Time.time > lastTapTime + Constants.DOUBLE_TAP_TIME_THRESHOLD) tapCount = 0;
-        tapCount++;
-        lastTapTime = Time.time;
-
-        if (tapCount == 1) firstTapPosition = tapPosition;
-        else if (tapCount >= 2)
-        {
-            if (targetModelController != null)
+            else if (isOrbiting)
             {
-                float direction = (firstTapPosition.x < Screen.width / 2f) ? -1f : 1f;
-                targetModelController.TriggerPresetViewRotation(direction);
+                if (Mathf.Abs(singleTouchVelocity.x) > Constants.FLICK_THRESHOLD && Mathf.Abs(singleTouchVelocity.x) > Mathf.Abs(singleTouchVelocity.y))
+                {
+                    targetModelController.StartContinuousRotation(Mathf.Sign(singleTouchVelocity.x));
+                }
+                HandleOrbitGestureInternal(currentRawPosition, phase);
             }
-            tapCount = 0;
+            else if (isHolding && longPressAchieved && potentialInteractionTarget != null)
+            {
+                cuttingPlaneManager.DestroyModelPart(potentialInteractionTarget);
+            }
+            else if (isCutActive)
+            {
+                cuttingPlaneManager.EndCutGesture(currentRawPosition);
+            }
+            ResetGestureStates();
         }
     }
 
@@ -210,29 +217,60 @@ public class InputManager : MonoBehaviour
         if ((touchZero.phase == TouchPhase.Moved || touchOne.phase == TouchPhase.Moved) && isEvaluatingTwoFingerGesture)
         {
             float currentDistance = Vector2.Distance(touchZero.position, touchOne.position);
-            Vector2 currentCentroid = (touchZero.position + touchOne.position) / 2f;
-
             float pinchAmount = Mathf.Abs(currentDistance - twoFingerStartDistance);
-            float swipeAmount = Mathf.Abs(currentCentroid.x - twoFingerStartCentroid.x);
 
-            if (pinchAmount > Constants.PINCH_REGISTER_THRESHOLD && pinchAmount > swipeAmount)
+            if (pinchAmount > Constants.PINCH_REGISTER_THRESHOLD)
             {
                 isEvaluatingTwoFingerGesture = false;
                 isZooming = true;
                 zoomDistanceHistory.Clear();
                 previousZoomDistance = GetSmoothedFloat(currentDistance, zoomDistanceHistory);
             }
-            else if (swipeAmount > Constants.SWIPE_THRESHOLD_PIXELS)
-            {
-                isEvaluatingTwoFingerGesture = false;
-                float direction = Mathf.Sign(currentCentroid.x - twoFingerStartCentroid.x);
-                targetModelController.StartContinuousRotation(direction);
-            }
         }
 
         if (isZooming)
         {
             HandleZoomGestureInternal();
+        }
+    }
+
+    private void ResetGestureStates()
+    {
+        if (isShakingSent && potentialInteractionTarget != null && cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.StopShake(potentialInteractionTarget);
+        }
+        if (cuttingPlaneManager != null)
+        {
+            cuttingPlaneManager.HideSliceIcon();
+        }
+
+        isShakingSent = false;
+        isPanning = false; isOrbiting = false; isZooming = false; isHolding = false;
+        isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
+        isRotating = false; isEvaluatingTwoFingerGesture = false;
+        potentialInteractionTarget = null;
+        singleTouchVelocity = Vector2.zero;
+        orbitPositionHistory.Clear(); panCentroidHistory.Clear(); zoomDistanceHistory.Clear();
+        rotationAngleHistory.Clear();
+        if (targetModelController != null) targetModelController.ResetOrbitLock();
+    }
+
+    private void HandleTap(Vector2 tapPosition)
+    {
+        if (Time.time > lastTapTime + Constants.DOUBLE_TAP_TIME_THRESHOLD) tapCount = 0;
+        tapCount++;
+        lastTapTime = Time.time;
+
+        if (tapCount == 1) firstTapPosition = tapPosition;
+        else if (tapCount >= 2)
+        {
+            if (targetModelController != null)
+            {
+                float direction = (firstTapPosition.x < Screen.width / 2f) ? -1f : 1f;
+                targetModelController.TriggerPresetViewRotation(direction);
+            }
+            tapCount = 0;
         }
     }
 
@@ -269,27 +307,6 @@ public class InputManager : MonoBehaviour
         if (Input.touchCount > 0) return Input.touchCount;
         if (Input.mousePresent && Input.GetMouseButton(0)) return 1;
         return 0;
-    }
-
-    private void ResetGestureStates()
-    {
-        if (isShakingSent && potentialInteractionTarget != null && cuttingPlaneManager != null)
-        {
-            cuttingPlaneManager.StopShake(potentialInteractionTarget);
-        }
-        if (cuttingPlaneManager != null)
-        {
-            cuttingPlaneManager.HideSliceIcon();
-        }
-
-        isShakingSent = false;
-        isPanning = false; isOrbiting = false; isZooming = false; isHolding = false;
-        isCutActive = false; longPressAchieved = false; longPressTimer = 0f;
-        isRotating = false; isEvaluatingTwoFingerGesture = false;
-        potentialInteractionTarget = null;
-        orbitPositionHistory.Clear(); panCentroidHistory.Clear(); zoomDistanceHistory.Clear();
-        rotationAngleHistory.Clear();
-        if (targetModelController != null) targetModelController.ResetOrbitLock();
     }
 
     private void HandlePanGesture()
