@@ -60,9 +60,6 @@ public class UIManager : MonoBehaviour
         {
             bool isOpening = !infoPanel.activeSelf;
             infoPanel.SetActive(isOpening);
-
-            // If the info panel is OPEN, disable the InputManager
-            // If the info panel is CLOSED, enable the InputManager
             if (inputManagerRef != null)
             {
                 inputManagerRef.enabled = !isOpening;
