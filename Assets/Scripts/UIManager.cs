@@ -31,6 +31,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button infoButton;
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
+    private string currentActiveModelID = "";
 
     void Awake()
     {
@@ -49,7 +50,6 @@ public class UIManager : MonoBehaviour
         if (undoButton != null) undoButton.onClick.AddListener(OnUndoButtonPressed);
         if (redoButton != null) redoButton.onClick.AddListener(OnRedoButtonPressed);
 
-        // Wire up the Info Button
         if (infoButton != null) infoButton.onClick.AddListener(ToggleInfoPanel);
         else Debug.LogWarning("[UIManager] InfoButton is not assigned.");
     }
@@ -77,18 +77,39 @@ public class UIManager : MonoBehaviour
             GameObject btn = Instantiate(modelButtonPrefab, modelButtonsContainer);
             btn.name = meta.modelID;
 
-            Image img = btn.GetComponent<Image>();
+            Image img = btn.transform.Find("Thumbnail")?.GetComponent<Image>();
             if (img != null && !string.IsNullOrEmpty(meta.thumbnailBase64))
                 img.sprite = wsManager.Base64ToSprite(meta.thumbnailBase64);
 
-            TMP_Text txt = btn.GetComponentInChildren<TMP_Text>();
-            if (txt != null) txt.text = meta.displayName;
+            TMP_Text nameTxt = btn.transform.Find("InfoContainer/NameText")?.GetComponent<TMP_Text>();
+            if (nameTxt != null) nameTxt.text = meta.displayName;
+
+            TMP_Text typeTxt = btn.transform.Find("InfoContainer/TypeLabel")?.GetComponent<TMP_Text>();
+            if (typeTxt != null) typeTxt.text = meta.modelType;
 
             var dragComp = btn.AddComponent<DraggableModelIcon>();
             dragComp.ModelID = meta.modelID;
             dragComp.OnModelDropped = wsManager.OnLoadModelSelected;
 
             dynamicModelButtons.Add(btn);
+        }
+
+        RefreshSelectionHighlights(currentActiveModelID);
+    }
+
+    public void RefreshSelectionHighlights(string activeID)
+    {
+        currentActiveModelID = activeID;
+
+        foreach (GameObject btn in dynamicModelButtons)
+        {
+            if (btn == null) continue;
+
+            Transform border = btn.transform.Find("SelectionBorder");
+            if (border != null)
+            {
+                border.gameObject.SetActive(btn.name == currentActiveModelID);
+            }
         }
     }
 
@@ -121,7 +142,7 @@ public class UIManager : MonoBehaviour
         if (connectionPanel != null) connectionPanel.SetActive(false);
         if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
         if (modelViewPanel != null) modelViewPanel.SetActive(false);
-        if (infoPanel != null) infoPanel.SetActive(false); // Hide info on screen changes
+        if (infoPanel != null) infoPanel.SetActive(false);
     }
 
     private void DeactivateInteractionSystems()

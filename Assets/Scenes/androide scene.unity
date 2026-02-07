@@ -154,7 +154,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 742.2, y: 40}
+  m_AnchoredPosition: {x: 775, y: 40}
   m_SizeDelta: {x: 70, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &50206435
@@ -679,7 +679,8 @@ MonoBehaviour:
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
   m_Text: "- Orbit: Single finger drag\r\n\r\n- Pan: Multi-finger drag\r\n\r\n- Zoom:
-    Two-finger pinch/spread\r\n\r\n- Auto-Orbit: Single finger swipe\n\r\n\r\r"
+    Two-finger pinch/spread\r\n\r\n- Auto-Orbit: Single finger swipe\n\r\n- 45\xB0
+    Orbit: Double Tap\r\r"
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -1223,7 +1224,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: "- Orbit: Single finger drag\r\n\r\n- Pan: Multi-finger drag\r\n\r\n- Zoom:
-    Two-finger pinch/spread\r\n\r\n- Auto-Orbit: Single finger swipe\n\r\n\r\r\u200B"
+    Two-finger pinch/spread\r\n\r\n- Auto-Orbit: Single finger swipe\n\r\n- 45\xB0
+    Orbit: Double Tap\r\r\u200B"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1997,7 +1999,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 0
+  autoConnectMode: 1
   uiManager: {fileID: 751785403}
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
@@ -3790,7 +3792,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -775.3, y: 40}
+  m_AnchoredPosition: {x: -775, y: 40}
   m_SizeDelta: {x: 70, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1621385746
@@ -3910,7 +3912,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -166.1, y: 35}
+  m_AnchoredPosition: {x: -150, y: 35}
   m_SizeDelta: {x: 150, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1782640182
@@ -4030,7 +4032,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 441.7, y: 40}
+  m_AnchoredPosition: {x: -441.7, y: 40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2027068772
@@ -4360,8 +4362,8 @@ MonoBehaviour:
     m_Bottom: 100
   m_ChildAlignment: 4
   m_StartCorner: 0
-  m_StartAxis: 0
-  m_CellSize: {x: 300, y: 300}
+  m_StartAxis: 1
+  m_CellSize: {x: 200, y: 200}
   m_Spacing: {x: 100, y: 100}
   m_Constraint: 0
   m_ConstraintCount: 2
@@ -4672,7 +4674,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 130.1, y: 40}
+  m_AnchoredPosition: {x: 150, y: 40}
   m_SizeDelta: {x: 150, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2139064991
@@ -4792,7 +4794,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -475.4, y: 40}
+  m_AnchoredPosition: {x: 441.7, y: 40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2140618428

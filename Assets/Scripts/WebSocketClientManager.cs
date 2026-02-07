@@ -81,12 +81,18 @@ public class WebSocketClientManager : MonoBehaviour
             {
                 byte[] imageData = modelData.thumbnail.texture.EncodeToPNG();
                 string base64Thumbnail = Convert.ToBase64String(imageData);
+
+                string typeLabel = "Unknown";
+                if (modelData is VolumetricModelData) typeLabel = "Volumetric";
+                else if (modelData is PolygonalModelData) typeLabel = "Polygonal";
+
                 metadataList.Add(new ModelMetadata
                 {
                     modelID = modelData.modelID,
                     displayName = modelData.displayName,
                     description = modelData.description,
-                    thumbnailBase64 = base64Thumbnail
+                    thumbnailBase64 = base64Thumbnail,
+                    modelType = typeLabel
                 });
             }
             catch (Exception ex) { Debug.LogError(ex.Message); }

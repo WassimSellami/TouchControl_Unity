@@ -17,6 +17,7 @@ public class ModelMetadata
     public string displayName;
     public string description;
     public string thumbnailBase64;
+    public string modelType;
 }
 
 [Serializable]
