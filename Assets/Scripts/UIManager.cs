@@ -32,6 +32,7 @@ public class UIManager : MonoBehaviour
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
     private string currentActiveModelID = "";
+    private HashSet<string> visitedModelIds = new HashSet<string>();
 
     void Awake()
     {
@@ -77,24 +78,67 @@ public class UIManager : MonoBehaviour
             GameObject btn = Instantiate(modelButtonPrefab, modelButtonsContainer);
             btn.name = meta.modelID;
 
-            Image img = btn.transform.Find("Thumbnail")?.GetComponent<Image>();
-            if (img != null && !string.IsNullOrEmpty(meta.thumbnailBase64))
-                img.sprite = wsManager.Base64ToSprite(meta.thumbnailBase64);
+            // Setup the Tile visual data
+            AssetTile tile = btn.GetComponent<AssetTile>();
+            if (tile != null)
+            {
+                Sprite iconSprite = null;
+                if (!string.IsNullOrEmpty(meta.thumbnailBase64))
+                {
+                    iconSprite = wsManager.Base64ToSprite(meta.thumbnailBase64);
+                }
 
-            TMP_Text nameTxt = btn.transform.Find("InfoContainer/NameText")?.GetComponent<TMP_Text>();
-            if (nameTxt != null) nameTxt.text = meta.displayName;
+                tile.Setup(meta.modelID, meta.displayName, meta.modelType, iconSprite, (currentActiveModelID == meta.modelID));
 
-            TMP_Text typeTxt = btn.transform.Find("InfoContainer/TypeLabel")?.GetComponent<TMP_Text>();
-            if (typeTxt != null) typeTxt.text = meta.modelType;
+                // 3. NEW: Check if this model was already visited, if so, turn it purple immediately
+                if (visitedModelIds.Contains(meta.modelID))
+                {
+                    tile.SetVisited();
+                }
+            }
 
+            // Setup the Drag logic
             var dragComp = btn.AddComponent<DraggableModelIcon>();
             dragComp.ModelID = meta.modelID;
-            dragComp.OnModelDropped = wsManager.OnLoadModelSelected;
+
+            // 4. NEW: Intercept the drop event
+            // Instead of just passing wsManager.OnLoadModelSelected, we do both actions:
+            dragComp.OnModelDropped = (id) =>
+            {
+                // A. Load the model (Original Logic)
+                wsManager.OnLoadModelSelected(id);
+
+                // B. Mark as visited (New Logic)
+                MarkModelAsVisited(id);
+            };
 
             dynamicModelButtons.Add(btn);
         }
 
         RefreshSelectionHighlights(currentActiveModelID);
+    }
+
+    private void MarkModelAsVisited(string id)
+    {
+        // Add to our history list
+        if (!visitedModelIds.Contains(id))
+        {
+            visitedModelIds.Add(id);
+        }
+
+        // Find the specific button in the list and update its color immediately
+        foreach (GameObject btn in dynamicModelButtons)
+        {
+            if (btn.name == id)
+            {
+                AssetTile tile = btn.GetComponent<AssetTile>();
+                if (tile != null)
+                {
+                    tile.SetVisited();
+                }
+                break; // Stop looking once we found it
+            }
+        }
     }
 
     public void RefreshSelectionHighlights(string activeID)
