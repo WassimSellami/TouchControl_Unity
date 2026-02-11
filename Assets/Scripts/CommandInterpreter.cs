@@ -68,6 +68,13 @@ public class CommandInterpreter : MonoBehaviour
             case Constants.HIDE_SLICE_ICON:
                 ProcessHideSliceIconCommand();
                 break;
+            case Constants.TOGGLE_AXES:
+                if (ModelController != null && args != null)
+                {
+                    bool visible = bool.Parse(args);
+                    ModelController.SetAxesVisibility(visible);
+                }
+                break;
             default:
                 Debug.LogWarning($"[CommandInterpreter] Unknown command received: {commandData}");
                 break;

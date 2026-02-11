@@ -202,6 +202,14 @@ public class ModelController : MonoBehaviour, IModelViewer
         try { Texture2D texture = sprite.texture; RenderTexture tmp = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear); Graphics.Blit(texture, tmp); RenderTexture previous = RenderTexture.active; RenderTexture.active = tmp; Texture2D readableTexture = new Texture2D(texture.width, texture.height); readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0); readableTexture.Apply(); RenderTexture.active = previous; RenderTexture.ReleaseTemporary(tmp); byte[] bytes = readableTexture.EncodeToPNG(); string base64 = Convert.ToBase64String(bytes); Destroy(readableTexture); return base64; }
         catch { return string.Empty; }
     }
+    public void SetAxesVisibility(bool visible)
+    {
+        showServerAxes = visible;
+        if (axesContainer != null)
+        {
+            axesContainer.SetActive(showServerAxes);
+        }
+    }
 
     public void ApplyWorldTransform(Vector3 localPosition, Quaternion localRotation, Vector3 localScale)
     {

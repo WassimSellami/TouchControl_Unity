@@ -267,7 +267,11 @@ public class WebSocketClientManager : MonoBehaviour
         lastSentState = state;
         SendMessageToServer($"{Constants.UPDATE_MODEL_TRANSFORM}:{JsonUtility.ToJson(state)}");
     }
-
+    public void SendToggleAxes(bool visible)
+    {
+        if (!IsConnected) return;
+        SendMessageToServer($"{Constants.TOGGLE_AXES}:{visible}");
+    }
     public void SendVisualCropPlane(Vector3 position, Vector3 normal, float scale)
     {
         if (!IsConnected) return;

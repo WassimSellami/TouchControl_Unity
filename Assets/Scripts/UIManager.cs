@@ -29,10 +29,12 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button undoButton;
     [SerializeField] private Button redoButton;
     [SerializeField] private Button infoButton;
+    [SerializeField] private Button toggleAxesButton;
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
     private string currentActiveModelID = "";
     private HashSet<string> visitedModelIds = new HashSet<string>();
+    private bool currentAxesState = true;
 
     void Awake()
     {
@@ -53,6 +55,23 @@ public class UIManager : MonoBehaviour
 
         if (infoButton != null) infoButton.onClick.AddListener(ToggleInfoPanel);
         else Debug.LogWarning("[UIManager] InfoButton is not assigned.");
+        if (toggleAxesButton != null) toggleAxesButton.onClick.AddListener(OnToggleAxesPressed);
+
+    }
+    private void OnToggleAxesPressed()
+    {
+        currentAxesState = !currentAxesState;
+
+        if (mockedModelController != null)
+        {
+            mockedModelController.SetAxesVisibility(currentAxesState);
+        }
+
+        WebSocketClientManager ws = FindObjectOfType<WebSocketClientManager>();
+        if (ws != null)
+        {
+            ws.SendToggleAxes(currentAxesState);
+        }
     }
 
     private void ToggleInfoPanel()

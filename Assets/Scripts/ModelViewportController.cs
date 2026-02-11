@@ -17,6 +17,8 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     [Header("Volumetric Settings")]
     [SerializeField] private Material volumetricSliceMaterial;
 
+    private bool axesVisible = true;
+
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     private Vector3 initialScale;
@@ -91,6 +93,14 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         {
             axesContainer.transform.position = modelReferencePoint.position;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
+        }
+    }
+    public void SetAxesVisibility(bool visible)
+    {
+        axesVisible = visible;
+        if (axesContainer != null)
+        {
+            axesContainer.SetActive(axesVisible);
         }
     }
 
@@ -290,9 +300,10 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         {
             CreateAxisVisuals();
             axesCreated = true;
-            axesContainer.SetActive(true);
         }
+        axesContainer.SetActive(axesVisible);
     }
+
 
     private void CreateAxisVisuals()
     {

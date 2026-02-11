@@ -52,8 +52,9 @@ public static class Constants
     public const float WIGGLE_ANGLE = 5f;
     public const float WIGGLE_SPEED = 50f;
 
-   
+
     //commands
+    public const string TOGGLE_AXES = "TOGGLE_AXES";
     public const string UPDATE_MODEL_TRANSFORM = "UPDATE_MODEL_TRANSFORM";
     public const string UPDATE_CAMERA_TRANSFORM = "UPDATE_CAMERA_TRANSFORM";
     public const string LOAD_MODEL = "LOAD_MODEL";
