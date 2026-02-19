@@ -2000,12 +2000,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90b98fbfe9604794d857cd03e56fe176, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoConnectMode: 1
+  autoConnectMode: 0
   uiManager: {fileID: 751785403}
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
   ipAddressInput: {fileID: 698393692}
-  defaultIpAddress: 192.168.0.35
+  defaultIpAddress: 10.141.101.77
   serverPort: 8070
   connectButton: {fileID: 885532448}
   connectButtonText: {fileID: 488383159}
@@ -2016,15 +2016,6 @@ MonoBehaviour:
   availableModelDataList:
   - {fileID: 11400000, guid: 96bfcac6514fa3746a1ea4b6e1b2c3d0, type: 2}
   - {fileID: 11400000, guid: 2121bead4c975a64c9fca424fc7678fc, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
   - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
 --- !u!114 &838438842
 MonoBehaviour:
@@ -2737,15 +2728,6 @@ MonoBehaviour:
   availableModels:
   - {fileID: 11400000, guid: 2121bead4c975a64c9fca424fc7678fc, type: 2}
   - {fileID: 11400000, guid: 96bfcac6514fa3746a1ea4b6e1b2c3d0, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
-  - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
   - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}
   axisOriginOffset: {x: 0, y: 0, z: 0}
   redAxisMaterial: {fileID: 2100000, guid: c43d4c43a365b1349a683e671b8b1c5e, type: 2}
