@@ -4,7 +4,6 @@ using TMPro;
 using System;
 using WebSocketSharp;
 using System.Collections.Generic;
-
 public class WebSocketClientManager : MonoBehaviour
 {
     [Header("Connection Settings")]
@@ -17,15 +16,12 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private int serverPort = Constants.DEFAULT_PORT;
 
     [Header("UI Elements")]
-    [SerializeField] private Button connectButton;
+[SerializeField] private Button connectButton;
     [SerializeField] private TMP_Text connectButtonText;
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private Image indicatorImage;
     [SerializeField] private Sprite defaultIndicatorSprite;
     [SerializeField] private Button backButtonFromModelView;
-
-    [Header("Available Models")]
-    [SerializeField] private ModelData[] availableModelDataList;
 
     private WebSocket ws;
     private bool isAttemptingConnection = false;
@@ -50,7 +46,6 @@ public class WebSocketClientManager : MonoBehaviour
         }
 
         modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
-        InitializeLocalModelList();
 
         if (autoConnectMode)
         {
@@ -67,39 +62,6 @@ public class WebSocketClientManager : MonoBehaviour
 
         if (backButtonFromModelView != null)
             backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
-    }
-
-    private void InitializeLocalModelList()
-    {
-        if (availableModelDataList == null || availableModelDataList.Length == 0) return;
-
-        var metadataList = new List<ModelMetadata>();
-        foreach (var modelData in availableModelDataList)
-        {
-            if (modelData == null || modelData.thumbnail == null) continue;
-            try
-            {
-                byte[] imageData = modelData.thumbnail.texture.EncodeToPNG();
-                string base64Thumbnail = Convert.ToBase64String(imageData);
-
-                string typeLabel = "Unknown";
-                if (modelData is VolumetricModelData) typeLabel = "Volumetric";
-                else if (modelData is PolygonalModelData) typeLabel = "Polygonal";
-
-                metadataList.Add(new ModelMetadata
-                {
-                    modelID = modelData.modelID,
-                    displayName = modelData.displayName,
-                    description = modelData.description,
-                    thumbnailBase64 = base64Thumbnail,
-                    modelType = typeLabel
-                });
-            }
-            catch (Exception ex) { Debug.LogError(ex.Message); }
-        }
-
-        if (uiManager != null && metadataList.Count > 0)
-            uiManager.PopulateModelButtons(metadataList, this);
     }
 
     void Update()
@@ -328,11 +290,35 @@ public class WebSocketClientManager : MonoBehaviour
     private void OnWebSocketMessage(string data)
     {
         if (autoConnectMode) return;
-        string[] parts = data.Split(new char[] { ',' }, 2);
+        string[] parts = data.Split(new char[] { ':' }, 2);
         string command = parts[0].ToUpperInvariant();
+
         if (command == Constants.MODEL_SIZE_UPDATE && parts.Length > 1)
         {
-            try { JsonUtility.FromJson<ModelBoundsSizeData>(parts[1]); } catch { }
+            try
+            {
+                var sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(parts[1]);
+                if (modelViewportController != null)
+                {
+                    modelViewportController.UpdatePlaceholderSize(sizeData.size);
+                }
+            }
+            catch { }
+        }
+        else if (command == Constants.MODELS_LIST_UPDATE && parts.Length > 1)
+        {
+            try
+            {
+                var listData = JsonUtility.FromJson<ModelMetadataList>(parts[1]);
+                if (uiManager != null && listData != null && listData.models != null)
+                {
+                    uiManager.PopulateModelButtons(new List<ModelMetadata>(listData.models), this);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Failed to parse model list: " + e.Message);
+            }
         }
     }
 

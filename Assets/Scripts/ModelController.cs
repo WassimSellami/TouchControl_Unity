@@ -1,19 +1,16 @@
-using EzySlice;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityVolumeRendering;
-
 public class ModelController : MonoBehaviour, IModelViewer
 {
     private LineRenderer activeLineRenderer;
     private GameObject activePlaneVisualizer;
     private readonly Dictionary<string, GameObject> allParts = new();
-
     [Header("Available Models")]
-    [SerializeField] private List<ModelData> availableModels = new();
+[SerializeField] private List<ModelData> availableModels = new();
     private GameObject axesContainer;
 
     [Header("Cutting Components")]
@@ -164,12 +161,21 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     private void SetupHull(GameObject hull, GameObject original) { hull.transform.SetParent(original.transform.parent, false); hull.AddComponent<MeshCollider>().convex = true; }
 
-    private void SetupReferencePoint(GameObject rootModel)
+    private void AlignToCorner(GameObject rootModel)
     {
-        modelReferencePoint = rootModel.transform.Find("ref");
-        if (modelReferencePoint == null) modelReferencePoint = rootModel.transform;
-        refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
-        refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
+        Bounds b = SliceUtility.GetFullBounds(rootModel);
+        Vector3 minCorner = b.min;
+
+        Vector3 offset = Vector3.zero - minCorner;
+
+        rootModel.transform.position += offset;
+
+        CurrentModelBoundsSize = b.size;
+
+        modelReferencePoint = rootModel.transform;
+
+        refPointLocalPosition = Vector3.zero;
+        refPointLocalRotation = Quaternion.identity;
     }
 
     private void SetupVisualHelpers()
@@ -259,7 +265,15 @@ public class ModelController : MonoBehaviour, IModelViewer
         SetupContainers();
         CurrentModelID = modelId;
         GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
-        if (root != null) { rootModel = root; rootModel.name = "RootModel"; allParts.Add(rootModel.name, rootModel); CurrentModelBoundsSize = modelData.boundsSize; SetupReferencePoint(rootModel); }
+        if (root != null)
+        {
+            rootModel = root;
+            rootModel.name = "RootModel";
+            allParts.Add(rootModel.name, rootModel);
+
+            // Align model so lower-back-left is at 0,0,0
+            AlignToCorner(rootModel);
+        }
         SetupVisualHelpers();
     }
 

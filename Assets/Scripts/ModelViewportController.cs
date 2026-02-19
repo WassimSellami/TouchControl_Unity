@@ -1,21 +1,18 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-
 public class ModelViewportController : MonoBehaviour, IModelManipulator
 {
     [Header("References")]
     [SerializeField] private Camera referenceCamera;
-    [SerializeField] private List<ModelData> availableModels = new List<ModelData>();
+    [Header("Appearance")]
+[SerializeField] private Material placeholderMaterial;
 
     [Header("Axis Visuals")]
     [SerializeField] private Vector3 axisOriginOffset = new Vector3(0f, 0f, 0f);
     [SerializeField] private Material redAxisMaterial;
     [SerializeField] private Material greenAxisMaterial;
     [SerializeField] private Material blueAxisMaterial;
-
-    [Header("Volumetric Settings")]
-    [SerializeField] private Material volumetricSliceMaterial;
 
     private bool axesVisible = true;
 
@@ -41,9 +38,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     private GameObject worldContainer;
     private GameObject modelContainer;
     private GameObject rootModel;
-    private Vector3 refPointLocalPosition = Vector3.zero;
-    private Quaternion refPointLocalRotation = Quaternion.identity;
-    private Dictionary<string, ModelData> modelDataLookup = new Dictionary<string, ModelData>();
 
     public bool IsAutoRotating => isAutoRotating;
     public string CurrentModelID { get; private set; }
@@ -56,26 +50,15 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         initialRotation = transform.rotation;
         initialScale = transform.localScale;
 
-        if (referenceCamera == null)
-            Debug.LogError("ModelViewportController: Reference Camera not assigned!");
-        else
+        if (referenceCamera != null)
         {
             initialCameraPosition = referenceCamera.transform.position;
             initialCameraRotation = referenceCamera.transform.rotation;
         }
 
-        foreach (var modelData in availableModels)
-        {
-            if (!string.IsNullOrEmpty(modelData.modelID))
-                modelDataLookup[modelData.modelID] = modelData;
-        }
-
-        if (redAxisMaterial == null)
-            redAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.red };
-        if (greenAxisMaterial == null)
-            greenAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.green };
-        if (blueAxisMaterial == null)
-            blueAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.blue };
+        if (redAxisMaterial == null) redAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.red };
+        if (greenAxisMaterial == null) greenAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.green };
+        if (blueAxisMaterial == null) blueAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.blue };
     }
 
     void Update()
@@ -95,6 +78,7 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
     }
+
     public void SetAxesVisibility(bool visible)
     {
         axesVisible = visible;
@@ -201,7 +185,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         transform.rotation = initialRotation;
         transform.localScale = initialScale;
 
-
         if (referenceCamera != null)
         {
             referenceCamera.transform.position = initialCameraPosition;
@@ -214,7 +197,9 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     public void SetModelVisibility(bool isVisible)
     {
         if (rootModel != null)
+        {
             rootModel.SetActive(isVisible);
+        }
     }
 
     public void TriggerPresetViewRotation(float direction)
@@ -238,12 +223,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
 
     public void LoadNewModel(string modelId)
     {
-        if (!modelDataLookup.TryGetValue(modelId, out ModelData modelData))
-        {
-            Debug.LogError($"Model ID {modelId} not found!");
-            return;
-        }
-
         if (worldContainer != null)
         {
             worldContainer.name = "WorldContainer_Destroying";
@@ -256,14 +235,36 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         SetupContainers();
         CurrentModelID = modelId;
 
-        GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
+        rootModel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        rootModel.name = "RootModel";
+        rootModel.transform.SetParent(modelContainer.transform, false);
 
-        if (root != null)
+        // Initial defaults (will be updated by UpdatePlaceholderSize)
+        rootModel.transform.localPosition = new Vector3(0.5f, 0.5f, 0.5f);
+        rootModel.transform.localRotation = Quaternion.identity;
+        rootModel.transform.localScale = Vector3.one;
+
+        // Apply material to fix pink color
+        if (placeholderMaterial != null)
         {
-            root.name = "RootModel";
-            this.rootModel = root;
-            SetupReferencePoint(root);
-            EnsureAxisVisualsAreCreated();
+            Renderer r = rootModel.GetComponent<Renderer>();
+            if (r != null) r.material = placeholderMaterial;
+        }
+
+        SetupReferencePoint(rootModel);
+        EnsureAxisVisualsAreCreated();
+    }
+
+    public void UpdatePlaceholderSize(Vector3 newSize)
+    {
+        if (rootModel != null)
+        {
+            // Scale the cube
+            rootModel.transform.localScale = newSize;
+
+            // Move the cube so its Min corner is at 0,0,0
+            // Since Unity Cube pivot is center, we move it by half the size
+            rootModel.transform.localPosition = newSize * 0.5f;
         }
     }
 
@@ -279,16 +280,10 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         axesContainer.transform.SetParent(worldContainer.transform, false);
     }
 
-
     private void SetupReferencePoint(GameObject rootModelObj)
     {
-        modelReferencePoint = rootModelObj.transform.Find("ref");
-
-        if (modelReferencePoint == null)
-            modelReferencePoint = rootModelObj.transform;
-
-        refPointLocalPosition = worldContainer.transform.InverseTransformPoint(modelReferencePoint.position);
-        refPointLocalRotation = Quaternion.Inverse(worldContainer.transform.rotation) * modelReferencePoint.rotation;
+        // Reference point is the object itself, effectively 0,0,0 of the parent
+        modelReferencePoint = worldContainer.transform;
     }
 
     public void EnsureAxisVisualsAreCreated()
@@ -304,7 +299,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         axesContainer.SetActive(axesVisible);
     }
 
-
     private void CreateAxisVisuals()
     {
         foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
@@ -317,7 +311,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
             axisOriginOffset,
             redAxisMaterial, greenAxisMaterial, blueAxisMaterial
         );
-
     }
 
     private IEnumerator AnimatePresetViewRotation(float direction)
