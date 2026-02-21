@@ -1,20 +1,47 @@
 using UnityEngine;
 using UnityVolumeRendering;
 using System.IO;
-using UnityEngine.Networking;
 
 public static class ModelLoader
 {
     public static GameObject Load(ModelData data, Transform parent, Material volMaterial)
     {
-        if (data is PolygonalModelData poly) return LoadPrefab(poly, parent);
+        if (data is PolygonalModelData poly) return LoadPolygonal(poly, parent);
         if (data is VolumetricModelData vol) return LoadVolumetric(vol, parent, volMaterial);
         return null;
     }
 
-    private static GameObject LoadPrefab(PolygonalModelData data, Transform parent)
+    private static GameObject LoadPolygonal(PolygonalModelData data, Transform parent)
     {
-        return data.prefab == null ? null : Object.Instantiate(data.prefab, parent);
+        GameObject loadedObject = null;
+
+        // Priority 1: Runtime File Path (OBJ)
+        if (!string.IsNullOrEmpty(data.modelFilePath) && File.Exists(data.modelFilePath))
+        {
+            string ext = Path.GetExtension(data.modelFilePath).ToLower();
+            if (ext == ".obj")
+            {
+                loadedObject = ObjLoader.Load(data.modelFilePath);
+            }
+            else
+            {
+                Debug.LogWarning("Runtime loading only supports .obj for now.");
+            }
+        }
+
+        // Priority 2: Prefab (Editor assigned)
+        if (loadedObject == null && data.prefab != null)
+        {
+            loadedObject = Object.Instantiate(data.prefab);
+        }
+
+        if (loadedObject != null)
+        {
+            loadedObject.transform.SetParent(parent, false);
+            return loadedObject;
+        }
+
+        return null;
     }
 
     private static GameObject LoadVolumetric(VolumetricModelData data, Transform parent, Material volMaterial)
@@ -60,24 +87,9 @@ public static class ModelLoader
     private static string ResolvePath(string rawPath)
     {
         if (Path.IsPathRooted(rawPath) && File.Exists(rawPath)) return rawPath;
-
         string fileName = Path.GetFileName(rawPath);
         string streamingPath = Path.Combine(Application.streamingAssetsPath, fileName);
-        string persistentPath = Path.Combine(Application.persistentDataPath, fileName);
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (!File.Exists(persistentPath))
-        {
-            var request = UnityWebRequest.Get(streamingPath);
-            request.SendWebRequest();
-            while (!request.isDone) { }
-            if (request.result == UnityWebRequest.Result.Success)
-                File.WriteAllBytes(persistentPath, request.downloadHandler.data);
-        }
-        return persistentPath;
-#else
         if (File.Exists(streamingPath)) return streamingPath;
         return rawPath;
-#endif
     }
 }

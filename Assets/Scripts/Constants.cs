@@ -20,14 +20,14 @@ public static class Constants
     public const float DOUBLE_TAP_TIME_THRESHOLD = 0.3f;
 
     // Control parameters
-    public const float PAN_SENSITIVITY = 0.01f;
+    public const float PAN_SENSITIVITY = 0.001f;
     public const float ORBIT_SENSITIVITY = 0.1f;
-    public const float ZOOM_SENSITIVITY = 0.005f;
+    public const float ZOOM_SENSITIVITY = 0.002f;
     public const float ROLL_SENSITIVITY = 0.5f;
     public const float SCALE_MIN = 0.001f;
     public const float SCALE_MAX = 100.0f;
     public const float PRESET_VIEW_ROTATION_STEP = 45f;
-    public const float PRESET_VIEW_ANIMATION_DURATION = 1f;
+    public const float PRESET_VIEW_ANIMATION_DURATION = 0.4f;
     public const float AUTO_ROTATION_SPEED = 40f;
     public const float AXIS_LENGTH = 10f;
     public const float AXIS_THICKNESS = 0.03f;
@@ -40,13 +40,13 @@ public static class Constants
 
     // Slice feature
     public const float PLANE_SCALE_FACTOR = 3f;
-    public const float SEPARATION_FACTOR = 0.2f;
+    public const float SEPARATION_FACTOR = 0.25f;
     public const float SEPARATION_ANIMATION_DURATION = 0.7f;
     public const float PLANE_DEPTH = 10f;
     public const float LINE_DURATION = 0.5f;
     public const float VISUAL_DEPTH_OFFSET = 0.005f;
     public const float MIN_DRAG_DISTANCE_SQUARED = 4f;
-    public const float ICON_VERTICAL_OFFSET_PERCENT = 0.15f;
+    public const float ICON_VERTICAL_OFFSET_PERCENT = 0.05f;
 
     // server
     public const float WIGGLE_ANGLE = 5f;

@@ -366,7 +366,7 @@ GameObject:
   - component: {fileID: 3709875588974726229}
   - component: {fileID: 5078563577899281009}
   m_Layer: 0
-  m_Name: MetaData
+  m_Name: SizeText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -419,7 +419,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Date / Size
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -720,6 +720,7 @@ MonoBehaviour:
   thumbnailImage: {fileID: 8073337005868063303}
   nameText: {fileID: 9099328228199741330}
   typeText: {fileID: 4011000727666107027}
+  sizeText: {fileID: 5078563577899281009}
 --- !u!114 &7384714617235066668
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -843,7 +844,7 @@ MonoBehaviour:
     m_Top: 5
     m_Bottom: 5
   m_ChildAlignment: 4
-  m_Spacing: 60
+  m_Spacing: 18
   m_ChildForceExpandWidth: 1
   m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 1

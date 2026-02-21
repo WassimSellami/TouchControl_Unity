@@ -179,6 +179,16 @@ public class WebSocketServerManager : MonoBehaviour
         }
     }
 
+    // -- New method for ModelController to use --
+    public void BroadcastModelList()
+    {
+        if (modelController == null) return;
+        ModelMetadataList metadataList = modelController.GetAllModelsMetadata();
+        string jsonData = JsonUtility.ToJson(metadataList);
+        string message = $"{Constants.MODELS_LIST_UPDATE}:{jsonData}";
+        BroadcastToAll(message);
+    }
+
     private void BroadcastToAll(string message)
     {
         if (wsServer != null && wsServer.IsListening)
