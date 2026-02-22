@@ -397,15 +397,19 @@ public class ModelController : MonoBehaviour, IModelViewer
         Bounds b = SliceUtility.GetFullBounds(rootModel);
         CurrentModelBoundsSize = b.size;
 
-        // Position the mesh so its center is exactly at the parent's (0,0,0)
-        // This makes the center of the model the pivot point for rotation
+        // 1. Position the mesh so its geometry center is at the local (0,0,0) pivot
         rootModel.transform.localPosition = -b.center;
+
+        // 2. Calculate the offset to the MIN corner (relative to the center pivot)
+        // This matches the client's: -newSize * 0.5f
+        currentModelCenterOffset = -b.extents;
 
         modelReferencePoint = rootModel.transform;
 
         // Reset initialization so the first packet from client snaps the containers
         isInitialized = false;
     }
+    // Inside ModelController.cs
     private void SetupVisualHelpers()
     {
         if (planeVisualizerPrefab != null)
@@ -423,19 +427,20 @@ public class ModelController : MonoBehaviour, IModelViewer
         if (axesContainer != null)
         {
             axesContainer.SetActive(true);
-            // Position the axes at the MIN corner relative to the center
+
+            // MOVE THE AXES TO THE MIN CORNER
+            // Now that currentModelCenterOffset is assigned in AlignToCorner
             axesContainer.transform.localPosition = currentModelCenterOffset;
 
             Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red };
             Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green };
             Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
 
-            // Create axes starting at 0 (which is now the corner)
             currentModelAxisVisuals = AxisGenerator.CreateAxes(
                 axesContainer.transform,
                 Constants.AXIS_LENGTH,
                 Constants.AXIS_THICKNESS,
-                Vector3.zero, // Offset is already handled by axesContainer.localPosition
+                Vector3.zero,
                 matX, matY, matZ
             );
         }

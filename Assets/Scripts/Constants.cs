@@ -20,12 +20,12 @@ public static class Constants
     public const float DOUBLE_TAP_TIME_THRESHOLD = 0.3f;
 
     // Control parameters
-    public const float PAN_SENSITIVITY = 0.001f;
+    public const float PAN_SENSITIVITY = 0.0025f;
     public const float ORBIT_SENSITIVITY = 0.1f;
-    public const float ZOOM_SENSITIVITY = 0.002f;
-    public const float ROLL_SENSITIVITY = 0.5f;
-    public const float SCALE_MIN = 0.001f;
-    public const float SCALE_MAX = 100.0f;
+    public const float ZOOM_SENSITIVITY = 0.001f;
+    public const float ROLL_SENSITIVITY = 0.8f;
+    public const float SCALE_MIN = 0.00001f;
+    public const float SCALE_MAX = 10000.0f;
     public const float PRESET_VIEW_ROTATION_STEP = 45f;
     public const float PRESET_VIEW_ANIMATION_DURATION = 0.4f;
     public const float AUTO_ROTATION_SPEED = 40f;
