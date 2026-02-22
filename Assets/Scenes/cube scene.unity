@@ -1207,7 +1207,6 @@ MonoBehaviour:
   assetTilePrefab: {fileID: 5599202588443561568, guid: fb959008f1df6b043a33adf66e0a049d, type: 3}
   plusIconSprite: {fileID: 21300000, guid: 1da71315c2aed1f4daed731b946bf17c, type: 3}
   defaultThumbnailSprite: {fileID: 21300000, guid: f3eeb890196cad842802c55678ae9288, type: 3}
-  openPanelButton: {fileID: 0}
   closePanelButton: {fileID: 695462616}
   selectFileButton: {fileID: 524983865}
   selectThumbnailButton: {fileID: 1481772371}

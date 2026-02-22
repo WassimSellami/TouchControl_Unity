@@ -197,7 +197,7 @@ public class ServerModelUIPanel : MonoBehaviour
         newData.description = descriptionInput.text;
         newData.thumbnail = thumb;
 
-        modelController.RegisterRuntimeModel(newData, fileSizeText.text);
+        modelController.RegisterRuntimeModel(newData, fileSizeText.text, currentThumbnailPath);
         ClosePanel();
     }
 

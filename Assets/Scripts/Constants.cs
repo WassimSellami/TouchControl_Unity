@@ -5,7 +5,7 @@ public static class Constants
     public const string DEFAULT_IP_ADDRESS= "192.168.0.35";
     public const int DEFAULT_PORT= 8070;
     public const int MODEL_UPDATE_FPS = 60;
-    public const float CONNECTION_TIMEOUT = 10f;
+    public const float CONNECTION_TIMEOUT = 5f;
 
     // input
     public const int ORBIT_TOUCH_COUNT = 1;
@@ -22,11 +22,11 @@ public static class Constants
     // Control parameters
     public const float PAN_SENSITIVITY = 0.0025f;
     public const float ORBIT_SENSITIVITY = 0.1f;
-    public const float ZOOM_SENSITIVITY = 0.001f;
-    public const float ROLL_SENSITIVITY = 0.8f;
+    public const float ZOOM_SENSITIVITY = 0.003f;
+    public const float ROLL_SENSITIVITY = 1f;
     public const float SCALE_MIN = 0.00001f;
     public const float SCALE_MAX = 10000.0f;
-    public const float PRESET_VIEW_ROTATION_STEP = 45f;
+    public const float PRESET_VIEW_ROTATION_STEP = 60f;
     public const float PRESET_VIEW_ANIMATION_DURATION = 0.4f;
     public const float AUTO_ROTATION_SPEED = 40f;
     public const float AXIS_LENGTH = 10f;

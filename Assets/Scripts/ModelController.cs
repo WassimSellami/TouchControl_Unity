@@ -67,6 +67,8 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     private string RegistryPath => Path.Combine(Application.persistentDataPath, "external_registry.json");
     private Dictionary<string, string> runtimeFileSizes = new Dictionary<string, string>();
+    private Dictionary<string, string> runtimeThumbPaths = new Dictionary<string, string>();
+
 
     void Awake()
     {
@@ -129,18 +131,7 @@ public class ModelController : MonoBehaviour, IModelViewer
             Debug.LogWarning($"[ModelController] Could not find model with ID: {modelID} to remove.");
         }
     }
-    public void RegisterRuntimeModel(ModelData newModel, string sizeStr)
-    {
-        if (newModel == null) return;
-        availableModels.Add(newModel);
-        runtimeFileSizes[newModel.modelID] = sizeStr;
-        RefreshModelLookup();
-        SaveRegistry();
-        if (wsManager != null) wsManager.BroadcastModelList();
 
-        ServerModelUIPanel serverUI = FindObjectOfType<ServerModelUIPanel>();
-        if (serverUI != null) serverUI.PopulateServerList(GetAllModelsMetadata().models.ToList());
-    }
 
     [Serializable]
     public class ModelRegistryEntry
@@ -150,12 +141,26 @@ public class ModelController : MonoBehaviour, IModelViewer
         public string desc;
         public string filePath;
         public string size;
+        public string thumbPath;
         public bool isVolumetric;
         public int dx, dy, dz;
     }
 
     [Serializable]
     public class RegistryWrapper { public List<ModelRegistryEntry> entries = new List<ModelRegistryEntry>(); }
+    public void RegisterRuntimeModel(ModelData newModel, string sizeStr, string thumbPath)
+    {
+        if (newModel == null) return;
+        availableModels.Add(newModel);
+        runtimeFileSizes[newModel.modelID] = sizeStr;
+        runtimeThumbPaths[newModel.modelID] = thumbPath; // Store the path
+        RefreshModelLookup();
+        SaveRegistry();
+        if (wsManager != null) wsManager.BroadcastModelList();
+
+        ServerModelUIPanel serverUI = FindObjectOfType<ServerModelUIPanel>();
+        if (serverUI != null) serverUI.PopulateServerList(GetAllModelsMetadata().models.ToList());
+    }
 
     private void SaveRegistry()
     {
@@ -176,6 +181,7 @@ public class ModelController : MonoBehaviour, IModelViewer
                 desc = m.description,
                 filePath = path,
                 size = runtimeFileSizes.ContainsKey(m.modelID) ? runtimeFileSizes[m.modelID] : m.fileSize,
+                thumbPath = runtimeThumbPaths.ContainsKey(m.modelID) ? runtimeThumbPaths[m.modelID] : "", // Save path
                 isVolumetric = isVol,
                 dx = x,
                 dy = y,
@@ -194,21 +200,33 @@ public class ModelController : MonoBehaviour, IModelViewer
             foreach (var e in wrapper.entries)
             {
                 if (!File.Exists(e.filePath)) continue;
+
                 runtimeFileSizes[e.id] = e.size;
+                runtimeThumbPaths[e.id] = e.thumbPath; // Restore path mapping
+
+                Sprite loadedThumb = null;
+                if (!string.IsNullOrEmpty(e.thumbPath) && File.Exists(e.thumbPath))
+                {
+                    byte[] bytes = File.ReadAllBytes(e.thumbPath);
+                    Texture2D tex = new Texture2D(2, 2);
+                    tex.LoadImage(bytes);
+                    loadedThumb = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), Vector2.one * 0.5f);
+                }
+
                 if (e.isVolumetric)
                 {
                     VolumetricModelData v = ScriptableObject.CreateInstance<VolumetricModelData>();
                     v.modelID = e.id; v.displayName = e.name; v.description = e.desc;
                     v.rawFilePath = e.filePath; v.dimX = e.dx; v.dimY = e.dy; v.dimZ = e.dz;
-                    v.fileSize = e.size;
+                    v.fileSize = e.size; v.thumbnail = loadedThumb; // Restore Sprite
                     availableModels.Add(v);
                 }
                 else
                 {
                     PolygonalModelData p = ScriptableObject.CreateInstance<PolygonalModelData>();
                     p.modelID = e.id; p.displayName = e.name; p.description = e.desc;
-                    p.modelFilePath = e.filePath;
-                    p.fileSize = e.size;
+                    p.modelFilePath = e.filePath; p.fileSize = e.size;
+                    p.thumbnail = loadedThumb; // Restore Sprite
                     availableModels.Add(p);
                 }
             }
