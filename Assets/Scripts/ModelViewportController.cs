@@ -255,20 +255,92 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         SetupReferencePoint(rootModel);
         EnsureAxisVisualsAreCreated();
     }
+    public void ApplyProxyMesh(MeshNetworkData data)
+    {
+        Debug.Log($"[Client] Applying Proxy Mesh. Verts: {data.v.Length}");
+
+        if (rootModel == null) return;
+
+        MeshFilter mf = rootModel.GetComponent<MeshFilter>();
+        if (mf == null) mf = rootModel.AddComponent<MeshFilter>();
+
+        MeshRenderer mr = rootModel.GetComponent<MeshRenderer>();
+        if (mr == null)
+        {
+            mr = rootModel.AddComponent<MeshRenderer>();
+            if (placeholderMaterial != null) mr.material = placeholderMaterial;
+        }
+
+        Mesh newMesh = new Mesh();
+        // Use 16-bit to save memory (Low poly is small anyway)
+        newMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt16;
+        newMesh.vertices = data.v;
+        newMesh.triangles = data.t;
+
+        newMesh.RecalculateNormals();
+        newMesh.RecalculateBounds();
+
+        mf.mesh = newMesh;
+
+        // Mark this mesh as a Custom Proxy so UpdatePlaceholderSize doesn't resize it
+        newMesh.name = "CustomProxy";
+
+        // CRITICAL: Reset Scale to 1.
+        // The vertices are already absolute size (e.g. 100, 50, 20).
+        rootModel.transform.localScale = Vector3.one;
+        rootModel.transform.localPosition = Vector3.zero;
+        rootModel.transform.localRotation = Quaternion.identity;
+
+        // Update Collider
+        Collider oldCol = rootModel.GetComponent<Collider>();
+        if (oldCol != null) Destroy(oldCol);
+
+        MeshCollider mc = rootModel.AddComponent<MeshCollider>();
+        mc.sharedMesh = newMesh;
+        mc.convex = true;
+    }
 
     public void UpdatePlaceholderSize(Vector3 newSize)
     {
         if (rootModel != null)
         {
-            rootModel.transform.localScale = Vector3.one;
+            MeshFilter mf = rootModel.GetComponent<MeshFilter>();
+
+            // Only scale if it is the DEFAULT primitive cube.
+            // If it is our "CustomProxy", we ignore size updates because
+            // the vertices are already the correct size.
+            if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name == "CustomProxy")
+            {
+                rootModel.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                // Fallback for default cubes
+                rootModel.transform.localScale = newSize;
+            }
+
             rootModel.transform.localPosition = Vector3.zero;
 
+            // Align Axes
             if (axesContainer != null)
             {
-                axesContainer.transform.localPosition = new Vector3(-0.5f, -0.5f, -0.5f);
+                // Use mesh bounds for accurate placement
+                Bounds b = (mf != null && mf.sharedMesh != null) ? mf.sharedMesh.bounds : new Bounds(Vector3.zero, newSize);
+
+                // If CustomProxy, bounds are absolute. If Cube, bounds are 1x1 * Scale.
+                Vector3 extents = b.extents;
+
+                // For the scaled cube, we need to calculate world extents
+                if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name != "CustomProxy")
+                {
+                    extents = new Vector3(newSize.x * 0.5f, newSize.y * 0.5f, newSize.z * 0.5f);
+                }
+
+                axesContainer.transform.localPosition = -extents;
             }
         }
     }
+
 
     private void SetupContainers()
     {

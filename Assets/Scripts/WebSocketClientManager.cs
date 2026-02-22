@@ -326,6 +326,19 @@ public class WebSocketClientManager : MonoBehaviour
                 Debug.LogError("Failed to parse model list: " + e.Message);
             }
         }
+        else if (command == "LOAD_PROXY_MESH" && parts.Length > 1)
+        {
+            try
+            {
+                var meshData = JsonUtility.FromJson<MeshNetworkData>(parts[1]);
+                if (modelViewportController != null)
+                {
+                    modelViewportController.ApplyProxyMesh(meshData);
+                }
+            }
+            catch (Exception ex) { Debug.LogError("Proxy mesh error: " + ex.Message); }
+        }
+
     }
 
     public Sprite Base64ToSprite(string base64)

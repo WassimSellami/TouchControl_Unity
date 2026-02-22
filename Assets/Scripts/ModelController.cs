@@ -233,6 +233,38 @@ public class ModelController : MonoBehaviour, IModelViewer
         }
         catch { }
     }
+    private void GenerateAndBroadcastProxy(string modelId)
+    {
+        if (!modelDataLookup.TryGetValue(modelId, out ModelData data)) return;
+
+        MeshNetworkData proxyData = null;
+
+        Debug.Log($"[Server] Generating Proxy Mesh for {modelId}...");
+
+        if (data is PolygonalModelData)
+        {
+            // Use the loaded rootModel (which contains the full mesh)
+            proxyData = AutoMeshProxy.GenerateFromMesh(rootModel);
+        }
+        else if (data is VolumetricModelData volData)
+        {
+            // Generate from file
+            proxyData = AutoMeshProxy.GenerateFromVolume(volData);
+        }
+
+        if (proxyData != null)
+        {
+            Debug.Log($"[Server] Proxy Generated. Verts: {proxyData.v.Length}");
+            string json = JsonUtility.ToJson(proxyData);
+            // Send using a specific tag
+            if (wsManager != null)
+                wsManager.BroadcastCustomCommand("LOAD_PROXY_MESH", json);
+        }
+        else
+        {
+            Debug.LogWarning("[Server] Failed to generate proxy mesh.");
+        }
+    }
 
     public ModelMetadataList GetAllModelsMetadata()
     {
@@ -302,6 +334,7 @@ public class ModelController : MonoBehaviour, IModelViewer
             rootModel.name = "RootModel";
             allParts.Add(rootModel.name, rootModel);
             AlignToCorner(rootModel);
+            GenerateAndBroadcastProxy(modelId);
         }
         SetupVisualHelpers();
     }

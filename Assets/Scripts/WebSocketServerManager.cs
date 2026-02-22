@@ -66,7 +66,10 @@ public class WebSocketServerManager : MonoBehaviour
     {
         StopWebSocketServer();
     }
-
+    public void BroadcastCustomCommand(string cmd, string data)
+    {
+        BroadcastToAll($"{cmd}:{data}");
+    }
     public void UpdateServerCameraTransform(Vector3 position, Quaternion rotation)
     {
         if (serverCamera != null)
