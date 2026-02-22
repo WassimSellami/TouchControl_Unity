@@ -260,17 +260,12 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     {
         if (rootModel != null)
         {
-            // 1. Scale the cube
-            rootModel.transform.localScale = newSize;
-
-            // 2. Center the cube (Unity Cube pivot is center, so local 0 is center)
+            rootModel.transform.localScale = Vector3.one;
             rootModel.transform.localPosition = Vector3.zero;
 
-            // 3. Move the Axes to the MIN corner
-            // The min corner of a centered cube is -(size/2)
             if (axesContainer != null)
             {
-                axesContainer.transform.localPosition = -newSize * 0.5f;
+                axesContainer.transform.localPosition = new Vector3(-0.5f, -0.5f, -0.5f);
             }
         }
     }

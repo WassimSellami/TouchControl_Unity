@@ -30,10 +30,6 @@ public class WebSocketClientManager : MonoBehaviour
     private float modelUpdateInterval;
     private ModelTransformStateData lastSentState;
     private Coroutine connectionTimeoutCoroutine;
-    private int clientFrameCount = 0;
-    private int packetsAttempted = 0;
-    private int packetsSent = 0;
-    private float debugTimer = 0f;
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
@@ -72,35 +68,15 @@ public class WebSocketClientManager : MonoBehaviour
 
     void Update()
     {
-        // Track Game FPS
-        clientFrameCount++;
-        debugTimer += Time.deltaTime;
-
         if (IsConnected && modelViewportController != null && uiManager != null && uiManager.modelViewPanel.activeInHierarchy)
         {
             timeSinceLastModelUpdate += Time.deltaTime;
 
             while (timeSinceLastModelUpdate >= modelUpdateInterval)
             {
-                packetsAttempted++; // Increment every time the timer says "it's time to send"
                 SendModelTransformState();
                 timeSinceLastModelUpdate -= modelUpdateInterval;
             }
-        }
-
-        // Log stats every 1 second
-        if (debugTimer >= 1.0f)
-        {
-            Debug.Log($"<color=orange>[Client Stats]</color> " +
-                      $"Game FPS: {clientFrameCount} | " +
-                      $"Target Sync: {packetsAttempted}/60 | " +
-                      $"Packets Sent: {packetsSent}");
-
-            // Reset counters
-            clientFrameCount = 0;
-            packetsAttempted = 0;
-            packetsSent = 0;
-            debugTimer = 0f;
         }
     }
 
@@ -242,18 +218,17 @@ public class WebSocketClientManager : MonoBehaviour
         if (!IsConnected || modelViewportController == null || autoConnectMode) return;
         Transform tr = modelViewportController.transform;
 
-        // Optimization: Check Position, Rotation, AND Scale
         if (lastSentState != null &&
             Vector3.SqrMagnitude(tr.localPosition - lastSentState.localPosition) < 0.000001f &&
             Quaternion.Angle(tr.localRotation, lastSentState.localRotation) < 0.01f &&
-            Vector3.SqrMagnitude(tr.localScale - lastSentState.localScale) < 0.000001f) // Check scale!
+            Vector3.SqrMagnitude(tr.localScale - lastSentState.localScale) < 0.000001f)
             return;
 
         ModelTransformStateData state = new ModelTransformStateData
         {
             localPosition = tr.localPosition,
             localRotation = tr.localRotation,
-            localScale = tr.localScale // Make sure this is being sent
+            localScale = tr.localScale
         };
 
         lastSentState = state;
