@@ -390,7 +390,31 @@ public class ModelController : MonoBehaviour, IModelViewer
     private void ApplyVolumeCut(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal) { Renderer[] renderers = root.GetComponentsInChildren<Renderer>(); foreach (Renderer rend in renderers) { if (rend.gameObject.name.Contains("Shaft") || rend.gameObject.name.Contains("Head")) continue; Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal); if (invertNormal) localNormal = -localNormal; rend.material.SetVector("_PlanePos", texturePoint); rend.material.SetVector("_PlaneNormal", localNormal); } }
     private void CleanUpAction(ActionRecord record) { if (record.Type == ActionType.Slice) foreach (var hull in record.NewHulls) { if (hull != null) { allParts.Remove(hull.name); Destroy(hull); } } }
     private void ExecuteVolumetricSlice(GameObject originalPart, SliceActionData data, ActionRecord record) { GameObject partA = Instantiate(originalPart, originalPart.transform.parent); GameObject partB = Instantiate(originalPart, originalPart.transform.parent); partA.name = originalPart.name + "_A"; partB.name = originalPart.name + "_B"; Renderer volRend = originalPart.GetComponentInChildren<Renderer>(); if (volRend == null) return; Vector3 localHitPos = volRend.transform.InverseTransformPoint(data.planePoint); Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f); ApplyVolumeCut(partA, textureSpacePos, data.planeNormal, false); ApplyVolumeCut(partB, textureSpacePos, data.planeNormal, true); if (!allParts.ContainsKey(partA.name)) allParts.Add(partA.name, partA); if (!allParts.ContainsKey(partB.name)) allParts.Add(partB.name, partB); StartCoroutine(AnimateSeparation(partA, partB, originalPart, data.planeNormal, data.separationFactor)); record.Originals.Add(originalPart); record.NewHulls.Add(partA); record.NewHulls.Add(partB); originalPart.SetActive(false); }
-    private void ExecuteMeshSlice(GameObject originalPart, SliceActionData data, ActionRecord record) { var result = SliceUtility.ExecuteMeshSlice(originalPart, data.planePoint, data.planeNormal, crossSectionMaterial, this, originalPart.transform.parent); if (result.isValid) { if (!allParts.ContainsKey(result.upperHull.name)) allParts.Add(result.upperHull.name, result.upperHull); if (!allParts.ContainsKey(result.lowerHull.name)) allParts.Add(result.lowerHull.name, result.lowerHull); record.Originals.Add(originalPart); record.NewHulls.Add(result.upperHull); record.NewHulls.Add(result.lowerHull); originalPart.SetActive(false); } }
+    private void ExecuteMeshSlice(GameObject originalPart, SliceActionData data, ActionRecord record)
+    {
+        GameObject meshTarget = originalPart.GetComponent<MeshFilter>() != null ? originalPart : originalPart.GetComponentInChildren<MeshFilter>()?.gameObject;
+        if (meshTarget == null) return;
+
+        while (redoStack.Count > 0) CleanUpAction(redoStack.Pop());
+        var result = SliceUtility.ExecuteMeshSlice(meshTarget, data.planePoint, data.planeNormal, crossSectionMaterial, this, originalPart.transform.parent);
+
+        if (result.isValid)
+        {
+            result.upperHull.name = originalPart.name + "_A";
+            result.lowerHull.name = originalPart.name + "_B";
+
+            if (allParts.ContainsKey(result.upperHull.name)) allParts[result.upperHull.name] = result.upperHull;
+            else allParts.Add(result.upperHull.name, result.upperHull);
+
+            if (allParts.ContainsKey(result.lowerHull.name)) allParts[result.lowerHull.name] = result.lowerHull;
+            else allParts.Add(result.lowerHull.name, result.lowerHull);
+
+            record.Originals.Add(originalPart);
+            record.NewHulls.Add(result.upperHull);
+            record.NewHulls.Add(result.lowerHull);
+            originalPart.SetActive(false);
+        }
+    }
     private void SetupContainers() { worldContainer = new GameObject("WorldContainer"); worldContainer.transform.SetParent(this.transform, false); modelContainer = new GameObject("ModelContainer"); modelContainer.transform.SetParent(worldContainer.transform, false); axesContainer = new GameObject("AxesContainer"); axesContainer.transform.SetParent(worldContainer.transform, false); }
     private void AlignToCorner(GameObject rootModel)
     {

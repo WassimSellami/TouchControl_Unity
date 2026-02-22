@@ -238,12 +238,14 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         rootModel.name = "RootModel";
         rootModel.transform.SetParent(modelContainer.transform, false);
 
-        // Initial defaults (will be updated by UpdatePlaceholderSize)
-        rootModel.transform.localPosition = new Vector3(0.5f, 0.5f, 0.5f);
+        DestroyImmediate(rootModel.GetComponent<BoxCollider>());
+        MeshCollider mc = rootModel.AddComponent<MeshCollider>();
+        mc.convex = true;
+
+        rootModel.transform.localPosition = Vector3.zero;
         rootModel.transform.localRotation = Quaternion.identity;
         rootModel.transform.localScale = Vector3.one;
 
-        // Apply material to fix pink color
         if (placeholderMaterial != null)
         {
             Renderer r = rootModel.GetComponent<Renderer>();
