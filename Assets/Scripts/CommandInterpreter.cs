@@ -1,16 +1,39 @@
 using UnityEngine;
 using System;
-using Mono.Cecil.Cil;
 public class CommandInterpreter : MonoBehaviour
 {
     public ModelController ModelController;
     public WebSocketServerManager WebSocketServerManager;
     [SerializeField] private ServerModelUIPanel serverUIPanel;
-void Start()
+
+    private int updateCounter = 0;
+    private float fpsTimer = 0f;
+    private int lastMeasuredFps = 0;
+
+    void Start()
     {
         if (ModelController == null) Debug.LogWarning("[CommandInterpreter] ModelController not assigned.");
         if (WebSocketServerManager == null) Debug.LogError("[CommandInterpreter] WebSocketServerManager not assigned.");
         if (serverUIPanel == null) serverUIPanel = FindObjectOfType<ServerModelUIPanel>();
+    }
+
+    void Update()
+    {
+        fpsTimer += Time.deltaTime;
+
+        // Every 1 second, report the count and reset
+        if (fpsTimer >= 1.0f)
+        {
+            lastMeasuredFps = updateCounter;
+
+            if (lastMeasuredFps > 0) // Only log if we are actually receiving data
+            {
+                Debug.Log($"<color=cyan>[Server FPS]</color> Receiving transform updates at: <b>{lastMeasuredFps} FPS</b>");
+            }
+
+            updateCounter = 0;
+            fpsTimer = 0f;
+        }
     }
 
     public void InterpretAndExecute(string commandData)
@@ -21,10 +44,15 @@ void Start()
 
         switch (command)
         {
+            case Constants.UPDATE_MODEL_TRANSFORM:
+                updateCounter++;
+                ProcessUpdateModelTransformCommand(args);
+                break;
+
             case Constants.LOAD_MODEL:
                 if (serverUIPanel != null)
                 {
-                        serverUIPanel.SetListVisibility(false);
+                    serverUIPanel.SetListVisibility(false);
                 }
                 ProcessLoadModelCommand(args);
                 break;
@@ -35,7 +63,6 @@ void Start()
                 }
                 ProcessUnloadModelCommand();
                 break;
-            case Constants.UPDATE_MODEL_TRANSFORM: ProcessUpdateModelTransformCommand(args); break;
             case Constants.UPDATE_CAMERA_TRANSFORM: ProcessUpdateCameraTransformCommand(args); break;
             case Constants.UPDATE_VISUAL_CROP_PLANE: ProcessVisualCropPlaneCommand(args); break;
             case Constants.EXECUTE_SLICE_ACTION: ProcessExecuteSliceActionCommand(args); break;

@@ -46,6 +46,8 @@ public class WebSocketServerManager : MonoBehaviour
 
     void Start()
     {
+        Application.targetFrameRate = Constants.MODEL_UPDATE_FPS;
+        QualitySettings.vSyncCount = 0;
         if (modelController == null) Debug.LogError("[Server] ModelController reference not set!");
         if (serverCamera == null) Debug.LogError("[Server] Server Camera reference not set!");
         if (commandInterpreter == null) Debug.LogError("[Server] CommandInterpreter reference not set!");

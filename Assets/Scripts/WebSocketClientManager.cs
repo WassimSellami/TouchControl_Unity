@@ -30,6 +30,10 @@ public class WebSocketClientManager : MonoBehaviour
     private float modelUpdateInterval;
     private ModelTransformStateData lastSentState;
     private Coroutine connectionTimeoutCoroutine;
+    private int clientFrameCount = 0;
+    private int packetsAttempted = 0;
+    private int packetsSent = 0;
+    private float debugTimer = 0f;
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
@@ -37,6 +41,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     void Start()
     {
+        Application.targetFrameRate = Constants.MODEL_UPDATE_FPS;
+        QualitySettings.vSyncCount = 0;
         if (uiManager == null || modelViewportController == null || referenceCamera == null ||
             connectButton == null || connectButtonText == null || statusText == null ||
             indicatorImage == null || defaultIndicatorSprite == null)
@@ -66,14 +72,35 @@ public class WebSocketClientManager : MonoBehaviour
 
     void Update()
     {
+        // Track Game FPS
+        clientFrameCount++;
+        debugTimer += Time.deltaTime;
+
         if (IsConnected && modelViewportController != null && uiManager != null && uiManager.modelViewPanel.activeInHierarchy)
         {
             timeSinceLastModelUpdate += Time.deltaTime;
-            if (timeSinceLastModelUpdate >= modelUpdateInterval)
+
+            while (timeSinceLastModelUpdate >= modelUpdateInterval)
             {
+                packetsAttempted++; // Increment every time the timer says "it's time to send"
                 SendModelTransformState();
-                timeSinceLastModelUpdate = 0f;
+                timeSinceLastModelUpdate -= modelUpdateInterval;
             }
+        }
+
+        // Log stats every 1 second
+        if (debugTimer >= 1.0f)
+        {
+            Debug.Log($"<color=orange>[Client Stats]</color> " +
+                      $"Game FPS: {clientFrameCount} | " +
+                      $"Target Sync: {packetsAttempted}/60 | " +
+                      $"Packets Sent: {packetsSent}");
+
+            // Reset counters
+            clientFrameCount = 0;
+            packetsAttempted = 0;
+            packetsSent = 0;
+            debugTimer = 0f;
         }
     }
 
@@ -94,6 +121,7 @@ public class WebSocketClientManager : MonoBehaviour
         isAttemptingConnection = true;
 
         ws = new WebSocket(url);
+        ws.NoDelay = true;
         ws.OnOpen += (sender, e) => UnityMainThreadDispatcher.Instance().Enqueue(OnWebSocketOpen);
         ws.OnMessage += (sender, e) => UnityMainThreadDispatcher.Instance().Enqueue(() => OnWebSocketMessage(e.Data));
         ws.OnError += (sender, e) => UnityMainThreadDispatcher.Instance().Enqueue(() => OnWebSocketError(e.Message));
@@ -214,21 +242,24 @@ public class WebSocketClientManager : MonoBehaviour
         if (!IsConnected || modelViewportController == null || autoConnectMode) return;
         Transform tr = modelViewportController.transform;
 
+        // Optimization: Check Position, Rotation, AND Scale
         if (lastSentState != null &&
-            Vector3.SqrMagnitude(tr.localPosition - lastSentState.localPosition) < 0.0001f &&
-            Quaternion.Angle(tr.localRotation, lastSentState.localRotation) < 0.1f &&
-            Vector3.SqrMagnitude(tr.localScale - lastSentState.localScale) < 0.0001f)
+            Vector3.SqrMagnitude(tr.localPosition - lastSentState.localPosition) < 0.000001f &&
+            Quaternion.Angle(tr.localRotation, lastSentState.localRotation) < 0.01f &&
+            Vector3.SqrMagnitude(tr.localScale - lastSentState.localScale) < 0.000001f) // Check scale!
             return;
 
         ModelTransformStateData state = new ModelTransformStateData
         {
             localPosition = tr.localPosition,
             localRotation = tr.localRotation,
-            localScale = tr.localScale
+            localScale = tr.localScale // Make sure this is being sent
         };
+
         lastSentState = state;
         SendMessageToServer($"{Constants.UPDATE_MODEL_TRANSFORM}:{JsonUtility.ToJson(state)}");
     }
+
     public void SendToggleAxes(bool visible)
     {
         if (!IsConnected) return;

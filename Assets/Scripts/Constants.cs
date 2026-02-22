@@ -4,7 +4,7 @@ public static class Constants
     public const string SERVICE_PATH = "/Control";
     public const string DEFAULT_IP_ADDRESS= "192.168.0.35";
     public const int DEFAULT_PORT= 8070;
-    public const float MODEL_UPDATE_FPS = 60f;
+    public const int MODEL_UPDATE_FPS = 60;
     public const float CONNECTION_TIMEOUT = 10f;
 
     // input

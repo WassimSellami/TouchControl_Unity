@@ -27,6 +27,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button infoButton;
     [SerializeField] private Button toggleAxesButton;
 
+    [Header("Fallbacks")]
+    [SerializeField] private Sprite defaultThumbnail; // Assign in Inspector
+
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
     private string currentActiveModelID = "";
     private HashSet<string> visitedModelIds = new HashSet<string>();
@@ -57,10 +60,15 @@ public class UIManager : MonoBehaviour
             GameObject btn = Instantiate(modelButtonPrefab, modelButtonsContainer);
             btn.name = meta.modelID;
             AssetTile tile = btn.GetComponent<AssetTile>();
+
             if (tile != null)
             {
                 Sprite icon = null;
-                if (!string.IsNullOrEmpty(meta.thumbnailBase64)) icon = wsManager.Base64ToSprite(meta.thumbnailBase64);
+                if (!string.IsNullOrEmpty(meta.thumbnailBase64))
+                    icon = wsManager.Base64ToSprite(meta.thumbnailBase64);
+
+                if (icon == null) icon = defaultThumbnail;
+
                 tile.Setup(meta.modelID, meta.displayName, meta.modelType, meta.fileSize, icon, currentActiveModelID == meta.modelID);
                 if (visitedModelIds.Contains(meta.modelID)) tile.SetVisited();
             }

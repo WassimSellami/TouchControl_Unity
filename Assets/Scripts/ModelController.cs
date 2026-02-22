@@ -54,8 +54,16 @@ public class ModelController : MonoBehaviour, IModelViewer
     [Header("Shaking Effect")]
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
 
+    [Header("Smoothing Settings")]
+    [SerializeField] private float smoothSpeed = 25f; // Adjust for responsiveness
+    private Vector3 targetLocalPos = Vector3.zero;
+    private Quaternion targetLocalRot = Quaternion.identity;
+    private Vector3 targetLocalScale = Vector3.one;
+    private bool isInitialized = false;
+
     private GameObject worldContainer;
     private WebSocketServerManager wsManager;
+    private Vector3 currentModelCenterOffset;
 
     private string RegistryPath => Path.Combine(Application.persistentDataPath, "external_registry.json");
     private Dictionary<string, string> runtimeFileSizes = new Dictionary<string, string>();
@@ -334,11 +342,33 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     public void UnloadCurrentModel()
     {
-        if (worldContainer != null) Destroy(worldContainer);
+        // Stop all active interactions
         foreach (var coroutine in shakingCoroutines.Values) if (coroutine != null) StopCoroutine(coroutine);
         if (feedbackIconImage != null) feedbackIconImage.gameObject.SetActive(false);
-        shakingCoroutines.Clear(); originalLocalRotations.Clear(); allParts.Clear(); undoStack.Clear(); redoStack.Clear();
-        ClearCurrentModelAxisVisuals(); modelReferencePoint = null; rootModel = null; worldContainer = null; modelContainer = null; axesContainer = null; CurrentModelID = null;
+
+        // Destroy the containers
+        if (worldContainer != null) Destroy(worldContainer);
+
+        // RESET SMOOTHING STATE
+        isInitialized = false;
+        targetLocalPos = Vector3.zero;
+        targetLocalRot = Quaternion.identity;
+        targetLocalScale = Vector3.one; // Reset Zoom to default
+
+        // Clear internal tracking
+        shakingCoroutines.Clear();
+        originalLocalRotations.Clear();
+        allParts.Clear();
+        undoStack.Clear();
+        redoStack.Clear();
+        ClearCurrentModelAxisVisuals();
+
+        modelReferencePoint = null;
+        rootModel = null;
+        worldContainer = null;
+        modelContainer = null;
+        axesContainer = null;
+        CurrentModelID = null;
     }
 
     public void UpdateCutLine(Vector3 start, Vector3 end) { if (activeLineRenderer != null) activeLineRenderer.enabled = true; activeLineRenderer.positionCount = 2; activeLineRenderer.SetPosition(0, start); activeLineRenderer.SetPosition(1, end); }
@@ -362,8 +392,54 @@ public class ModelController : MonoBehaviour, IModelViewer
     private void ExecuteVolumetricSlice(GameObject originalPart, SliceActionData data, ActionRecord record) { GameObject partA = Instantiate(originalPart, originalPart.transform.parent); GameObject partB = Instantiate(originalPart, originalPart.transform.parent); partA.name = originalPart.name + "_A"; partB.name = originalPart.name + "_B"; Renderer volRend = originalPart.GetComponentInChildren<Renderer>(); if (volRend == null) return; Vector3 localHitPos = volRend.transform.InverseTransformPoint(data.planePoint); Vector3 textureSpacePos = localHitPos + new Vector3(0.5f, 0.5f, 0.5f); ApplyVolumeCut(partA, textureSpacePos, data.planeNormal, false); ApplyVolumeCut(partB, textureSpacePos, data.planeNormal, true); if (!allParts.ContainsKey(partA.name)) allParts.Add(partA.name, partA); if (!allParts.ContainsKey(partB.name)) allParts.Add(partB.name, partB); StartCoroutine(AnimateSeparation(partA, partB, originalPart, data.planeNormal, data.separationFactor)); record.Originals.Add(originalPart); record.NewHulls.Add(partA); record.NewHulls.Add(partB); originalPart.SetActive(false); }
     private void ExecuteMeshSlice(GameObject originalPart, SliceActionData data, ActionRecord record) { var result = SliceUtility.ExecuteMeshSlice(originalPart, data.planePoint, data.planeNormal, crossSectionMaterial, this, originalPart.transform.parent); if (result.isValid) { if (!allParts.ContainsKey(result.upperHull.name)) allParts.Add(result.upperHull.name, result.upperHull); if (!allParts.ContainsKey(result.lowerHull.name)) allParts.Add(result.lowerHull.name, result.lowerHull); record.Originals.Add(originalPart); record.NewHulls.Add(result.upperHull); record.NewHulls.Add(result.lowerHull); originalPart.SetActive(false); } }
     private void SetupContainers() { worldContainer = new GameObject("WorldContainer"); worldContainer.transform.SetParent(this.transform, false); modelContainer = new GameObject("ModelContainer"); modelContainer.transform.SetParent(worldContainer.transform, false); axesContainer = new GameObject("AxesContainer"); axesContainer.transform.SetParent(worldContainer.transform, false); }
-    private void AlignToCorner(GameObject rootModel) { Bounds b = SliceUtility.GetFullBounds(rootModel); Vector3 minCorner = b.min; Vector3 offset = Vector3.zero - minCorner; rootModel.transform.position += offset; CurrentModelBoundsSize = b.size; modelReferencePoint = rootModel.transform; refPointLocalPosition = Vector3.zero; refPointLocalRotation = Quaternion.identity; }
-    private void SetupVisualHelpers() { if (planeVisualizerPrefab != null) { activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false); activePlaneVisualizer.SetActive(false); } if (lineRendererPrefab != null) { activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>(); activeLineRenderer.enabled = false; } if (axesContainer != null) { axesContainer.SetActive(true); Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red }; Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green }; Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue }; currentModelAxisVisuals = AxisGenerator.CreateAxes(axesContainer.transform, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, serverAxisOriginOffset, matX, matY, matZ); } }
+    private void AlignToCorner(GameObject rootModel)
+    {
+        Bounds b = SliceUtility.GetFullBounds(rootModel);
+        CurrentModelBoundsSize = b.size;
+
+        // Position the mesh so its center is exactly at the parent's (0,0,0)
+        // This makes the center of the model the pivot point for rotation
+        rootModel.transform.localPosition = -b.center;
+
+        modelReferencePoint = rootModel.transform;
+
+        // Reset initialization so the first packet from client snaps the containers
+        isInitialized = false;
+    }
+    private void SetupVisualHelpers()
+    {
+        if (planeVisualizerPrefab != null)
+        {
+            activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
+            activePlaneVisualizer.SetActive(false);
+        }
+
+        if (lineRendererPrefab != null)
+        {
+            activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
+            activeLineRenderer.enabled = false;
+        }
+
+        if (axesContainer != null)
+        {
+            axesContainer.SetActive(true);
+            // Position the axes at the MIN corner relative to the center
+            axesContainer.transform.localPosition = currentModelCenterOffset;
+
+            Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red };
+            Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green };
+            Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
+
+            // Create axes starting at 0 (which is now the corner)
+            currentModelAxisVisuals = AxisGenerator.CreateAxes(
+                axesContainer.transform,
+                Constants.AXIS_LENGTH,
+                Constants.AXIS_THICKNESS,
+                Vector3.zero, // Offset is already handled by axesContainer.localPosition
+                matX, matY, matZ
+            );
+        }
+    }
     private void ShowLocalServerIcon(Vector3 worldPos, Sprite icon) { if (feedbackIconImage == null || serverCamera == null || uiCanvasRectTransform == null) return; Vector3 screenPoint = serverCamera.WorldToScreenPoint(worldPos); if (screenPoint.z < 0) return; feedbackIconImage.sprite = icon; InteractionUtility.PositionIcon(feedbackIconImage, (Vector2)screenPoint, uiCanvasRectTransform, null, false); }
     private string SpriteToBase64(Sprite sprite) { if (sprite == null) return string.Empty; try { Texture2D texture = sprite.texture; RenderTexture tmp = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear); Graphics.Blit(texture, tmp); RenderTexture previous = RenderTexture.active; RenderTexture.active = tmp; Texture2D readableTexture = new Texture2D(texture.width, texture.height); readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0); readableTexture.Apply(); RenderTexture.active = previous; RenderTexture.ReleaseTemporary(tmp); byte[] bytes = readableTexture.EncodeToPNG(); string base64 = Convert.ToBase64String(bytes); Destroy(readableTexture); return base64; } catch { return string.Empty; } }
     private enum ActionType { Slice, Destroy }

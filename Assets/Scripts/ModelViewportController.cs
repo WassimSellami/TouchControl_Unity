@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Mono.Cecil.Cil;
 public class ModelViewportController : MonoBehaviour, IModelManipulator
 {
     [Header("References")]
@@ -75,7 +74,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     {
         if (axesContainer != null && modelReferencePoint != null)
         {
-            axesContainer.transform.position = modelReferencePoint.position;
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
     }
@@ -260,12 +258,18 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     {
         if (rootModel != null)
         {
-            // Scale the cube
+            // 1. Scale the cube
             rootModel.transform.localScale = newSize;
 
-            // Move the cube so its Min corner is at 0,0,0
-            // Since Unity Cube pivot is center, we move it by half the size
-            rootModel.transform.localPosition = newSize * 0.5f;
+            // 2. Center the cube (Unity Cube pivot is center, so local 0 is center)
+            rootModel.transform.localPosition = Vector3.zero;
+
+            // 3. Move the Axes to the MIN corner
+            // The min corner of a centered cube is -(size/2)
+            if (axesContainer != null)
+            {
+                axesContainer.transform.localPosition = -newSize * 0.5f;
+            }
         }
     }
 
