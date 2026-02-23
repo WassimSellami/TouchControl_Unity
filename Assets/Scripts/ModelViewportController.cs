@@ -43,7 +43,7 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     public string CurrentModelID { get; private set; }
 
     private AnimationCurve PRESET_VIEW_EASE_CURVE = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
-
+    private bool currentProxyIsVolumetric = false;
     void Awake()
     {
         initialPosition = transform.position;
@@ -257,90 +257,82 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     }
     public void ApplyProxyMesh(MeshNetworkData data)
     {
-        Debug.Log($"[Client] Applying Proxy Mesh. Verts: {data.v.Length}");
-
         if (rootModel == null) return;
+
+        // Store the flag from the server
+        currentProxyIsVolumetric = data.isVolumetric;
 
         MeshFilter mf = rootModel.GetComponent<MeshFilter>();
         if (mf == null) mf = rootModel.AddComponent<MeshFilter>();
 
-        MeshRenderer mr = rootModel.GetComponent<MeshRenderer>();
-        if (mr == null)
-        {
-            mr = rootModel.AddComponent<MeshRenderer>();
-            if (placeholderMaterial != null) mr.material = placeholderMaterial;
-        }
-
         Mesh newMesh = new Mesh();
-        // Use 16-bit to save memory (Low poly is small anyway)
-        newMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt16;
         newMesh.vertices = data.v;
         newMesh.triangles = data.t;
-
         newMesh.RecalculateNormals();
-        newMesh.RecalculateBounds();
-
         mf.mesh = newMesh;
 
-        // Mark this mesh as a Custom Proxy so UpdatePlaceholderSize doesn't resize it
-        newMesh.name = "CustomProxy";
-
-        // CRITICAL: Reset Scale to 1.
-        // The vertices are already absolute size (e.g. 100, 50, 20).
-        rootModel.transform.localScale = Vector3.one;
+        // Reset transform
         rootModel.transform.localPosition = Vector3.zero;
         rootModel.transform.localRotation = Quaternion.identity;
+
+        // Initial scaling logic:
+        // If it's poly, we must be at (1,1,1). If it's vol, wait for UpdatePlaceholderSize.
+        if (!currentProxyIsVolumetric) rootModel.transform.localScale = Vector3.one;
 
         // Update Collider
         Collider oldCol = rootModel.GetComponent<Collider>();
         if (oldCol != null) Destroy(oldCol);
-
-        MeshCollider mc = rootModel.AddComponent<MeshCollider>();
-        mc.sharedMesh = newMesh;
-        mc.convex = true;
+        rootModel.AddComponent<MeshCollider>().convex = true;
     }
 
     public void UpdatePlaceholderSize(Vector3 newSize)
     {
-        if (rootModel != null)
-        {
-            MeshFilter mf = rootModel.GetComponent<MeshFilter>();
+        if (rootModel == null) return;
 
-            // Only scale if it is the DEFAULT primitive cube.
-            // If it is our "CustomProxy", we ignore size updates because
-            // the vertices are already the correct size.
-            if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name == "CustomProxy")
+        MeshFilter mf = rootModel.GetComponent<MeshFilter>();
+
+        if (currentProxyIsVolumetric)
+        {
+            // PROBLEM 2 FIX: Force Volumetric proxy to be exactly 1x1x1 unit
+            rootModel.transform.localScale = Vector3.one;
+        }
+        else
+        {
+            // Polygonal: Keep scale at 1 (geometry is absolute)
+            rootModel.transform.localScale = Vector3.one;
+        }
+
+        rootModel.transform.localPosition = Vector3.zero;
+
+        // --- AXIS PLACEMENT (PROBLEM 1 & 2 FIX) ---
+        if (axesContainer != null)
+        {
+            Vector3 extents;
+            if (currentProxyIsVolumetric)
             {
-                rootModel.transform.localScale = Vector3.one;
+                // Since it's a 1x1x1 cube, extents are always 0.5
+                extents = new Vector3(0.5f, 0.5f, 0.5f);
+            }
+            else if (mf != null && mf.sharedMesh != null)
+            {
+                // Use the calculated bounds of the cluster mesh
+                extents = mf.sharedMesh.bounds.extents;
             }
             else
             {
-                // Fallback for default cubes
-                rootModel.transform.localScale = newSize;
+                extents = Vector3.zero;
             }
 
-            rootModel.transform.localPosition = Vector3.zero;
-
-            // Align Axes
-            if (axesContainer != null)
-            {
-                // Use mesh bounds for accurate placement
-                Bounds b = (mf != null && mf.sharedMesh != null) ? mf.sharedMesh.bounds : new Bounds(Vector3.zero, newSize);
-
-                // If CustomProxy, bounds are absolute. If Cube, bounds are 1x1 * Scale.
-                Vector3 extents = b.extents;
-
-                // For the scaled cube, we need to calculate world extents
-                if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name != "CustomProxy")
-                {
-                    extents = new Vector3(newSize.x * 0.5f, newSize.y * 0.5f, newSize.z * 0.5f);
-                }
-
-                axesContainer.transform.localPosition = -extents;
-            }
+            // Move axes to the bottom-front-left corner
+            axesContainer.transform.localPosition = -extents;
         }
     }
 
+    private Bounds GetBounds(GameObject go)
+    {
+        Renderer r = go.GetComponent<Renderer>();
+        return r != null ? r.bounds : new Bounds(Vector3.zero, Vector3.one);
+    }
 
     private void SetupContainers()
     {
@@ -353,7 +345,6 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         axesContainer = new GameObject("AxesContainer");
         axesContainer.transform.SetParent(worldContainer.transform, false);
     }
-
     private void SetupReferencePoint(GameObject rootModelObj)
     {
         // Reference point is the object itself, effectively 0,0,0 of the parent

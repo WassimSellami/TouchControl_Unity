@@ -1,9 +1,10 @@
 using UnityEngine;
 using System;
 
-[Serializable]
+[System.Serializable]
 public class MeshNetworkData
 {
-    public Vector3[] v; // Vertices
-    public int[] t;     // Triangles
+    public Vector3[] v;
+    public int[] t;
+    public bool isVolumetric;
 }
