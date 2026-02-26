@@ -54,6 +54,7 @@ public static class Constants
     public const float WIGGLE_SPEED = 50f;
     public const float POLYGONAL_DROPDOWN_INDEX = 1;
     public const float VOLUMETRIC_DROPDOWN_INDEX = 0;
+    public const float VOLUMETRIC_PROXY_SCALE = 0.5f;
 
 
     //commands

@@ -297,29 +297,29 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
 
         if (currentProxyIsVolumetric)
         {
-            // PROBLEM 2 FIX: Force Volumetric proxy to be exactly 1x1x1 unit
-            rootModel.transform.localScale = Vector3.one;
+            // Use the new constant here instead of Vector3.one
+            rootModel.transform.localScale = Vector3.one * Constants.VOLUMETRIC_PROXY_SCALE;
         }
         else
         {
-            // Polygonal: Keep scale at 1 (geometry is absolute)
             rootModel.transform.localScale = Vector3.one;
         }
 
         rootModel.transform.localPosition = Vector3.zero;
 
-        // --- AXIS PLACEMENT (PROBLEM 1 & 2 FIX) ---
+        // --- AXIS PLACEMENT FIX ---
         if (axesContainer != null)
         {
             Vector3 extents;
             if (currentProxyIsVolumetric)
             {
-                // Since it's a 1x1x1 cube, extents are always 0.5
-                extents = new Vector3(0.5f, 0.5f, 0.5f);
+                // Calculate extents based on the new scale 
+                // (A scale of 0.5 means the total width is 0.5, so distance from center to edge is 0.25)
+                float halfScale = Constants.VOLUMETRIC_PROXY_SCALE * 0.5f;
+                extents = new Vector3(halfScale, halfScale, halfScale);
             }
             else if (mf != null && mf.sharedMesh != null)
             {
-                // Use the calculated bounds of the cluster mesh
                 extents = mf.sharedMesh.bounds.extents;
             }
             else
@@ -327,10 +327,11 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
                 extents = Vector3.zero;
             }
 
-            // Move axes to the bottom-front-left corner
+            // Move axes to the corner of the newly sized cube
             axesContainer.transform.localPosition = -extents;
         }
     }
+
 
     private Bounds GetBounds(GameObject go)
     {
