@@ -20,9 +20,13 @@ public static class Constants
     public const float DOUBLE_TAP_TIME_THRESHOLD = 0.3f;
 
     // Control parameters
-    public const float PAN_SENSITIVITY = 0.0025f;
+    public const float PAN_SENSITIVITY = 0.002f;
     public const float ORBIT_SENSITIVITY = 0.1f;
-    public const float ZOOM_SENSITIVITY = 0.005f;
+    public const float ZOOM_SENSITIVITY = 0.003f;
+    public const float ZOOM_MIN_DISTANCE = -500f;
+    public const float ZOOM_MAX_DISTANCE = 500f;
+    public const float ZOOM_MIN_DISTANCE_TO_CAM = 0.0001f;
+    public const float ZOOM_MAX_DISTANCE_TO_CAM = 100f;
     public const float ROLL_SENSITIVITY = 1f;
     public const float SCALE_MIN = 0.00001f;
     public const float SCALE_MAX = 10000.0f;

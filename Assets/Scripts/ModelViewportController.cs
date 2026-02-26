@@ -148,17 +148,21 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     {
         StopContinuousRotation();
 
-        if (isAnimatingPresetView)
-            zoomAmount = 0;
+        if (referenceCamera == null || isAnimatingPresetView)
+            return;
+        Vector3 camForward = referenceCamera.transform.forward;
+        float moveDistance = zoomAmount * Constants.ZOOM_SENSITIVITY;
+        Vector3 targetPosition = transform.position - (camForward * moveDistance);
 
-        float scaleChange = 1.0f + zoomAmount * Constants.ZOOM_SENSITIVITY;
-        Vector3 newScale = transform.localScale * scaleChange;
+        float distToCam = Vector3.Distance(targetPosition, referenceCamera.transform.position);
 
-        newScale.x = Mathf.Clamp(newScale.x, Constants.SCALE_MIN, Constants.SCALE_MAX);
-        newScale.y = Mathf.Clamp(newScale.y, Constants.SCALE_MIN, Constants.SCALE_MAX);
-        newScale.z = Mathf.Clamp(newScale.z, Constants.SCALE_MIN, Constants.SCALE_MAX);
+        Vector3 dirToTarget = (targetPosition - referenceCamera.transform.position).normalized;
+        float dotProduct = Vector3.Dot(camForward, dirToTarget);
 
-        transform.localScale = newScale;
+        if (dotProduct > 0 && distToCam > Constants.ZOOM_MIN_DISTANCE_TO_CAM && distToCam < Constants.ZOOM_MAX_DISTANCE_TO_CAM)
+        {
+            transform.position = targetPosition;
+        }
     }
 
     public void ProcessRoll(float angleDelta)

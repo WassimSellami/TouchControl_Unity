@@ -49,6 +49,8 @@ public class WebSocketClientManager : MonoBehaviour
             return;
         }
 
+        modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
+
         if (autoConnectMode)
         {
             uiManager.ShowLoadingScreenOrMinimalStatus();
@@ -83,7 +85,7 @@ public class WebSocketClientManager : MonoBehaviour
     public void AttemptConnect()
     {
         if (IsConnected || isAttemptingConnection) return;
-
+        modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
         if (autoConnectMode)
         {
             HandleMockConnect();
