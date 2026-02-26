@@ -76,6 +76,10 @@ public class CommandInterpreter : MonoBehaviour
             case Constants.SHOW_SLICE_ICON: ProcessShowSliceIconCommand(args); break;
             case Constants.HIDE_SLICE_ICON: ProcessHideSliceIconCommand(); break;
             case Constants.UPDATE_VOLUME_DENSITY: ProcessUpdateVolumeDensity(args); break;
+            case Constants.CANCEL_LOAD:
+                if (ModelController != null) ModelController.UnloadCurrentModel();
+                if (serverUIPanel != null) serverUIPanel.SetListVisibility(true);
+                break;
             case Constants.TOGGLE_AXES:
                 if (ModelController != null && args != null) ModelController.SetAxesVisibility(bool.Parse(args));
                 break;

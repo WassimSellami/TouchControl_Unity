@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.EventSystems; // Required for detecting clicks
+using UnityEngine.EventSystems;
 using System;
 
 public class AssetTile : MonoBehaviour, IPointerClickHandler
@@ -15,11 +15,8 @@ public class AssetTile : MonoBehaviour, IPointerClickHandler
     public string ModelID { get; private set; }
     private bool isAddButton = false;
 
-    // Static events for the System to listen to
-    public static event Action<string, Vector2> OnRightClicked; // For Delete popup
-    public static event Action OnAddTileClicked;               // For Plus Icon
-
-    // This is the specific one the error was complaining about:
+    public static event Action<string, Vector2> OnRightClicked;
+    public static event Action OnAddTileClicked;
     public static event Action<string> OnTileSelected;
     public static void TriggerSelectionEvent(string id) => OnTileSelected?.Invoke(id);
 
@@ -43,25 +40,20 @@ public class AssetTile : MonoBehaviour, IPointerClickHandler
         if (thumbnailImage) thumbnailImage.sprite = plusIcon;
     }
 
-    // This function runs whenever you click the tile (Left or Right)
     public void OnPointerClick(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Right)
         {
-            // Only allow right-click delete on actual models, not the "+" tile
             if (!isAddButton)
+            {
                 OnRightClicked?.Invoke(ModelID, eventData.position);
+            }
         }
         else if (eventData.button == PointerEventData.InputButton.Left)
         {
             if (isAddButton)
             {
                 OnAddTileClicked?.Invoke();
-            }
-            else
-            {
-                // When left-clicked, trigger the selection event
-                TriggerSelectionEvent(ModelID);
             }
         }
     }

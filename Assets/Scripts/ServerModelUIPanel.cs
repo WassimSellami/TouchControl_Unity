@@ -80,7 +80,6 @@ public class ServerModelUIPanel : MonoBehaviour
         confirmDeleteButton.onClick.AddListener(ConfirmDeletion);
         cancelDeleteButton.onClick.AddListener(() => confirmationPopup.SetActive(false));
 
-        typeDropdown.onValueChanged.AddListener(OnTypeChanged);
 
         dimXInput.onValueChanged.AddListener(_ => AutoAnalyzeFormat());
         dimYInput.onValueChanged.AddListener(_ => AutoAnalyzeFormat());
@@ -89,7 +88,7 @@ public class ServerModelUIPanel : MonoBehaviour
 
     private void SelectFile()
     {
-        bool isVol = (typeDropdown.value == 1);
+        bool isVol = (typeDropdown.value == 0);
         string filter = isVol ? "Volume Files\0*.nii;*.nii.gz;*.nrrd;*.nhdr;*.dcm;*.raw;*.dat;*.vol;*.vgi\0All\0*.*\0\0" : "OBJ\0*.obj\0All\0*.*\0\0";
 
         string path = FileBrowserHelper.OpenFile("Select File", filter);
@@ -326,7 +325,6 @@ public class ServerModelUIPanel : MonoBehaviour
         RefreshList();
     }
 
-    private void OnTypeChanged(int index) => volumetricContainer.SetActive(index == 1);
     private void OpenPanel() { panelRoot.SetActive(true); ResetFields(); }
     public void ClosePanel() => panelRoot.SetActive(false);
     private void HandleTileSelection(string id) => AssetTile.TriggerSelectionEvent(id);

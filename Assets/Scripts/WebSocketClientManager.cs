@@ -49,8 +49,6 @@ public class WebSocketClientManager : MonoBehaviour
             return;
         }
 
-        modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
-
         if (autoConnectMode)
         {
             uiManager.ShowLoadingScreenOrMinimalStatus();
@@ -392,7 +390,14 @@ public class WebSocketClientManager : MonoBehaviour
         if (modelViewportController != null) modelViewportController.ResetState();
         CuttingPlaneManager cpm = FindObjectOfType<CuttingPlaneManager>();
         if (cpm != null) cpm.ResetCrop();
-        if (IsConnected && !autoConnectMode) SendMessageToServer(Constants.UNLOAD_MODEL);
+
+        if (IsConnected && !autoConnectMode)
+        {
+            // Tell server to stop/unload regardless of current state
+            SendMessageToServer(Constants.CANCEL_LOAD);
+            SendMessageToServer(Constants.UNLOAD_MODEL);
+        }
+
         if (uiManager != null) uiManager.ShowMainMenuPanel();
     }
 

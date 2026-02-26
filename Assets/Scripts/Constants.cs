@@ -22,7 +22,7 @@ public static class Constants
     // Control parameters
     public const float PAN_SENSITIVITY = 0.0025f;
     public const float ORBIT_SENSITIVITY = 0.1f;
-    public const float ZOOM_SENSITIVITY = 0.003f;
+    public const float ZOOM_SENSITIVITY = 0.005f;
     public const float ROLL_SENSITIVITY = 1f;
     public const float SCALE_MIN = 0.00001f;
     public const float SCALE_MAX = 10000.0f;
@@ -54,6 +54,7 @@ public static class Constants
 
 
     //commands
+    public const string CANCEL_LOAD = "CANCEL_LOAD";
     public const string TOGGLE_AXES = "TOGGLE_AXES";
     public const string UPDATE_MODEL_TRANSFORM = "UPDATE_MODEL_TRANSFORM";
     public const string UPDATE_CAMERA_TRANSFORM = "UPDATE_CAMERA_TRANSFORM";
