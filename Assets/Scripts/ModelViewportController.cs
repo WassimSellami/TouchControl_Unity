@@ -150,18 +150,18 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
 
         if (referenceCamera == null || isAnimatingPresetView)
             return;
-        Vector3 camForward = referenceCamera.transform.forward;
+
+        Vector3 zoomDirection = -referenceCamera.transform.forward;
+
         float moveDistance = zoomAmount * Constants.ZOOM_SENSITIVITY;
-        Vector3 targetPosition = transform.position - (camForward * moveDistance);
+        Vector3 translation = zoomDirection * moveDistance;
 
-        float distToCam = Vector3.Distance(targetPosition, referenceCamera.transform.position);
+        Vector3 newPosition = transform.position + translation;
 
-        Vector3 dirToTarget = (targetPosition - referenceCamera.transform.position).normalized;
-        float dotProduct = Vector3.Dot(camForward, dirToTarget);
-
-        if (dotProduct > 0 && distToCam > Constants.ZOOM_MIN_DISTANCE_TO_CAM && distToCam < Constants.ZOOM_MAX_DISTANCE_TO_CAM)
+        float distFromOrigin = Vector3.Distance(newPosition, initialPosition);
+        if (distFromOrigin < Constants.ZOOM_MAX_DISTANCE)
         {
-            transform.position = targetPosition;
+            transform.position = newPosition;
         }
     }
 
