@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityVolumeRendering;
 using System.IO;
-
 public static class ModelLoader
 {
     public static GameObject Load(ModelData data, Transform parent, Material volMaterial)
@@ -10,12 +9,10 @@ public static class ModelLoader
         if (data is VolumetricModelData vol) return LoadVolumetric(vol, parent, volMaterial);
         return null;
     }
-
-    private static GameObject LoadPolygonal(PolygonalModelData data, Transform parent)
+private static GameObject LoadPolygonal(PolygonalModelData data, Transform parent)
     {
         GameObject loadedObject = null;
 
-        // Priority 1: Runtime File Path (OBJ)
         if (!string.IsNullOrEmpty(data.modelFilePath) && File.Exists(data.modelFilePath))
         {
             string ext = Path.GetExtension(data.modelFilePath).ToLower();
@@ -23,13 +20,8 @@ public static class ModelLoader
             {
                 loadedObject = ObjLoader.Load(data.modelFilePath);
             }
-            else
-            {
-                Debug.LogWarning("Runtime loading only supports .obj for now.");
-            }
         }
 
-        // Priority 2: Prefab (Editor assigned)
         if (loadedObject == null && data.prefab != null)
         {
             loadedObject = Object.Instantiate(data.prefab);
@@ -54,11 +46,25 @@ public static class ModelLoader
             return null;
         }
 
-        RawDatasetImporter importer = new RawDatasetImporter(
-            filePath, data.dimX, data.dimY, data.dimZ, data.contentFormat, data.endianness, data.bytesToSkip
-        );
+        VolumeDataset dataset = null;
+        IImageFileImporter nativeImporter = null;
 
-        VolumeDataset dataset = importer.Import();
+        string ext = Path.GetExtension(filePath).ToLower();
+        if (ext == ".nii" || filePath.ToLower().EndsWith(".nii.gz")) nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
+        else if (ext == ".nrrd" || ext == ".nhdr") nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
+
+        if (nativeImporter != null)
+        {
+            dataset = nativeImporter.Import(filePath);
+        }
+        else
+        {
+            RawDatasetImporter rawImporter = new RawDatasetImporter(
+                filePath, data.dimX, data.dimY, data.dimZ, data.contentFormat, data.endianness, data.bytesToSkip
+            );
+            dataset = rawImporter.Import();
+        }
+
         if (dataset == null) return null;
 
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
@@ -66,16 +72,30 @@ public static class ModelLoader
         volObj.transform.localPosition = Vector3.zero;
 
         GameObject rendererObj = volObj.transform.GetChild(0).gameObject;
+        Renderer rend = rendererObj.GetComponent<Renderer>();
 
-        if (volMaterial != null)
+        if (rend != null)
         {
-            Renderer rend = rendererObj.GetComponent<Renderer>();
-            if (rend != null)
+            Vector3 rawSize = rend.bounds.size;
+            float maxDim = Mathf.Max(rawSize.x, rawSize.y, rawSize.z);
+            if (maxDim > 0f)
             {
-                rend.material = new Material(volMaterial);
-                rend.material.SetVector("_PlanePos", new Vector3(-10, -10, -10));
-                rend.material.SetVector("_PlaneNormal", Vector3.up);
+                volObj.transform.localScale = Vector3.one * (1.0f / maxDim);
             }
+        }
+
+        if (volMaterial != null && rend != null)
+        {
+            Texture generated3DTexture = rend.material.GetTexture("_DataTex");
+            rend.material = new Material(volMaterial);
+
+            if (generated3DTexture != null)
+            {
+                rend.material.SetTexture("_DataTex", generated3DTexture);
+            }
+
+            rend.material.SetVector("_PlanePos", new Vector3(-10, -10, -10));
+            rend.material.SetVector("_PlaneNormal", Vector3.up);
         }
 
         if (rendererObj.GetComponent<BoxCollider>() == null)

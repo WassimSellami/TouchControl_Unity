@@ -1,4 +1,3 @@
-using EzySlice;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,6 +6,7 @@ using UnityEngine.UI;
 using UnityVolumeRendering;
 using System.IO;
 using System.Linq;
+
 public class ModelController : MonoBehaviour, IModelViewer
 {
     private LineRenderer activeLineRenderer;
@@ -50,12 +50,14 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     [Header("Volumetric Settings")]
     [SerializeField] private Material volumetricSliceMaterial;
+    [Range(0f, 1f)] public float volumeMinVal = 0.0f;
+    [Range(0f, 1f)] public float volumeMaxVal = 1.0f;
 
     [Header("Shaking Effect")]
     [SerializeField] private Vector3 wiggleAxis = Vector3.up;
 
     [Header("Smoothing Settings")]
-    [SerializeField] private float smoothSpeed = 25f; // Adjust for responsiveness
+    [SerializeField] private float smoothSpeed = 25f;
     private Vector3 targetLocalPos = Vector3.zero;
     private Quaternion targetLocalRot = Quaternion.identity;
     private Vector3 targetLocalScale = Vector3.one;
@@ -78,6 +80,30 @@ public class ModelController : MonoBehaviour, IModelViewer
         wsManager = FindObjectOfType<WebSocketServerManager>();
     }
 
+    private void OnValidate()
+    {
+        if (Application.isPlaying) SetVolumeDensity(volumeMinVal, volumeMaxVal);
+    }
+
+    public void SetVolumeDensity(float min, float max)
+    {
+        volumeMinVal = min;
+        volumeMaxVal = max;
+
+        if (modelContainer == null) return;
+        Renderer[] renderers = modelContainer.GetComponentsInChildren<Renderer>();
+        foreach (Renderer rend in renderers)
+        {
+            if (rend.gameObject.name.Contains("Shaft") || rend.gameObject.name.Contains("Head"))
+                continue;
+
+            if (rend.material.HasProperty("_MinVal"))
+                rend.material.SetFloat("_MinVal", min);
+            if (rend.material.HasProperty("_MaxVal"))
+                rend.material.SetFloat("_MaxVal", max);
+        }
+    }
+
     private void RefreshModelLookup()
     {
         modelDataLookup.Clear();
@@ -87,77 +113,36 @@ public class ModelController : MonoBehaviour, IModelViewer
                 modelDataLookup[modelData.modelID] = modelData;
         }
     }
+
     public void RemoveModel(string modelID)
     {
-        if (availableModels == null)
-        {
-            Debug.LogError("[ModelController] availableModels list is null!");
-            return;
-        }
-
-        // 2. Safety check: Handle null entries inside the list while searching
-        // We add 'm != null' to the search criteria
+        if (availableModels == null) return;
         var modelToRemove = availableModels.Find(m => m != null && m.modelID == modelID);
 
         if (modelToRemove != null)
         {
             availableModels.Remove(modelToRemove);
-
-            // 3. Safety check: Ensure dictionary exists before removing key
-            if (runtimeFileSizes != null && runtimeFileSizes.ContainsKey(modelID))
-            {
-                runtimeFileSizes.Remove(modelID);
-            }
-
+            if (runtimeFileSizes != null && runtimeFileSizes.ContainsKey(modelID)) runtimeFileSizes.Remove(modelID);
             RefreshModelLookup();
             SaveRegistry();
-
-            // Notify network
             if (wsManager != null) wsManager.BroadcastModelList();
-
-            // Refresh Server UI
             ServerModelUIPanel serverUI = FindObjectOfType<ServerModelUIPanel>();
-            if (serverUI != null)
-            {
-                var metadata = GetAllModelsMetadata();
-                if (metadata != null && metadata.models != null)
-                {
-                    serverUI.PopulateServerList(metadata.models.ToList());
-                }
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"[ModelController] Could not find model with ID: {modelID} to remove.");
+            if (serverUI != null) serverUI.PopulateServerList(GetAllModelsMetadata().models.ToList());
         }
     }
 
+    [Serializable] public class ModelRegistryEntry { public string id; public string name; public string desc; public string filePath; public string size; public string thumbPath; public bool isVolumetric; public int dx, dy, dz; }
+    [Serializable] public class RegistryWrapper { public List<ModelRegistryEntry> entries = new List<ModelRegistryEntry>(); }
 
-    [Serializable]
-    public class ModelRegistryEntry
-    {
-        public string id;
-        public string name;
-        public string desc;
-        public string filePath;
-        public string size;
-        public string thumbPath;
-        public bool isVolumetric;
-        public int dx, dy, dz;
-    }
-
-    [Serializable]
-    public class RegistryWrapper { public List<ModelRegistryEntry> entries = new List<ModelRegistryEntry>(); }
     public void RegisterRuntimeModel(ModelData newModel, string sizeStr, string thumbPath)
     {
         if (newModel == null) return;
         availableModels.Add(newModel);
         runtimeFileSizes[newModel.modelID] = sizeStr;
-        runtimeThumbPaths[newModel.modelID] = thumbPath; // Store the path
+        runtimeThumbPaths[newModel.modelID] = thumbPath;
         RefreshModelLookup();
         SaveRegistry();
         if (wsManager != null) wsManager.BroadcastModelList();
-
         ServerModelUIPanel serverUI = FindObjectOfType<ServerModelUIPanel>();
         if (serverUI != null) serverUI.PopulateServerList(GetAllModelsMetadata().models.ToList());
     }
@@ -181,7 +166,7 @@ public class ModelController : MonoBehaviour, IModelViewer
                 desc = m.description,
                 filePath = path,
                 size = runtimeFileSizes.ContainsKey(m.modelID) ? runtimeFileSizes[m.modelID] : m.fileSize,
-                thumbPath = runtimeThumbPaths.ContainsKey(m.modelID) ? runtimeThumbPaths[m.modelID] : "", // Save path
+                thumbPath = runtimeThumbPaths.ContainsKey(m.modelID) ? runtimeThumbPaths[m.modelID] : "",
                 isVolumetric = isVol,
                 dx = x,
                 dy = y,
@@ -202,7 +187,7 @@ public class ModelController : MonoBehaviour, IModelViewer
                 if (!File.Exists(e.filePath)) continue;
 
                 runtimeFileSizes[e.id] = e.size;
-                runtimeThumbPaths[e.id] = e.thumbPath; // Restore path mapping
+                runtimeThumbPaths[e.id] = e.thumbPath;
 
                 Sprite loadedThumb = null;
                 if (!string.IsNullOrEmpty(e.thumbPath) && File.Exists(e.thumbPath))
@@ -218,7 +203,7 @@ public class ModelController : MonoBehaviour, IModelViewer
                     VolumetricModelData v = ScriptableObject.CreateInstance<VolumetricModelData>();
                     v.modelID = e.id; v.displayName = e.name; v.description = e.desc;
                     v.rawFilePath = e.filePath; v.dimX = e.dx; v.dimY = e.dy; v.dimZ = e.dz;
-                    v.fileSize = e.size; v.thumbnail = loadedThumb; // Restore Sprite
+                    v.fileSize = e.size; v.thumbnail = loadedThumb;
                     availableModels.Add(v);
                 }
                 else
@@ -226,43 +211,25 @@ public class ModelController : MonoBehaviour, IModelViewer
                     PolygonalModelData p = ScriptableObject.CreateInstance<PolygonalModelData>();
                     p.modelID = e.id; p.displayName = e.name; p.description = e.desc;
                     p.modelFilePath = e.filePath; p.fileSize = e.size;
-                    p.thumbnail = loadedThumb; // Restore Sprite
+                    p.thumbnail = loadedThumb;
                     availableModels.Add(p);
                 }
             }
         }
         catch { }
     }
+
     private void GenerateAndBroadcastProxy(string modelId)
     {
         if (!modelDataLookup.TryGetValue(modelId, out ModelData data)) return;
-
         MeshNetworkData proxyData = null;
-
-        Debug.Log($"[Server] Generating Proxy Mesh for {modelId}...");
-
-        if (data is PolygonalModelData)
-        {
-            // Use the loaded rootModel (which contains the full mesh)
-            proxyData = AutoMeshProxy.GenerateFromMesh(rootModel);
-        }
-        else if (data is VolumetricModelData volData)
-        {
-            // Generate from file
-            proxyData = AutoMeshProxy.GenerateFromVolume(volData);
-        }
+        if (data is PolygonalModelData) proxyData = AutoMeshProxy.GenerateFromMesh(rootModel);
+        else if (data is VolumetricModelData volData) proxyData = AutoMeshProxy.GenerateFromVolume(volData);
 
         if (proxyData != null)
         {
-            Debug.Log($"[Server] Proxy Generated. Verts: {proxyData.v.Length}");
             string json = JsonUtility.ToJson(proxyData);
-            // Send using a specific tag
-            if (wsManager != null)
-                wsManager.BroadcastCustomCommand("LOAD_PROXY_MESH", json);
-        }
-        else
-        {
-            Debug.LogWarning("[Server] Failed to generate proxy mesh.");
+            if (wsManager != null) wsManager.BroadcastCustomCommand("LOAD_PROXY_MESH", json);
         }
     }
 
@@ -335,7 +302,15 @@ public class ModelController : MonoBehaviour, IModelViewer
             allParts.Add(rootModel.name, rootModel);
             AlignToCorner(rootModel);
             GenerateAndBroadcastProxy(modelId);
+
+            // RESET DENSITY
+            volumeMinVal = 0.0f;
+            volumeMaxVal = 1.0f;
+            SetVolumeDensity(volumeMinVal, volumeMaxVal);
         }
+
+        // RESET AXES
+        showServerAxes = true;
         SetupVisualHelpers();
     }
 
@@ -393,27 +368,19 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     public void UnloadCurrentModel()
     {
-        // Stop all active interactions
         foreach (var coroutine in shakingCoroutines.Values) if (coroutine != null) StopCoroutine(coroutine);
         if (feedbackIconImage != null) feedbackIconImage.gameObject.SetActive(false);
-
-        // Destroy the containers
         if (worldContainer != null) Destroy(worldContainer);
-
-        // RESET SMOOTHING STATE
         isInitialized = false;
         targetLocalPos = Vector3.zero;
         targetLocalRot = Quaternion.identity;
-        targetLocalScale = Vector3.one; // Reset Zoom to default
-
-        // Clear internal tracking
+        targetLocalScale = Vector3.one;
         shakingCoroutines.Clear();
         originalLocalRotations.Clear();
         allParts.Clear();
         undoStack.Clear();
         redoStack.Clear();
         ClearCurrentModelAxisVisuals();
-
         modelReferencePoint = null;
         rootModel = null;
         worldContainer = null;
@@ -445,24 +412,15 @@ public class ModelController : MonoBehaviour, IModelViewer
     {
         GameObject meshTarget = originalPart.GetComponent<MeshFilter>() != null ? originalPart : originalPart.GetComponentInChildren<MeshFilter>()?.gameObject;
         if (meshTarget == null) return;
-
         while (redoStack.Count > 0) CleanUpAction(redoStack.Pop());
         var result = SliceUtility.ExecuteMeshSlice(meshTarget, data.planePoint, data.planeNormal, crossSectionMaterial, this, originalPart.transform.parent);
-
         if (result.isValid)
         {
             result.upperHull.name = originalPart.name + "_A";
             result.lowerHull.name = originalPart.name + "_B";
-
-            if (allParts.ContainsKey(result.upperHull.name)) allParts[result.upperHull.name] = result.upperHull;
-            else allParts.Add(result.upperHull.name, result.upperHull);
-
-            if (allParts.ContainsKey(result.lowerHull.name)) allParts[result.lowerHull.name] = result.lowerHull;
-            else allParts.Add(result.lowerHull.name, result.lowerHull);
-
-            record.Originals.Add(originalPart);
-            record.NewHulls.Add(result.upperHull);
-            record.NewHulls.Add(result.lowerHull);
+            if (allParts.ContainsKey(result.upperHull.name)) allParts[result.upperHull.name] = result.upperHull; else allParts.Add(result.upperHull.name, result.upperHull);
+            if (allParts.ContainsKey(result.lowerHull.name)) allParts[result.lowerHull.name] = result.lowerHull; else allParts.Add(result.lowerHull.name, result.lowerHull);
+            record.Originals.Add(originalPart); record.NewHulls.Add(result.upperHull); record.NewHulls.Add(result.lowerHull);
             originalPart.SetActive(false);
         }
     }
@@ -471,53 +429,23 @@ public class ModelController : MonoBehaviour, IModelViewer
     {
         Bounds b = SliceUtility.GetFullBounds(rootModel);
         CurrentModelBoundsSize = b.size;
-
-        // 1. Position the mesh so its geometry center is at the local (0,0,0) pivot
         rootModel.transform.localPosition = -b.center;
-
-        // 2. Calculate the offset to the MIN corner (relative to the center pivot)
-        // This matches the client's: -newSize * 0.5f
         currentModelCenterOffset = -b.extents;
-
         modelReferencePoint = rootModel.transform;
-
-        // Reset initialization so the first packet from client snaps the containers
         isInitialized = false;
     }
-    // Inside ModelController.cs
     private void SetupVisualHelpers()
     {
-        if (planeVisualizerPrefab != null)
-        {
-            activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false);
-            activePlaneVisualizer.SetActive(false);
-        }
-
-        if (lineRendererPrefab != null)
-        {
-            activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>();
-            activeLineRenderer.enabled = false;
-        }
-
+        if (planeVisualizerPrefab != null) { activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false); activePlaneVisualizer.SetActive(false); }
+        if (lineRendererPrefab != null) { activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>(); activeLineRenderer.enabled = false; }
         if (axesContainer != null)
         {
-            axesContainer.SetActive(true);
-
-            // MOVE THE AXES TO THE MIN CORNER
-            // Now that currentModelCenterOffset is assigned in AlignToCorner
+            axesContainer.SetActive(showServerAxes); // Use variable
             axesContainer.transform.localPosition = currentModelCenterOffset;
-
             Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red };
             Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green };
             Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
-
-            currentModelAxisVisuals = AxisGenerator.CreateAxes(
-                axesContainer.transform,
-                Constants.AXIS_LENGTH,
-                Constants.AXIS_THICKNESS,
-                Vector3.zero,
-                matX, matY, matZ
-            );
+            currentModelAxisVisuals = AxisGenerator.CreateAxes(axesContainer.transform, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Vector3.zero, matX, matY, matZ);
         }
     }
     private void ShowLocalServerIcon(Vector3 worldPos, Sprite icon) { if (feedbackIconImage == null || serverCamera == null || uiCanvasRectTransform == null) return; Vector3 screenPoint = serverCamera.WorldToScreenPoint(worldPos); if (screenPoint.z < 0) return; feedbackIconImage.sprite = icon; InteractionUtility.PositionIcon(feedbackIconImage, (Vector2)screenPoint, uiCanvasRectTransform, null, false); }

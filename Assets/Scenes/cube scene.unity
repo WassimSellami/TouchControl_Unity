@@ -940,17 +940,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &718179712 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5075374780809688208, guid: 12d4bc3e4dbced349949355cc0d3bbf6, type: 3}
-  m_PrefabInstance: {fileID: 380336167}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &718270462
 GameObject:
   m_ObjectHideFlags: 0
@@ -1194,11 +1183,10 @@ MonoBehaviour:
   serverListRoot: {fileID: 97400424}
   confirmationPopup: {fileID: 1424253585}
   displayNameInput: {fileID: 1416755821}
-  descriptionInput: {fileID: 1195411867}
   typeDropdown: {fileID: 1902220979}
   filePathText: {fileID: 1385798643}
   fileSizeText: {fileID: 1398460301}
-  thumbnailPathText: {fileID: 718179712}
+  statusText: {fileID: 1933158668}
   volumetricContainer: {fileID: 2122382779}
   dimXInput: {fileID: 1455647522}
   dimYInput: {fileID: 886329913}
@@ -1207,13 +1195,13 @@ MonoBehaviour:
   assetTilePrefab: {fileID: 5599202588443561568, guid: fb959008f1df6b043a33adf66e0a049d, type: 3}
   plusIconSprite: {fileID: 21300000, guid: 1da71315c2aed1f4daed731b946bf17c, type: 3}
   defaultThumbnailSprite: {fileID: 21300000, guid: f3eeb890196cad842802c55678ae9288, type: 3}
+  modelController: {fileID: 1971269431}
   closePanelButton: {fileID: 695462616}
   selectFileButton: {fileID: 524983865}
   selectThumbnailButton: {fileID: 1481772371}
   addModelButton: {fileID: 1370142642}
   confirmDeleteButton: {fileID: 718270464}
   cancelDeleteButton: {fileID: 175429042}
-  modelController: {fileID: 1971269431}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1546,17 +1534,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1075513432}
   m_CullTransparentMesh: 1
---- !u!114 &1195411867 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 992119035654778185, guid: 12d4bc3e4dbced349949355cc0d3bbf6, type: 3}
-  m_PrefabInstance: {fileID: 380336167}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &1370142642 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8328727898359808165, guid: 12d4bc3e4dbced349949355cc0d3bbf6, type: 3}
@@ -1802,6 +1779,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b743370ac3e4ec2a1668f5455a8ef8a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1933158668 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 793300642724875528, guid: 12d4bc3e4dbced349949355cc0d3bbf6, type: 3}
+  m_PrefabInstance: {fileID: 380336167}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1971269430
 GameObject:
   m_ObjectHideFlags: 0
@@ -1831,6 +1819,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6521105644d11aa4aac7ddf1d3242b10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  thresholdPropertyName: _MinVal
+  volumeThreshold: 0.1
   availableModels:
   - {fileID: 11400000, guid: 2121bead4c975a64c9fca424fc7678fc, type: 2}
   - {fileID: 11400000, guid: cff31758b76d1f84d9958cb4a5dfe5bf, type: 2}

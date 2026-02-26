@@ -21,12 +21,11 @@ public class CommandInterpreter : MonoBehaviour
     {
         fpsTimer += Time.deltaTime;
 
-        // Every 1 second, report the count and reset
         if (fpsTimer >= 1.0f)
         {
             lastMeasuredFps = updateCounter;
 
-            if (lastMeasuredFps > 0) // Only log if we are actually receiving data
+            if (lastMeasuredFps > 0)
             {
                 Debug.Log($"<color=cyan>[Server FPS]</color> Receiving transform updates at: <b>{lastMeasuredFps} FPS</b>");
             }
@@ -76,6 +75,7 @@ public class CommandInterpreter : MonoBehaviour
             case Constants.HIDE_CUT_LINE: ProcessHideCutLineCommand(); break;
             case Constants.SHOW_SLICE_ICON: ProcessShowSliceIconCommand(args); break;
             case Constants.HIDE_SLICE_ICON: ProcessHideSliceIconCommand(); break;
+            case Constants.UPDATE_VOLUME_DENSITY: ProcessUpdateVolumeDensity(args); break;
             case Constants.TOGGLE_AXES:
                 if (ModelController != null && args != null) ModelController.SetAxesVisibility(bool.Parse(args));
                 break;
@@ -119,4 +119,15 @@ public class CommandInterpreter : MonoBehaviour
     private void ProcessHideCutLineCommand() { if (ModelController != null) ModelController.HideCutLine(); }
     private void ProcessShowSliceIconCommand(string args) { try { ShowSliceIconData d = JsonUtility.FromJson<ShowSliceIconData>(args); ModelController.ShowSliceIcon(d.worldPosition); } catch { } }
     private void ProcessHideSliceIconCommand() { if (ModelController != null) ModelController.HideSliceIcon(); }
+
+    private void ProcessUpdateVolumeDensity(string args)
+    {
+        if (ModelController == null || string.IsNullOrEmpty(args)) return;
+        try
+        {
+            VolumeDensityData data = JsonUtility.FromJson<VolumeDensityData>(args);
+            ModelController.SetVolumeDensity(data.minVal, data.maxVal);
+        }
+        catch (Exception ex) { Debug.LogError("Volume Density Error: " + ex.Message); }
+    }
 }

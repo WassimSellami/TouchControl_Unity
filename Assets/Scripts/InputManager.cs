@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
-
 public class InputManager : MonoBehaviour
 {
     [Header("References")]
@@ -12,7 +11,7 @@ public class InputManager : MonoBehaviour
     [SerializeField]
     private CuttingPlaneManager cuttingPlaneManager;
 
-    private bool isHolding = false;
+private bool isHolding = false;
     private bool longPressAchieved = false;
     private bool isCutActive = false;
     private float longPressTimer = 0f;
@@ -43,6 +42,17 @@ public class InputManager : MonoBehaviour
     private Queue<float> zoomDistanceHistory = new Queue<float>();
     private Queue<float> rotationAngleHistory = new Queue<float>();
 
+    private bool isInteractionEnabled = true;
+
+    public void SetInteractionEnabled(bool enabled)
+    {
+        isInteractionEnabled = enabled;
+        if (!enabled)
+        {
+            ResetGestureStates();
+        }
+    }
+
     void Start()
     {
         if (targetModelController == null) { this.enabled = false; Debug.LogError("InputManager: TargetModelController not assigned!"); return; }
@@ -53,6 +63,8 @@ public class InputManager : MonoBehaviour
 
     void Update()
     {
+        if (!isInteractionEnabled) return;
+
         int currentTouchCount = GetTouchOrMouseCount();
 
         if (currentTouchCount == 0)

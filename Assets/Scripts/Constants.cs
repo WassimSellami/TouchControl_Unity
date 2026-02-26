@@ -2,8 +2,8 @@ public static class Constants
 {
     // Websocket
     public const string SERVICE_PATH = "/Control";
-    public const string DEFAULT_IP_ADDRESS= "192.168.0.35";
-    public const int DEFAULT_PORT= 8070;
+    public const string DEFAULT_IP_ADDRESS = "192.168.0.35";
+    public const int DEFAULT_PORT = 8070;
     public const int MODEL_UPDATE_FPS = 90;
     public const float CONNECTION_TIMEOUT = 5f;
 
@@ -73,6 +73,5 @@ public static class Constants
     public const string HIDE_SLICE_ICON = "HIDE_SLICE_ICON";
     public const string MODELS_LIST_UPDATE = "MODELS_LIST_UPDATE";
     public const string MODEL_SIZE_UPDATE = "MODEL_SIZE_UPDATE";
+    public const string UPDATE_VOLUME_DENSITY = "UPDATE_VOLUME_DENSITY";
 }
-
-

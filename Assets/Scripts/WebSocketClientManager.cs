@@ -1,9 +1,11 @@
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
 using WebSocketSharp;
 using System.Collections.Generic;
+
 public class WebSocketClientManager : MonoBehaviour
 {
     [Header("Connection Settings")]
@@ -16,7 +18,7 @@ public class WebSocketClientManager : MonoBehaviour
     [SerializeField] private int serverPort = Constants.DEFAULT_PORT;
 
     [Header("UI Elements")]
-[SerializeField] private Button connectButton;
+    [SerializeField] private Button connectButton;
     [SerializeField] private TMP_Text connectButtonText;
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private Image indicatorImage;
@@ -126,11 +128,7 @@ public class WebSocketClientManager : MonoBehaviour
 
             if (ws != null)
             {
-                try
-                {
-                    ws.CloseAsync();
-                }
-                catch { }
+                try { ws.CloseAsync(); } catch { }
                 ws = null;
             }
             PerformDisconnectionCleanup();
@@ -233,6 +231,13 @@ public class WebSocketClientManager : MonoBehaviour
 
         lastSentState = state;
         SendMessageToServer($"{Constants.UPDATE_MODEL_TRANSFORM}:{JsonUtility.ToJson(state)}");
+    }
+
+    public void SendVolumeDensity(float min, float max)
+    {
+        if (!IsConnected) return;
+        VolumeDensityData data = new VolumeDensityData { minVal = min, maxVal = max };
+        SendMessageToServer($"{Constants.UPDATE_VOLUME_DENSITY}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendToggleAxes(bool visible)

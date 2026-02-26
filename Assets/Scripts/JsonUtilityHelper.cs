@@ -59,3 +59,10 @@ public class ShowSliceIconData
 {
     public Vector3 worldPosition;
 }
+
+[System.Serializable]
+public class VolumeDensityData
+{
+    public float minVal;
+    public float maxVal;
+}

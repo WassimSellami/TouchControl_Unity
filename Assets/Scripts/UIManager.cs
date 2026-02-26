@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+
 public class UIManager : MonoBehaviour
 {
     [Header("UI Panels")]
@@ -8,6 +9,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] public GameObject mainMenuPanel;
     [SerializeField] public GameObject modelViewPanel;
     [SerializeField] public GameObject infoPanel;
+
     [Header("Model Button Setup")]
     [SerializeField] private Transform modelButtonsContainer;
     [SerializeField] private GameObject modelButtonPrefab;
@@ -17,6 +19,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private InputManager inputManagerRef;
     [SerializeField] private CuttingPlaneManager cuttingPlaneManager;
     [SerializeField] private HistoryManager historyManager;
+    [SerializeField] private WebSocketClientManager wsManager;
 
     [Header("Buttons")]
     [SerializeField] private Button backButtonToMainMenu;
@@ -27,8 +30,14 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button infoButton;
     [SerializeField] private Button toggleAxesButton;
 
+    [Header("Volumetric Controls")]
+    [SerializeField] private GameObject densityControlPanel;
+    [SerializeField] private Button toggleDensityButton;
+    [SerializeField] private Slider minDensitySlider;
+    [SerializeField] private Slider maxDensitySlider;
+
     [Header("Fallbacks")]
-    [SerializeField] private Sprite defaultThumbnail; // Assign in Inspector
+    [SerializeField] private Sprite defaultThumbnail;
 
     private List<GameObject> dynamicModelButtons = new List<GameObject>();
     private string currentActiveModelID = "";
@@ -49,9 +58,33 @@ public class UIManager : MonoBehaviour
         if (redoButton != null) redoButton.onClick.AddListener(OnRedoButtonPressed);
         if (infoButton != null) infoButton.onClick.AddListener(ToggleInfoPanel);
         if (toggleAxesButton != null) toggleAxesButton.onClick.AddListener(OnToggleAxesPressed);
+
+        if (toggleDensityButton != null) toggleDensityButton.onClick.AddListener(OnToggleDensityPressed);
+        if (densityControlPanel != null) densityControlPanel.SetActive(false);
+
+        if (minDensitySlider != null) minDensitySlider.onValueChanged.AddListener(OnDensityChanged);
+        if (maxDensitySlider != null) maxDensitySlider.onValueChanged.AddListener(OnDensityChanged);
     }
 
-    public void PopulateModelButtons(List<ModelMetadata> models, WebSocketClientManager wsManager)
+    private void OnToggleDensityPressed()
+    {
+        if (densityControlPanel != null)
+        {
+            bool isActive = !densityControlPanel.activeSelf;
+            densityControlPanel.SetActive(isActive);
+            if (inputManagerRef != null) inputManagerRef.SetInteractionEnabled(!isActive);
+        }
+    }
+
+    private void OnDensityChanged(float value)
+    {
+        if (wsManager != null && minDensitySlider != null && maxDensitySlider != null)
+        {
+            wsManager.SendVolumeDensity(minDensitySlider.value, maxDensitySlider.value);
+        }
+    }
+
+    public void PopulateModelButtons(List<ModelMetadata> models, WebSocketClientManager wsManagerRef)
     {
         ClearDynamicButtons();
         if (modelButtonsContainer == null || modelButtonPrefab == null) return;
@@ -65,7 +98,7 @@ public class UIManager : MonoBehaviour
             {
                 Sprite icon = null;
                 if (!string.IsNullOrEmpty(meta.thumbnailBase64))
-                    icon = wsManager.Base64ToSprite(meta.thumbnailBase64);
+                    icon = wsManagerRef.Base64ToSprite(meta.thumbnailBase64);
 
                 if (icon == null) icon = defaultThumbnail;
 
@@ -74,7 +107,7 @@ public class UIManager : MonoBehaviour
             }
             var dragComp = btn.AddComponent<DraggableModelIcon>();
             dragComp.ModelID = meta.modelID;
-            dragComp.OnModelDropped = (id) => { wsManager.OnLoadModelSelected(id); MarkModelAsVisited(id); };
+            dragComp.OnModelDropped = (id) => { wsManagerRef.OnLoadModelSelected(id); MarkModelAsVisited(id); };
             dynamicModelButtons.Add(btn);
         }
         RefreshSelectionHighlights(currentActiveModelID);
@@ -105,12 +138,51 @@ public class UIManager : MonoBehaviour
     private void OnRedoButtonPressed() { if (historyManager != null) historyManager.Redo(); }
     private void OnResetCropButtonPressed() { if (cuttingPlaneManager != null) cuttingPlaneManager.ResetCrop(); }
     private void OnResetViewButtonPressed() { if (mockedModelController != null) mockedModelController.ResetState(); }
-    private void OnToggleAxesPressed() { currentAxesState = !currentAxesState; if (mockedModelController != null) mockedModelController.SetAxesVisibility(currentAxesState); WebSocketClientManager ws = FindObjectOfType<WebSocketClientManager>(); if (ws != null) ws.SendToggleAxes(currentAxesState); }
+
+    private void OnToggleAxesPressed()
+    {
+        currentAxesState = !currentAxesState;
+        if (mockedModelController != null) mockedModelController.SetAxesVisibility(currentAxesState);
+        if (wsManager != null) wsManager.SendToggleAxes(currentAxesState);
+    }
+
     private void ToggleInfoPanel() { if (infoPanel != null) { bool isOpening = !infoPanel.activeSelf; infoPanel.SetActive(isOpening); if (inputManagerRef != null) inputManagerRef.enabled = !isOpening; } }
     private void HideAllPanelsAndPopups() { if (connectionPanel != null) connectionPanel.SetActive(false); if (mainMenuPanel != null) mainMenuPanel.SetActive(false); if (modelViewPanel != null) modelViewPanel.SetActive(false); if (infoPanel != null) infoPanel.SetActive(false); }
     private void DeactivateInteractionSystems() { if (mockedModelController != null) { mockedModelController.SetModelVisibility(false); mockedModelController.gameObject.SetActive(false); } if (inputManagerRef != null) inputManagerRef.enabled = false; }
     public void ShowConnectionPanel() { HideAllPanelsAndPopups(); DeactivateInteractionSystems(); if (connectionPanel != null) connectionPanel.SetActive(true); }
     public void ShowLoadingScreenOrMinimalStatus() { HideAllPanelsAndPopups(); if (connectionPanel != null) connectionPanel.SetActive(true); DeactivateInteractionSystems(); }
     public void ShowMainMenuPanel() { HideAllPanelsAndPopups(); DeactivateInteractionSystems(); if (mainMenuPanel != null) mainMenuPanel.SetActive(true); }
-    public void ShowModelViewPanel() { HideAllPanelsAndPopups(); if (modelViewPanel != null) modelViewPanel.SetActive(true); if (mockedModelController != null) { mockedModelController.gameObject.SetActive(true); mockedModelController.SetModelVisibility(true); mockedModelController.EnsureAxisVisualsAreCreated(); } if (inputManagerRef != null) inputManagerRef.enabled = true; }
+
+    public void ShowModelViewPanel()
+    {
+        HideAllPanelsAndPopups();
+        if (modelViewPanel != null) modelViewPanel.SetActive(true);
+
+        // 1. Reset Internal State
+        currentAxesState = true;
+
+        // 2. Reset Proxy Controller
+        if (mockedModelController != null)
+        {
+            mockedModelController.gameObject.SetActive(true);
+            mockedModelController.SetModelVisibility(true);
+            mockedModelController.EnsureAxisVisualsAreCreated();
+            mockedModelController.SetAxesVisibility(true); // Force Axes On
+        }
+
+        // 3. Reset Input
+        if (inputManagerRef != null)
+        {
+            inputManagerRef.enabled = true;
+            inputManagerRef.SetInteractionEnabled(true); // Force Input On
+        }
+
+        // 4. Reset Density Panel
+        if (densityControlPanel != null) densityControlPanel.SetActive(false);
+        if (minDensitySlider != null) minDensitySlider.SetValueWithoutNotify(0f);
+        if (maxDensitySlider != null) maxDensitySlider.SetValueWithoutNotify(1f);
+
+        // 5. Send Reset Sync to Server (in case server was left with axes off)
+        if (wsManager != null) wsManager.SendToggleAxes(true);
+    }
 }
