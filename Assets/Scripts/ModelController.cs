@@ -79,6 +79,27 @@ public class ModelController : MonoBehaviour, IModelViewer
     {
         if (Application.isPlaying) SetVolumeDensity(volumeMinVal, volumeMaxVal);
     }
+
+    void LateUpdate()
+    {
+        UpdateAxisScale();
+    }
+
+    private void UpdateAxisScale()
+    {
+        if (axesContainer == null || serverCamera == null) return;
+
+        float distance = Vector3.Distance(serverCamera.transform.position, axesContainer.transform.position);
+
+        if (serverCamera.orthographic)
+        {
+            distance = serverCamera.orthographicSize * 2f;
+        }
+
+        // Apply the same constant factor
+        axesContainer.transform.localScale = Vector3.one * (distance * Constants.AXIS_SCREEN_SCALE);
+    }
+
     public void RemoveModel(string modelID)
     {
         if (availableModels == null) return;

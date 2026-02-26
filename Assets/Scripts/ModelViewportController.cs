@@ -76,6 +76,24 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         {
             axesContainer.transform.rotation = modelReferencePoint.rotation;
         }
+        UpdateAxisScale();
+    }
+    private void UpdateAxisScale()
+    {
+        if (axesContainer == null || referenceCamera == null) return;
+
+        // Calculate distance from camera to axes
+        float distance = Vector3.Distance(referenceCamera.transform.position, axesContainer.transform.position);
+
+        // If using an Orthographic camera, use orthographicSize instead of distance
+        if (referenceCamera.orthographic)
+        {
+            distance = referenceCamera.orthographicSize * 2f;
+        }
+
+        // Apply scale: as distance decreases (zoom in), container scale decreases, 
+        // keeping visual size constant.
+        axesContainer.transform.localScale = Vector3.one * (distance * Constants.AXIS_SCREEN_SCALE);
     }
 
     public void SetAxesVisibility(bool visible)

@@ -25,8 +25,6 @@ public static class Constants
     public const float ZOOM_SENSITIVITY = 0.003f;
     public const float ZOOM_MAX_DISTANCE = 500f;
     public const float ROLL_SENSITIVITY = 1f;
-    public const float SCALE_MIN = 0.00001f;
-    public const float SCALE_MAX = 10000.0f;
     public const float PRESET_VIEW_ROTATION_STEP = 60f;
     public const float PRESET_VIEW_ANIMATION_DURATION = 0.4f;
     public const float AUTO_ROTATION_SPEED = 40f;
@@ -55,6 +53,7 @@ public static class Constants
     public const float POLYGONAL_DROPDOWN_INDEX = 1;
     public const float VOLUMETRIC_DROPDOWN_INDEX = 0;
     public const float VOLUMETRIC_PROXY_SCALE = 0.5f;
+    public const float AXIS_SCREEN_SCALE = 0.2f;
 
 
     //commands
