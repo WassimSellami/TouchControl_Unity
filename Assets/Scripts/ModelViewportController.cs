@@ -370,13 +370,12 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     }
     private void SetupReferencePoint(GameObject rootModelObj)
     {
-        // Reference point is the object itself, effectively 0,0,0 of the parent
         modelReferencePoint = worldContainer.transform;
     }
 
     public void EnsureAxisVisualsAreCreated()
     {
-        if (!this.gameObject.activeInHierarchy || modelReferencePoint == null)
+        if (modelReferencePoint == null)
             return;
 
         if (!axesCreated)
@@ -384,7 +383,12 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
             CreateAxisVisuals();
             axesCreated = true;
         }
-        axesContainer.SetActive(axesVisible);
+
+        if (axesContainer != null)
+        {
+            axesContainer.SetActive(axesVisible);
+            UpdateAxisScale();
+        }
     }
 
     private void CreateAxisVisuals()

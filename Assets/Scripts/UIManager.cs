@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System.Collections;
 
 public class UIManager : MonoBehaviour
 {
@@ -157,6 +158,7 @@ public class UIManager : MonoBehaviour
     {
         HideAllPanelsAndPopups();
         if (modelViewPanel != null) modelViewPanel.SetActive(true);
+        StartCoroutine(InitializeModelViewRoutine());
 
         // 1. Reset Internal State
         currentAxesState = true;
@@ -185,4 +187,27 @@ public class UIManager : MonoBehaviour
         // 5. Send Reset Sync to Server (in case server was left with axes off)
         if (wsManager != null) wsManager.SendToggleAxes(true);
     }
+    private IEnumerator InitializeModelViewRoutine()
+    {
+        yield return null; // Wait one frame for the build to activate objects
+
+        currentAxesState = true;
+
+        if (mockedModelController != null)
+        {
+            mockedModelController.gameObject.SetActive(true);
+            mockedModelController.SetModelVisibility(true);
+            mockedModelController.ResetState(); // This calls EnsureAxisVisualsAreCreated
+            mockedModelController.SetAxesVisibility(true);
+        }
+
+        if (inputManagerRef != null)
+        {
+            inputManagerRef.enabled = true;
+            inputManagerRef.SetInteractionEnabled(true);
+        }
+
+        if (wsManager != null) wsManager.SendToggleAxes(true);
+    }
+
 }

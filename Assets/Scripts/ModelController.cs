@@ -161,47 +161,54 @@ public class ModelController : MonoBehaviour, IModelViewer
 
     private IEnumerator LoadModelRoutine(string modelId)
     {
+        // 1. Hide the Server List immediately
+        ServerModelUIPanel serverUI = FindObjectOfType<ServerModelUIPanel>();
+        if (serverUI != null) serverUI.SetListVisibility(false);
+
         UnloadCurrentModel();
         if (!modelDataLookup.TryGetValue(modelId, out ModelData modelData)) yield break;
 
+        // 2. Show the Loading Spinner
         if (loadingUI != null) loadingUI.Show(modelData.displayName);
 
-        // Wait one frame so the Spinner/Loading UI can actually appear before the main thread gets heavy
+        // 3. CRITICAL: Wait two frames. 
+        // Frame 1: UI starts the change. 
+        // Frame 2: Unity renders the change to the screen.
         yield return null;
+        yield return new WaitForEndOfFrame();
 
-        SetupContainers();
-        CurrentModelID = modelId;
-
-        // ModelLoader.Load is synchronous, but by putting it in a coroutine after a yield, 
-        // the server UI shows the spinner first.
-        GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
-
-        if (root != null)
+        try
         {
-            rootModel = root;
-            rootModel.name = "RootModel";
-            allParts.Add(rootModel.name, rootModel);
-            AlignToCorner(rootModel);
-            GenerateAndBroadcastProxy(modelId);
+            SetupContainers();
+            CurrentModelID = modelId;
 
-            volumeMinVal = 0.0f;
-            volumeMaxVal = 1.0f;
-            SetVolumeDensity(volumeMinVal, volumeMaxVal);
+            // Now the CPU can be heavy, the UI is already drawn
+            GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
+
+            if (root != null)
+            {
+                rootModel = root;
+                rootModel.name = "RootModel";
+                allParts.Add(rootModel.name, rootModel);
+                AlignToCorner(rootModel);
+                GenerateAndBroadcastProxy(modelId);
+                SetVolumeDensity(0, 1);
+            }
+
+            showServerAxes = true;
+            SetupVisualHelpers();
+        }
+        finally
+        {
+            if (loadingUI != null) loadingUI.Hide();
+            loadCoroutine = null;
         }
 
-        showServerAxes = true;
-        SetupVisualHelpers();
-
-        if (loadingUI != null) loadingUI.Hide();
-
-        // Notify client load is complete
         if (wsManager != null)
         {
             wsManager.BroadcastModelLoaded(modelId);
             wsManager.SendModelSizeUpdate(CurrentModelBoundsSize);
         }
-
-        loadCoroutine = null;
     }
 
     public void UnloadCurrentModel()
@@ -416,15 +423,39 @@ public class ModelController : MonoBehaviour, IModelViewer
     private void AlignToCorner(GameObject rootModel) { Bounds b = SliceUtility.GetFullBounds(rootModel); CurrentModelBoundsSize = b.size; rootModel.transform.localPosition = -b.center; currentModelCenterOffset = -b.extents; modelReferencePoint = rootModel.transform; }
     private void SetupVisualHelpers()
     {
-        if (planeVisualizerPrefab != null) { activePlaneVisualizer = Instantiate(planeVisualizerPrefab, worldContainer.transform, false); activePlaneVisualizer.SetActive(false); }
-        if (lineRendererPrefab != null) { activeLineRenderer = Instantiate(lineRendererPrefab, worldContainer.transform, false).GetComponent<LineRenderer>(); activeLineRenderer.enabled = false; }
-        if (axesContainer != null)
+        if (axesContainer == null) return;
+
+        ClearCurrentModelAxisVisuals();
+        axesContainer.transform.localPosition = currentModelCenterOffset;
+
+        // Use "Legacy Shaders/Diffuse" or "Standard" but check for null
+        Shader axisShader = Shader.Find("Hidden/Internal-Colored"); // This is always in builds
+        if (axisShader == null) axisShader = Shader.Find("Standard");
+
+        Material matX = new Material(axisShader) { color = Color.red };
+        Material matY = new Material(axisShader) { color = Color.green };
+        Material matZ = new Material(axisShader) { color = Color.blue };
+
+        currentModelAxisVisuals = AxisGenerator.CreateAxes(
+            axesContainer.transform,
+            Constants.AXIS_LENGTH,
+            Constants.AXIS_THICKNESS,
+            Vector3.zero,
+            matX, matY, matZ
+        );
+
+        // Initial Scale Fix: Ensure distance is never 0
+        float distance = 10f;
+        if (serverCamera != null)
         {
-            axesContainer.SetActive(showServerAxes); axesContainer.transform.localPosition = currentModelCenterOffset;
-            Material matX = new Material(Shader.Find("Unlit/Color")) { color = Color.red }; Material matY = new Material(Shader.Find("Unlit/Color")) { color = Color.green }; Material matZ = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
-            currentModelAxisVisuals = AxisGenerator.CreateAxes(axesContainer.transform, Constants.AXIS_LENGTH, Constants.AXIS_THICKNESS, Vector3.zero, matX, matY, matZ);
+            distance = Vector3.Distance(serverCamera.transform.position, axesContainer.transform.position);
+            if (distance <= 0) distance = 10f;
         }
+
+        axesContainer.transform.localScale = Vector3.one * (distance * Constants.AXIS_SCREEN_SCALE);
+        axesContainer.SetActive(showServerAxes);
     }
+
     private void ShowLocalServerIcon(Vector3 worldPos, Sprite icon) { if (feedbackIconImage == null || serverCamera == null || uiCanvasRectTransform == null) return; Vector3 screenPoint = serverCamera.WorldToScreenPoint(worldPos); if (screenPoint.z < 0) return; feedbackIconImage.sprite = icon; InteractionUtility.PositionIcon(feedbackIconImage, (Vector2)screenPoint, uiCanvasRectTransform, null, false); }
     private string SpriteToBase64(Sprite sprite) { if (sprite == null) return string.Empty; try { Texture2D texture = sprite.texture; RenderTexture tmp = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear); Graphics.Blit(texture, tmp); RenderTexture previous = RenderTexture.active; RenderTexture.active = tmp; Texture2D readableTexture = new Texture2D(texture.width, texture.height); readableTexture.ReadPixels(new Rect(0, 0, tmp.width, tmp.height), 0, 0); readableTexture.Apply(); RenderTexture.active = previous; RenderTexture.ReleaseTemporary(tmp); byte[] bytes = readableTexture.EncodeToPNG(); string base64 = Convert.ToBase64String(bytes); Destroy(readableTexture); return base64; } catch { return string.Empty; } }
     private enum ActionType { Slice, Destroy }

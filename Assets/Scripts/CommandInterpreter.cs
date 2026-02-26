@@ -49,9 +49,13 @@ public class CommandInterpreter : MonoBehaviour
                 break;
 
             case Constants.LOAD_MODEL:
+                // Ensure we find the panel even if Start() missed it
+                if (serverUIPanel == null) serverUIPanel = FindObjectOfType<ServerModelUIPanel>();
+
                 if (serverUIPanel != null)
                 {
                     serverUIPanel.SetListVisibility(false);
+                    serverUIPanel.ClosePanel(); // Force close the "Add Model" popup too
                 }
                 ProcessLoadModelCommand(args);
                 break;
