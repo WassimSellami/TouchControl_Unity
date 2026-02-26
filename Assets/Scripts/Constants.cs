@@ -50,8 +50,10 @@ public static class Constants
     public const float ICON_VERTICAL_OFFSET_PERCENT = 0.05f;
 
     // server
-    public const float WIGGLE_ANGLE = 5f;
+    public const float WIGGLE_ANGLE = 2f;
     public const float WIGGLE_SPEED = 50f;
+    public const float POLYGONAL_DROPDOWN_INDEX = 1;
+    public const float VOLUMETRIC_DROPDOWN_INDEX = 0;
 
 
     //commands

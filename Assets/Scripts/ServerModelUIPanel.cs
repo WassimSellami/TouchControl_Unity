@@ -88,7 +88,7 @@ public class ServerModelUIPanel : MonoBehaviour
 
     private void SelectFile()
     {
-        bool isVol = (typeDropdown.value == 0);
+        bool isVol = (typeDropdown.value == Constants.VOLUMETRIC_DROPDOWN_INDEX);
         string filter = isVol ? "Volume Files\0*.nii;*.nii.gz;*.nrrd;*.nhdr;*.dcm;*.raw;*.dat;*.vol;*.vgi\0All\0*.*\0\0" : "OBJ\0*.obj\0All\0*.*\0\0";
 
         string path = FileBrowserHelper.OpenFile("Select File", filter);
@@ -214,7 +214,7 @@ public class ServerModelUIPanel : MonoBehaviour
         }
 
         ModelData newData;
-        if (typeDropdown.value == 0)
+        if (typeDropdown.value == Constants.POLYGONAL_DROPDOWN_INDEX)
         {
             var p = ScriptableObject.CreateInstance<PolygonalModelData>();
             p.modelFilePath = currentFilePath;
