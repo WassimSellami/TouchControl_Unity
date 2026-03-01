@@ -24,6 +24,10 @@ public class ModelController : MonoBehaviour, IModelViewer
     [SerializeField] private Sprite sliceIconSprite;
     [SerializeField] private Image feedbackIconImage;
     [SerializeField] private GameObject lineRendererPrefab;
+    [SerializeField] private float sliceLineBaseWidth = 0.01f;   // tune in Inspector
+    [SerializeField] private float sliceLineReferenceDistance = 1.0f;
+    [SerializeField] private float sliceLineMinWidth = 0.001f;
+    [SerializeField] private float sliceLineMaxWidth = 0.05f;
     private GameObject modelContainer;
 
     private readonly Dictionary<string, ModelData> modelDataLookup = new();
@@ -71,11 +75,7 @@ public class ModelController : MonoBehaviour, IModelViewer
     {
         LoadRegistry();
         RefreshModelLookup();
-        if (feedbackIconImage != null)
-        {
-            feedbackIconImage.gameObject.SetActive(false);
-            feedbackIconImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        }
+        LoadLineRendererAndFeedbackIcon();
         wsManager = FindObjectOfType<WebSocketServerManager>();
     }
 
@@ -88,6 +88,25 @@ public class ModelController : MonoBehaviour, IModelViewer
     private void LateUpdate()
     {
         UpdateAxisScale();
+    }
+
+    private void LoadLineRendererAndFeedbackIcon()
+    {
+        if (feedbackIconImage != null)
+        {
+            feedbackIconImage.gameObject.SetActive(false);
+            feedbackIconImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        }
+        if (lineRendererPrefab != null && activeLineRenderer == null)
+        {
+            GameObject lineObj = Instantiate(lineRendererPrefab, transform);
+            activeLineRenderer = lineObj.GetComponent<LineRenderer>();
+            if (activeLineRenderer != null)
+            {
+                activeLineRenderer.positionCount = 0;
+                activeLineRenderer.enabled = false;
+            }
+        }
     }
 
     private void UpdateAxisScale()
@@ -195,6 +214,17 @@ public class ModelController : MonoBehaviour, IModelViewer
         try
         {
             SetupContainers();
+            if (lineRendererPrefab != null && activeLineRenderer == null)
+            {
+                GameObject lineObj = GameObject.Instantiate(lineRendererPrefab, worldContainer != null ? worldContainer.transform : this.transform);
+                activeLineRenderer = lineObj.GetComponent<LineRenderer>();
+                if (activeLineRenderer != null)
+                {
+                    activeLineRenderer.positionCount = 0;
+                    activeLineRenderer.enabled = false;
+                }
+            }
+
             CurrentModelID = modelId;
 
             GameObject root = ModelLoader.Load(modelData, modelContainer.transform, volumetricSliceMaterial);
@@ -224,6 +254,36 @@ public class ModelController : MonoBehaviour, IModelViewer
             wsManager.BroadcastModelLoaded(modelId);
             wsManager.SendModelSizeUpdate(CurrentModelBoundsSize);
         }
+    }
+
+    private void UpdateSliceLineWidth(Vector3 start, Vector3 end)
+    {
+        if (activeLineRenderer == null || serverCamera == null)
+            return;
+
+        // Midpoint of the line in world space
+        Vector3 mid = (start + end) * 0.5f;
+
+        float distance;
+
+        if (serverCamera.orthographic)
+        {
+            // For orthographic, use orthographicSize as a pseudo-distance
+            distance = Mathf.Max(0.0001f, serverCamera.orthographicSize);
+        }
+        else
+        {
+            // Perspective: distance from camera to line midpoint
+            distance = Mathf.Max(0.0001f, Vector3.Distance(serverCamera.transform.position, mid));
+        }
+
+        // Scale inversely with distance so it looks constant on screen
+        float scale = sliceLineReferenceDistance / distance;
+        float width = sliceLineBaseWidth * scale;
+
+        width = Mathf.Clamp(width, sliceLineMinWidth, sliceLineMaxWidth);
+
+        activeLineRenderer.widthMultiplier = width;
     }
 
     public void UnloadCurrentModel()
@@ -556,7 +616,9 @@ public class ModelController : MonoBehaviour, IModelViewer
         activeLineRenderer.positionCount = 2;
         activeLineRenderer.SetPosition(0, start);
         activeLineRenderer.SetPosition(1, end);
+        UpdateSliceLineWidth(start, end);
     }
+
     public void UpdateVisualCropPlane(Vector3 position, Vector3 normal, float scale)
     {
         if (activePlaneVisualizer == null)
