@@ -1,5 +1,5 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
 
 public static class AxisGenerator
 {
@@ -74,8 +74,12 @@ public static class AxisGenerator
             int bottomCurrent = segments + 1 + i;
             int bottomNext = segments + 1 + i + 1;
 
-            triangles.Add(current); triangles.Add(next); triangles.Add(bottomCurrent);
-            triangles.Add(bottomCurrent); triangles.Add(next); triangles.Add(bottomNext);
+            triangles.Add(current);
+            triangles.Add(next);
+            triangles.Add(bottomCurrent);
+            triangles.Add(bottomCurrent);
+            triangles.Add(next);
+            triangles.Add(bottomNext);
         }
 
         mesh.vertices = vertices;

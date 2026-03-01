@@ -1,10 +1,13 @@
-using UnityEngine;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 public class DestroyCommand : ICommand
 {
-    public string ActionID { get; private set; }
+    public string ActionID
+    {
+        get; private set;
+    }
     private GameObject objectToDestroy;
     private List<GameObject> activePartsList;
     private WebSocketClientManager webSocketClientManager;
@@ -32,7 +35,7 @@ public class DestroyCommand : ICommand
 
             if (webSocketClientManager != null && !string.IsNullOrEmpty(targetPartID))
             {
-                var destroyData = new DestroyActionData
+                DestroyActionData destroyData = new DestroyActionData
                 {
                     actionID = this.ActionID,
                     targetPartID = this.targetPartID
@@ -54,5 +57,7 @@ public class DestroyCommand : ICommand
         }
     }
 
-    public void CleanUp() { }
+    public void CleanUp()
+    {
+    }
 }

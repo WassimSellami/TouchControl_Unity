@@ -1,6 +1,6 @@
+using System.IO;
 using UnityEngine;
 using UnityVolumeRendering;
-using System.IO;
 
 public class VolumetricSceneController : MonoBehaviour
 {
@@ -24,12 +24,12 @@ public class VolumetricSceneController : MonoBehaviour
     private VolumeRenderedObject loadedVolumeObj;
     private Vector2 touchStartPos;
 
-    void Start()
+    private void Start()
     {
         LoadVolume();
     }
 
-    void Update()
+    private void Update()
     {
         HandleInput();
     }
@@ -81,9 +81,10 @@ public class VolumetricSceneController : MonoBehaviour
         transform.localScale = newScale;
     }
 
-    void LoadVolume()
+    private void LoadVolume()
     {
-        if (!File.Exists(rawFilePath)) return;
+        if (!File.Exists(rawFilePath))
+            return;
 
         RawDatasetImporter importer = new RawDatasetImporter(
             rawFilePath, dimX, dimY, dimZ, contentFormat, endianness, bytesToSkip
@@ -102,20 +103,22 @@ public class VolumetricSceneController : MonoBehaviour
         ApplyMaterialRecursive(loadedVolumeObj.gameObject);
     }
 
-    void ApplyMaterialRecursive(GameObject root)
+    private void ApplyMaterialRecursive(GameObject root)
     {
         Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
         foreach (Renderer rend in renderers)
         {
-            if (sliceMaterial != null) rend.sharedMaterial = sliceMaterial;
+            if (sliceMaterial != null)
+                rend.sharedMaterial = sliceMaterial;
             rend.sharedMaterial.SetVector("_PlanePos", new Vector3(-10, -10, -10));
             rend.sharedMaterial.SetVector("_PlaneNormal", Vector3.up);
         }
     }
 
-    void TryExecuteSlice(Vector2 start, Vector2 end, Vector2 swipeVector)
+    private void TryExecuteSlice(Vector2 start, Vector2 end, Vector2 swipeVector)
     {
-        if (loadedVolumeObj == null) return;
+        if (loadedVolumeObj == null)
+            return;
 
         Vector2 midPoint = (start + end) / 2f;
         Ray ray = Camera.main.ScreenPointToRay(midPoint);
@@ -127,7 +130,7 @@ public class VolumetricSceneController : MonoBehaviour
         }
     }
 
-    void ExecuteSliceAtPoint(Vector3 worldHitPoint, Vector2 swipeVector, GameObject hitTarget)
+    private void ExecuteSliceAtPoint(Vector3 worldHitPoint, Vector2 swipeVector, GameObject hitTarget)
     {
         GameObject originalGO = loadedVolumeObj.gameObject;
         Vector2 swipeDir = swipeVector.normalized;
@@ -155,13 +158,14 @@ public class VolumetricSceneController : MonoBehaviour
         loadedVolumeObj = null;
     }
 
-    void ApplyCutToHierarchy(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
+    private void ApplyCutToHierarchy(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
     {
         Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
         foreach (Renderer rend in renderers)
         {
             Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal);
-            if (invertNormal) localNormal = -localNormal;
+            if (invertNormal)
+                localNormal = -localNormal;
 
             Material mat = new Material(rend.sharedMaterial);
             mat.SetVector("_PlanePos", texturePoint);

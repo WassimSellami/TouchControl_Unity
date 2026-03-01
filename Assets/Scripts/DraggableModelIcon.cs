@@ -1,6 +1,6 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using System;
 
 public class DraggableModelIcon : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -15,15 +15,16 @@ public class DraggableModelIcon : MonoBehaviour, IBeginDragHandler, IDragHandler
     private Vector2 lastPos;
     private bool isGliding = false;
 
-    void Awake()
+    private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
         canvas = GetComponentInParent<Canvas>();
         canvasGroup = GetComponent<CanvasGroup>();
-        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        if (canvasGroup == null)
+            canvasGroup = gameObject.AddComponent<CanvasGroup>();
     }
 
-    void Update()
+    private void Update()
     {
         if (isGliding)
         {
@@ -32,7 +33,8 @@ public class DraggableModelIcon : MonoBehaviour, IBeginDragHandler, IDragHandler
 
             if (!IsOnScreen() || velocity.sqrMagnitude < Constants.MODEL_THUMBNAIL_RESET_VELOCITY)
             {
-                if (!IsOnScreen()) OnModelDropped?.Invoke(ModelID);
+                if (!IsOnScreen())
+                    OnModelDropped?.Invoke(ModelID);
                 ResetPosition();
             }
         }
@@ -48,7 +50,8 @@ public class DraggableModelIcon : MonoBehaviour, IBeginDragHandler, IDragHandler
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (canvas == null) return;
+        if (canvas == null)
+            return;
         rectTransform.anchoredPosition += eventData.delta / canvas.scaleFactor;
         velocity = (eventData.position - lastPos) / Time.deltaTime;
         lastPos = eventData.position;

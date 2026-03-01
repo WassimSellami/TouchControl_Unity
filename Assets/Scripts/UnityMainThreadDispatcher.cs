@@ -1,6 +1,6 @@
-using UnityEngine;
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class UnityMainThreadDispatcher : MonoBehaviour
 {
@@ -21,7 +21,7 @@ public class UnityMainThreadDispatcher : MonoBehaviour
         return _instance;
     }
 
-    void Awake()
+    private void Awake()
     {
         if (_instance == null)
         {
@@ -34,7 +34,7 @@ public class UnityMainThreadDispatcher : MonoBehaviour
         }
     }
 
-    void Update()
+    private void Update()
     {
         lock (_executionQueue)
         {

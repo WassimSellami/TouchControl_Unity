@@ -2,7 +2,10 @@ using UnityEngine;
 
 public interface ICommand
 {
-    string ActionID { get; }
+    string ActionID
+    {
+        get;
+    }
     void Execute();
     void Undo();
     void CleanUp();
@@ -26,5 +29,8 @@ public interface IModelManipulator : IModelViewer
     void ProcessRoll(float angleDelta);
     void ResetOrbitLock();
     void TriggerPresetViewRotation(float direction);
-    bool IsAutoRotating { get; }
+    bool IsAutoRotating
+    {
+        get;
+    }
 }

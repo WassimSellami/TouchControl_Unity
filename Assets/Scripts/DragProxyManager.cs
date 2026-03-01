@@ -3,21 +3,22 @@ using UnityEngine.UI;
 
 public class DragProxyManager : MonoBehaviour
 {
-    [Header("Assign in Inspector")]
     public Image proxyImage;
     public RectTransform proxyRect;
 
     private Canvas parentCanvas;
 
-    void Awake()
+    private void Awake()
     {
         parentCanvas = GetComponent<Canvas>();
-        if (proxyImage != null) proxyImage.gameObject.SetActive(false);
+        if (proxyImage != null)
+            proxyImage.gameObject.SetActive(false);
     }
 
     public void StartDrag(Sprite icon)
     {
-        if (proxyImage == null) return;
+        if (proxyImage == null)
+            return;
 
         proxyImage.sprite = icon;
         proxyImage.gameObject.SetActive(true);
@@ -26,7 +27,8 @@ public class DragProxyManager : MonoBehaviour
 
     public void UpdateDragPosition(Vector2 screenPosition)
     {
-        if (proxyImage == null || parentCanvas == null) return;
+        if (proxyImage == null || parentCanvas == null)
+            return;
 
         Vector2 localPos;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -40,6 +42,7 @@ public class DragProxyManager : MonoBehaviour
 
     public void EndDrag()
     {
-        if (proxyImage != null) proxyImage.gameObject.SetActive(false);
+        if (proxyImage != null)
+            proxyImage.gameObject.SetActive(false);
     }
 }

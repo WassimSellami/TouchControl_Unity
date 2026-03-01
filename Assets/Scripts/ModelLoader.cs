@@ -1,15 +1,17 @@
+using System.IO;
 using UnityEngine;
 using UnityVolumeRendering;
-using System.IO;
 public static class ModelLoader
 {
     public static GameObject Load(ModelData data, Transform parent, Material volMaterial)
     {
-        if (data is PolygonalModelData poly) return LoadPolygonal(poly, parent);
-        if (data is VolumetricModelData vol) return LoadVolumetric(vol, parent, volMaterial);
+        if (data is PolygonalModelData poly)
+            return LoadPolygonal(poly, parent);
+        if (data is VolumetricModelData vol)
+            return LoadVolumetric(vol, parent, volMaterial);
         return null;
     }
-private static GameObject LoadPolygonal(PolygonalModelData data, Transform parent)
+    private static GameObject LoadPolygonal(PolygonalModelData data, Transform parent)
     {
         GameObject loadedObject = null;
 
@@ -50,8 +52,10 @@ private static GameObject LoadPolygonal(PolygonalModelData data, Transform paren
         IImageFileImporter nativeImporter = null;
 
         string ext = Path.GetExtension(filePath).ToLower();
-        if (ext == ".nii" || filePath.ToLower().EndsWith(".nii.gz")) nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
-        else if (ext == ".nrrd" || ext == ".nhdr") nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
+        if (ext == ".nii" || filePath.ToLower().EndsWith(".nii.gz"))
+            nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
+        else if (ext == ".nrrd" || ext == ".nhdr")
+            nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
 
         if (nativeImporter != null)
         {
@@ -65,7 +69,8 @@ private static GameObject LoadPolygonal(PolygonalModelData data, Transform paren
             dataset = rawImporter.Import();
         }
 
-        if (dataset == null) return null;
+        if (dataset == null)
+            return null;
 
         VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
         volObj.transform.SetParent(parent, false);
@@ -106,10 +111,12 @@ private static GameObject LoadPolygonal(PolygonalModelData data, Transform paren
 
     private static string ResolvePath(string rawPath)
     {
-        if (Path.IsPathRooted(rawPath) && File.Exists(rawPath)) return rawPath;
+        if (Path.IsPathRooted(rawPath) && File.Exists(rawPath))
+            return rawPath;
         string fileName = Path.GetFileName(rawPath);
         string streamingPath = Path.Combine(Application.streamingAssetsPath, fileName);
-        if (File.Exists(streamingPath)) return streamingPath;
+        if (File.Exists(streamingPath))
+            return streamingPath;
         return rawPath;
     }
 }

@@ -1,9 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System;
-using System.IO;
-using System.Collections.Generic;
 using UnityVolumeRendering;
 public class ServerModelUIPanel : MonoBehaviour
 {
@@ -12,7 +12,7 @@ public class ServerModelUIPanel : MonoBehaviour
     [SerializeField] private GameObject serverListRoot;
     [SerializeField] private GameObject confirmationPopup;
     [Header("Add Model Form Fields")]
-[SerializeField] private TMP_InputField displayNameInput;
+    [SerializeField] private TMP_InputField displayNameInput;
     [SerializeField] private TMP_Dropdown typeDropdown;
     [SerializeField] private TMP_Text filePathText;
     [SerializeField] private TMP_Text fileSizeText;
@@ -61,7 +61,7 @@ public class ServerModelUIPanel : MonoBehaviour
         AssetTile.OnTileSelected -= HandleTileSelection;
     }
 
-    void Start()
+    private void Start()
     {
         InitializeUI();
         RefreshList();
@@ -69,9 +69,12 @@ public class ServerModelUIPanel : MonoBehaviour
 
     private void InitializeUI()
     {
-        if (panelRoot) panelRoot.SetActive(false);
-        if (volumetricContainer) volumetricContainer.SetActive(false);
-        if (confirmationPopup) confirmationPopup.SetActive(false);
+        if (panelRoot)
+            panelRoot.SetActive(false);
+        if (volumetricContainer)
+            volumetricContainer.SetActive(false);
+        if (confirmationPopup)
+            confirmationPopup.SetActive(false);
 
         closePanelButton.onClick.AddListener(ClosePanel);
         selectFileButton.onClick.AddListener(SelectFile);
@@ -92,7 +95,8 @@ public class ServerModelUIPanel : MonoBehaviour
         string filter = isVol ? "Volume Files\0*.nii;*.nii.gz;*.nrrd;*.nhdr;*.dcm;*.raw;*.dat;*.vol;*.vgi\0All\0*.*\0\0" : "OBJ\0*.obj\0All\0*.*\0\0";
 
         string path = FileBrowserHelper.OpenFile("Select File", filter);
-        if (string.IsNullOrEmpty(path)) return;
+        if (string.IsNullOrEmpty(path))
+            return;
 
         currentFilePath = path;
         filePathText.text = Path.GetFileName(path);
@@ -103,8 +107,10 @@ public class ServerModelUIPanel : MonoBehaviour
             string ext = Path.GetExtension(path).ToLower();
             IImageFileImporter nativeImporter = null;
 
-            if (ext == ".nii" || path.ToLower().EndsWith(".nii.gz")) nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
-            else if (ext == ".nrrd" || ext == ".nhdr") nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
+            if (ext == ".nii" || path.ToLower().EndsWith(".nii.gz"))
+                nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
+            else if (ext == ".nrrd" || ext == ".nhdr")
+                nativeImporter = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
             if (nativeImporter != null)
             {
                 statusText.text = $"Native UVR format detected: {Path.GetExtension(path).ToUpper()}";
@@ -125,8 +131,10 @@ public class ServerModelUIPanel : MonoBehaviour
         string ext = Path.GetExtension(path).ToLower();
         long totalBytes = new FileInfo(path).Length;
 
-        if (ext == ".dat" && TryParseDatText(path)) return;
-        if (TryGuessDimensions(totalBytes)) return;
+        if (ext == ".dat" && TryParseDatText(path))
+            return;
+        if (TryGuessDimensions(totalBytes))
+            return;
 
         statusText.text = "Format unknown. Please enter dimensions manually.";
     }
@@ -143,7 +151,7 @@ public class ServerModelUIPanel : MonoBehaviour
                 {
                     if (line.StartsWith("Resolution"))
                     {
-                        var parts = line.Split(new[] { ':', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] parts = line.Split(new[] { ':', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                         SetDimensionFields(int.Parse(parts[1]), int.Parse(parts[2]), int.Parse(parts[3]));
                         statusText.text = "Detected .DAT Text Metadata";
                         return true;
@@ -162,16 +170,26 @@ public class ServerModelUIPanel : MonoBehaviour
         {
             long v8 = (long)s * s * s;
             long v16 = v8 * 2;
-            if (length >= v8 && length < v8 + 2048) { SetDimensionFields(s, s, s); return true; }
-            if (length >= v16 && length < v16 + 2048) { SetDimensionFields(s, s, s); return true; }
+            if (length >= v8 && length < v8 + 2048)
+            {
+                SetDimensionFields(s, s, s);
+                return true;
+            }
+            if (length >= v16 && length < v16 + 2048)
+            {
+                SetDimensionFields(s, s, s);
+                return true;
+            }
         }
         return false;
     }
 
     private void AutoAnalyzeFormat()
     {
-        if (string.IsNullOrEmpty(currentFilePath)) return;
-        if (!int.TryParse(dimXInput.text, out int x) || !int.TryParse(dimYInput.text, out int y) || !int.TryParse(dimZInput.text, out int z)) return;
+        if (string.IsNullOrEmpty(currentFilePath))
+            return;
+        if (!int.TryParse(dimXInput.text, out int x) || !int.TryParse(dimYInput.text, out int y) || !int.TryParse(dimZInput.text, out int z))
+            return;
 
         long totalBytes = new FileInfo(currentFilePath).Length;
         long voxelCount = (long)x * y * z;
@@ -187,7 +205,8 @@ public class ServerModelUIPanel : MonoBehaviour
             detectedSkip = (int)(totalBytes - voxelCount);
         }
 
-        if (detectedSkip < 0) detectedSkip = 0;
+        if (detectedSkip < 0)
+            detectedSkip = 0;
         statusText.text = $"Auto-Config: {detectedFormat}, Skip: {detectedSkip} bytes";
     }
 
@@ -216,13 +235,13 @@ public class ServerModelUIPanel : MonoBehaviour
         ModelData newData;
         if (typeDropdown.value == Constants.POLYGONAL_DROPDOWN_INDEX)
         {
-            var p = ScriptableObject.CreateInstance<PolygonalModelData>();
+            PolygonalModelData p = ScriptableObject.CreateInstance<PolygonalModelData>();
             p.modelFilePath = currentFilePath;
             newData = p;
         }
         else
         {
-            var v = ScriptableObject.CreateInstance<VolumetricModelData>();
+            VolumetricModelData v = ScriptableObject.CreateInstance<VolumetricModelData>();
             v.rawFilePath = currentFilePath;
 
             if (volumetricContainer.activeSelf)
@@ -274,12 +293,16 @@ public class ServerModelUIPanel : MonoBehaviour
     private void SelectThumbnail()
     {
         string path = FileBrowserHelper.OpenFile("Select Thumbnail", "Images\0*.png;*.jpg;*.jpeg\0\0");
-        if (!string.IsNullOrEmpty(path)) { currentThumbnailPath = path; }
+        if (!string.IsNullOrEmpty(path))
+        {
+            currentThumbnailPath = path;
+        }
     }
 
     private Sprite LoadThumbnail(string path)
     {
-        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return null;
         byte[] b = File.ReadAllBytes(path);
         Texture2D t = new Texture2D(2, 2);
         t.LoadImage(b);
@@ -290,10 +313,11 @@ public class ServerModelUIPanel : MonoBehaviour
 
     public void PopulateServerList(IEnumerable<ModelMetadata> models)
     {
-        foreach (Transform child in serverListContainer) Destroy(child.gameObject);
-        foreach (var meta in models)
+        foreach (Transform child in serverListContainer)
+            Destroy(child.gameObject);
+        foreach (ModelMetadata meta in models)
         {
-            var tile = Instantiate(assetTilePrefab, serverListContainer).GetComponent<AssetTile>();
+            AssetTile tile = Instantiate(assetTilePrefab, serverListContainer).GetComponent<AssetTile>();
             Sprite icon = Base64ToSprite(meta.thumbnailBase64) ?? defaultThumbnailSprite;
             tile.Setup(meta.modelID, meta.displayName, meta.modelType, meta.fileSize, icon, false);
         }
@@ -302,12 +326,14 @@ public class ServerModelUIPanel : MonoBehaviour
 
     public void SetListVisibility(bool isVisible)
     {
-        if (serverListRoot != null) serverListRoot.SetActive(isVisible);
+        if (serverListRoot != null)
+            serverListRoot.SetActive(isVisible);
     }
 
     private Sprite Base64ToSprite(string base64)
     {
-        if (string.IsNullOrEmpty(base64)) return null;
+        if (string.IsNullOrEmpty(base64))
+            return null;
         try
         {
             byte[] bytes = Convert.FromBase64String(base64);
@@ -320,15 +346,24 @@ public class ServerModelUIPanel : MonoBehaviour
 
     private void ConfirmDeletion()
     {
-        if (!string.IsNullOrEmpty(pendingDeleteID)) modelController.RemoveModel(pendingDeleteID);
+        if (!string.IsNullOrEmpty(pendingDeleteID))
+            modelController.RemoveModel(pendingDeleteID);
         confirmationPopup.SetActive(false);
         RefreshList();
     }
 
-    private void OpenPanel() { panelRoot.SetActive(true); ResetFields(); }
+    private void OpenPanel()
+    {
+        panelRoot.SetActive(true);
+        ResetFields();
+    }
     public void ClosePanel() => panelRoot.SetActive(false);
     private void HandleTileSelection(string id) => AssetTile.TriggerSelectionEvent(id);
-    private void ShowDeleteConfirmation(string id, Vector2 pos) { pendingDeleteID = id; confirmationPopup.SetActive(true); }
+    private void ShowDeleteConfirmation(string id, Vector2 pos)
+    {
+        pendingDeleteID = id;
+        confirmationPopup.SetActive(true);
+    }
 
     private void ResetFields()
     {

@@ -4,16 +4,12 @@ using UnityEngine;
 
 public static class SliceUtility
 {
-    /// <summary>
-    /// Configures a newly created mesh hull with the necessary components and parenting.
-    /// </summary>
     public static void SetupMeshHull(GameObject hull, Transform parent, Material crossSectionMat)
     {
         hull.transform.SetParent(parent, false);
         MeshCollider collider = hull.AddComponent<MeshCollider>();
         collider.convex = true;
 
-        // Ensure the renderer has the correct material
         MeshRenderer renderer = hull.GetComponent<MeshRenderer>();
         if (renderer != null && crossSectionMat != null)
         {
@@ -21,38 +17,32 @@ public static class SliceUtility
         }
     }
 
-    /// <summary>
-    /// Updates shader parameters for volumetric slicing.
-    /// </summary>
     public static void ApplyVolumeCut(GameObject root, Vector3 texturePoint, Vector3 worldNormal, bool invertNormal)
     {
         Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
         foreach (Renderer rend in renderers)
         {
-            // Ignore axis visuals if they are children
             if (rend.gameObject.name.Contains("Shaft") || rend.gameObject.name.Contains("Head"))
                 continue;
 
             Vector3 localNormal = rend.transform.InverseTransformDirection(worldNormal);
-            if (invertNormal) localNormal = -localNormal;
+            if (invertNormal)
+                localNormal = -localNormal;
 
             rend.material.SetVector("_PlanePos", texturePoint);
             rend.material.SetVector("_PlaneNormal", localNormal);
         }
     }
 
-    /// <summary>
-    /// Calculates the world-space bounds of a GameObject and all its children.
-    /// </summary>
     public static Bounds GetFullBounds(GameObject obj)
     {
         Renderer[] rends = obj.GetComponentsInChildren<Renderer>();
-        if (rends.Length == 0) return new Bounds(obj.transform.position, Vector3.one);
+        if (rends.Length == 0)
+            return new Bounds(obj.transform.position, Vector3.one);
 
         Bounds b = rends[0].bounds;
         for (int i = 1; i < rends.Length; i++)
         {
-            // Skip helper visuals
             if (rends[i].gameObject.name.Contains("Shaft") || rends[i].gameObject.name.Contains("Head"))
                 continue;
             b.Encapsulate(rends[i].bounds);
@@ -60,9 +50,6 @@ public static class SliceUtility
         return b;
     }
 
-    /// <summary>
-    /// Calculates the start and end positions for the separation animation.
-    /// </summary>
     public static void CalculateSeparationPoints(GameObject hull, Vector3 planeNormal, float factor, bool isUpper, out Vector3 startPos, out Vector3 endPos)
     {
         startPos = hull.transform.position;
@@ -74,18 +61,15 @@ public static class SliceUtility
     public static void SetupHull(GameObject hull, Transform parent)
     {
         hull.transform.SetParent(parent, false);
-        var collider = hull.AddComponent<MeshCollider>();
+        MeshCollider collider = hull.AddComponent<MeshCollider>();
         collider.convex = true;
     }
 
-    /// <summary>
-    /// Shared coroutine logic for animating the separation of two hulls.
-    /// </summary>
     public static IEnumerator PerformSeparation(GameObject upperHull, GameObject lowerHull, Vector3 planeNormal, float separationFactor, float duration)
     {
-        if (upperHull == null || lowerHull == null) yield break;
+        if (upperHull == null || lowerHull == null)
+            yield break;
 
-        // Calculate distance based on the combined bounds of the object
         Bounds b = GetFullBounds(upperHull);
         b.Encapsulate(GetFullBounds(lowerHull));
 
@@ -100,7 +84,8 @@ public static class SliceUtility
         float elapsedTime = 0f;
         while (elapsedTime < duration)
         {
-            if (upperHull == null || lowerHull == null) yield break;
+            if (upperHull == null || lowerHull == null)
+                yield break;
 
             float t = Mathf.SmoothStep(0.0f, 1.0f, elapsedTime / duration);
             upperHull.transform.position = Vector3.Lerp(upperStartPos, upperEndPos, t);
@@ -110,8 +95,10 @@ public static class SliceUtility
             yield return null;
         }
 
-        if (upperHull != null) upperHull.transform.position = upperEndPos;
-        if (lowerHull != null) lowerHull.transform.position = lowerEndPos;
+        if (upperHull != null)
+            upperHull.transform.position = upperEndPos;
+        if (lowerHull != null)
+            lowerHull.transform.position = lowerEndPos;
     }
 
     public struct SliceResult
@@ -121,9 +108,6 @@ public static class SliceUtility
         public bool isValid;
     }
 
-    /// <summary>
-    /// Orchestrates a mesh slice: creates hulls, configures them, and starts separation animation.
-    /// </summary>
     public static SliceResult ExecuteMeshSlice(
     GameObject originalPart,
     Vector3 planePoint,
@@ -134,7 +118,8 @@ public static class SliceUtility
     {
         SlicedHull hull = originalPart.Slice(planePoint, planeNormal, crossSectionMaterial);
 
-        if (hull == null) return new SliceResult { isValid = false };
+        if (hull == null)
+            return new SliceResult { isValid = false };
 
         GameObject upper = hull.CreateUpperHull(originalPart, crossSectionMaterial);
         GameObject lower = hull.CreateLowerHull(originalPart, crossSectionMaterial);

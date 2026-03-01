@@ -1,11 +1,14 @@
-﻿using UnityEngine;
+﻿using System;
 using System.Collections.Generic;
-using System;
+using UnityEngine;
 public class SliceCommand : ICommand
 {
-    public string ActionID { get; private set; }
+    public string ActionID
+    {
+        get; private set;
+    }
 
-private List<GameObject> originals;
+    private List<GameObject> originals;
     private List<GameObject> newHulls = new List<GameObject>();
     private Vector3 planePoint;
     private Vector3 planeNormal;
@@ -31,7 +34,7 @@ private List<GameObject> originals;
     {
         if (hasBeenExecuted)
         {
-            foreach (var hull in newHulls)
+            foreach (GameObject hull in newHulls)
             {
                 if (hull != null)
                 {
@@ -41,7 +44,7 @@ private List<GameObject> originals;
                 }
             }
 
-            foreach (var original in originals)
+            foreach (GameObject original in originals)
             {
                 if (original != null)
                 {
@@ -55,13 +58,14 @@ private List<GameObject> originals;
         List<string> originalPartIDs = new List<string>();
         List<GameObject> successfullySlicedOriginals = new List<GameObject>();
 
-        foreach (var originalPart in originals)
+        foreach (GameObject originalPart in originals)
         {
-            if (originalPart == null) continue;
+            if (originalPart == null)
+                continue;
             ExecuteMeshSlice(originalPart, ref successfullySlicedOriginals, ref originalPartIDs);
         }
 
-        foreach (var successfulOriginal in successfullySlicedOriginals)
+        foreach (GameObject successfulOriginal in successfullySlicedOriginals)
         {
             if (successfulOriginal != null)
             {
@@ -72,7 +76,7 @@ private List<GameObject> originals;
 
         if (webSocketClientManager != null && originalPartIDs.Count > 0)
         {
-            var sliceData = new SliceActionData
+            SliceActionData sliceData = new SliceActionData
             {
                 actionID = this.ActionID,
                 planePoint = this.planePoint,
@@ -89,7 +93,7 @@ private List<GameObject> originals;
 
     private void ExecuteMeshSlice(GameObject originalPart, ref List<GameObject> successfullySlicedOriginals, ref List<string> originalPartIDs)
     {
-        var result = SliceUtility.ExecuteMeshSlice(
+        SliceUtility.SliceResult result = SliceUtility.ExecuteMeshSlice(
             originalPart,
             planePoint,
             planeNormal,
@@ -112,7 +116,7 @@ private List<GameObject> originals;
 
     public void Undo()
     {
-        foreach (var hull in newHulls)
+        foreach (GameObject hull in newHulls)
         {
             if (hull != null)
             {
@@ -121,7 +125,7 @@ private List<GameObject> originals;
             }
         }
 
-        foreach (var original in originals)
+        foreach (GameObject original in originals)
         {
             if (original != null)
             {
@@ -136,7 +140,7 @@ private List<GameObject> originals;
 
     public void CleanUp()
     {
-        foreach (var hull in newHulls)
+        foreach (GameObject hull in newHulls)
         {
             if (hull != null)
             {

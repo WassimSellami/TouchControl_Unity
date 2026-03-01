@@ -1,8 +1,8 @@
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
-using UnityEngine.EventSystems;
 using System;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class AssetTile : MonoBehaviour, IPointerClickHandler
 {
@@ -11,8 +11,10 @@ public class AssetTile : MonoBehaviour, IPointerClickHandler
     [SerializeField] private TMP_Text nameText;
     [SerializeField] private TMP_Text typeText;
     [SerializeField] private TMP_Text sizeText;
-
-    public string ModelID { get; private set; }
+    public string ModelID
+    {
+        get; private set;
+    }
     private bool isAddButton = false;
 
     public static event Action<string, Vector2> OnRightClicked;
@@ -24,22 +26,29 @@ public class AssetTile : MonoBehaviour, IPointerClickHandler
     {
         ModelID = id;
         isAddButton = false;
-        if (nameText) nameText.text = displayName;
-        if (typeText) typeText.text = type;
-        if (sizeText) sizeText.text = size;
-        if (thumbnailImage) thumbnailImage.sprite = icon;
+        if (nameText)
+            nameText.text = displayName;
+        if (typeText)
+            typeText.text = type;
+        if (sizeText)
+            sizeText.text = size;
+        if (thumbnailImage)
+            thumbnailImage.sprite = icon;
     }
 
     public void SetupAsAddButton(Sprite plusIcon)
     {
         ModelID = "ADD_NEW";
         isAddButton = true;
-        if (nameText) nameText.text = "Add New Model";
-        if (typeText) typeText.text = "Action";
-        if (sizeText) sizeText.text = "";
-        if (thumbnailImage) thumbnailImage.sprite = plusIcon;
+        if (nameText)
+            nameText.text = "Add New Model";
+        if (typeText)
+            typeText.text = "Action";
+        if (sizeText)
+            sizeText.text = "";
+        if (thumbnailImage)
+            thumbnailImage.sprite = plusIcon;
     }
-
     public void OnPointerClick(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Right)
@@ -60,6 +69,7 @@ public class AssetTile : MonoBehaviour, IPointerClickHandler
 
     public void SetVisited()
     {
-        if (nameText != null) nameText.color = new Color(0.6f, 0.2f, 1.0f);
+        if (nameText != null)
+            nameText.color = new Color(0.6f, 0.2f, 1.0f);
     }
 }

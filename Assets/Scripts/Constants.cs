@@ -54,6 +54,7 @@ public static class Constants
     public const float VOLUMETRIC_DROPDOWN_INDEX = 0;
     public const float VOLUMETRIC_PROXY_SCALE = 0.5f;
     public const float AXIS_SCREEN_SCALE = 0.2f;
+    public const int POLY_GRID_RESOLUTION = 180;
 
 
     //commands

@@ -1,5 +1,5 @@
-using System.Runtime.InteropServices;
 using System;
+using System.Runtime.InteropServices;
 
 public static class FileBrowserHelper
 {
@@ -21,7 +21,7 @@ public static class FileBrowserHelper
         ofn.initialDir = UnityEngine.Application.dataPath;
         ofn.title = title;
         ofn.defExt = "obj";
-        ofn.flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000200 | 0x00000008; // Explorer-style, FileMustExist, PathMustExist, NoChangeDir, AllowMultiSelect (disabled here)
+        ofn.flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000200 | 0x00000008;
         ofn.owner = GetActiveWindow();
 
         if (GetOpenFileName(ofn))
@@ -37,23 +37,23 @@ public static class FileBrowserHelper
         public int structSize = 0;
         public IntPtr owner = IntPtr.Zero;
         public IntPtr instance = IntPtr.Zero;
-        public String filter = null;
-        public String customFilter = null;
+        public string filter = null;
+        public string customFilter = null;
         public int maxCustFilter = 0;
         public int filterIndex = 0;
-        public String file = null;
+        public string file = null;
         public int maxFile = 0;
-        public String fileTitle = null;
+        public string fileTitle = null;
         public int maxFileTitle = 0;
-        public String initialDir = null;
-        public String title = null;
+        public string initialDir = null;
+        public string title = null;
         public int flags = 0;
         public short fileOffset = 0;
         public short fileExtension = 0;
-        public String defExt = null;
+        public string defExt = null;
         public IntPtr custData = IntPtr.Zero;
         public IntPtr hook = IntPtr.Zero;
-        public String templateName = null;
+        public string templateName = null;
         public IntPtr reservedPtr = IntPtr.Zero;
         public int reservedInt = 0;
         public int flagsEx = 0;

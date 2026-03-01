@@ -1,10 +1,10 @@
 
+using System;
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System;
 using WebSocketSharp;
-using System.Collections.Generic;
 
 public class WebSocketClientManager : MonoBehaviour
 {
@@ -35,9 +35,12 @@ public class WebSocketClientManager : MonoBehaviour
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
-    public enum ConnectionState { IdleWaiting, Connecting, Connected, Failed, Disconnected }
+    public enum ConnectionState
+    {
+        IdleWaiting, Connecting, Connected, Failed, Disconnected
+    }
 
-    void Start()
+    private void Start()
     {
         Application.targetFrameRate = Constants.MODEL_UPDATE_FPS;
         QualitySettings.vSyncCount = 0;
@@ -58,7 +61,8 @@ public class WebSocketClientManager : MonoBehaviour
         }
         else
         {
-            if (ipAddressInput != null) ipAddressInput.text = defaultIpAddress;
+            if (ipAddressInput != null)
+                ipAddressInput.text = defaultIpAddress;
             connectButton.onClick.AddListener(AttemptConnect);
             uiManager.ShowConnectionPanel();
             UpdateConnectionUI(ConnectionState.IdleWaiting);
@@ -68,7 +72,7 @@ public class WebSocketClientManager : MonoBehaviour
             backButtonFromModelView.onClick.AddListener(OnBackToMainMenuPressed);
     }
 
-    void Update()
+    private void Update()
     {
         if (IsConnected && modelViewportController != null && uiManager != null && uiManager.modelViewPanel.activeInHierarchy)
         {
@@ -84,7 +88,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     public void AttemptConnect()
     {
-        if (IsConnected || isAttemptingConnection) return;
+        if (IsConnected || isAttemptingConnection)
+            return;
         modelUpdateInterval = 1.0f / Mathf.Max(1f, Constants.MODEL_UPDATE_FPS);
         if (autoConnectMode)
         {
@@ -108,7 +113,8 @@ public class WebSocketClientManager : MonoBehaviour
         try
         {
             ws.ConnectAsync();
-            if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+            if (connectionTimeoutCoroutine != null)
+                StopCoroutine(connectionTimeoutCoroutine);
             connectionTimeoutCoroutine = StartCoroutine(ConnectionTimeoutSequence(Constants.CONNECTION_TIMEOUT));
         }
         catch (Exception ex)
@@ -128,7 +134,11 @@ public class WebSocketClientManager : MonoBehaviour
 
             if (ws != null)
             {
-                try { ws.CloseAsync(); } catch { }
+                try
+                {
+                    ws.CloseAsync();
+                }
+                catch { }
                 ws = null;
             }
             PerformDisconnectionCleanup();
@@ -144,15 +154,18 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnWebSocketOpen()
     {
-        if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+        if (connectionTimeoutCoroutine != null)
+            StopCoroutine(connectionTimeoutCoroutine);
         UpdateConnectionUI(ConnectionState.Connected);
         isAttemptingConnection = false;
-        if (uiManager != null) uiManager.ShowMainMenuPanel();
+        if (uiManager != null)
+            uiManager.ShowMainMenuPanel();
     }
 
     private void OnWebSocketError(string errorMessage)
     {
-        if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+        if (connectionTimeoutCoroutine != null)
+            StopCoroutine(connectionTimeoutCoroutine);
         isAttemptingConnection = false;
         UpdateConnectionUI(ConnectionState.Failed);
         PerformDisconnectionCleanup();
@@ -160,7 +173,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnWebSocketClose(string reason, ushort code)
     {
-        if (connectionTimeoutCoroutine != null) StopCoroutine(connectionTimeoutCoroutine);
+        if (connectionTimeoutCoroutine != null)
+            StopCoroutine(connectionTimeoutCoroutine);
         isAttemptingConnection = false;
         UpdateConnectionUI(ConnectionState.Disconnected);
         PerformDisconnectionCleanup();
@@ -200,20 +214,24 @@ public class WebSocketClientManager : MonoBehaviour
                 break;
         }
 
-        if (statusText != null) statusText.text = message;
+        if (statusText != null)
+            statusText.text = message;
         if (indicatorImage != null)
         {
             indicatorImage.color = indicatorColor;
             indicatorImage.enabled = true;
             indicatorImage.sprite = defaultIndicatorSprite;
         }
-        if (connectButton != null) connectButton.interactable = buttonInteractable;
-        if (connectButtonText != null) connectButtonText.text = buttonText;
+        if (connectButton != null)
+            connectButton.interactable = buttonInteractable;
+        if (connectButtonText != null)
+            connectButtonText.text = buttonText;
     }
 
     private void SendModelTransformState()
     {
-        if (!IsConnected || modelViewportController == null || autoConnectMode) return;
+        if (!IsConnected || modelViewportController == null || autoConnectMode)
+            return;
         Transform tr = modelViewportController.transform;
 
         if (lastSentState != null &&
@@ -235,44 +253,51 @@ public class WebSocketClientManager : MonoBehaviour
 
     public void SendVolumeDensity(float min, float max)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         VolumeDensityData data = new VolumeDensityData { minVal = min, maxVal = max };
         SendMessageToServer($"{Constants.UPDATE_VOLUME_DENSITY}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendToggleAxes(bool visible)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         SendMessageToServer($"{Constants.TOGGLE_AXES}:{visible}");
     }
     public void SendVisualCropPlane(Vector3 position, Vector3 normal, float scale)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         VisualCropPlaneData data = new VisualCropPlaneData { position = position, normal = normal, scale = scale };
         SendMessageToServer($"{Constants.UPDATE_VISUAL_CROP_PLANE}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendExecuteSlice(SliceActionData data)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         SendMessageToServer($"{Constants.EXECUTE_SLICE_ACTION}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendExecuteDestroy(DestroyActionData data)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         SendMessageToServer($"{Constants.EXECUTE_DESTROY_ACTION}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendStartShake(DestroyActionData data)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         SendMessageToServer($"{Constants.START_SHAKE}:{JsonUtility.ToJson(data)}");
     }
 
     public void SendStopShake(DestroyActionData data)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         SendMessageToServer($"{Constants.STOP_SHAKE}:{JsonUtility.ToJson(data)}");
     }
 
@@ -282,7 +307,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     public void SendLineData(Vector3 start, Vector3 end)
     {
-        if (!IsConnected) return;
+        if (!IsConnected)
+            return;
         LineData data = new LineData { start = start, end = end };
         SendMessageToServer($"{Constants.UPDATE_CUT_LINE}:{JsonUtility.ToJson(data)}");
     }
@@ -291,8 +317,9 @@ public class WebSocketClientManager : MonoBehaviour
 
     public void SendShowSliceIcon(Vector3 worldPosition)
     {
-        if (!IsConnected) return;
-        var data = new ShowSliceIconData { worldPosition = worldPosition };
+        if (!IsConnected)
+            return;
+        ShowSliceIconData data = new ShowSliceIconData { worldPosition = worldPosition };
         SendMessageToServer($"{Constants.SHOW_SLICE_ICON}:{JsonUtility.ToJson(data)}");
     }
 
@@ -300,7 +327,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void OnWebSocketMessage(string data)
     {
-        if (autoConnectMode) return;
+        if (autoConnectMode)
+            return;
         string[] parts = data.Split(new char[] { ':' }, 2);
         string command = parts[0].ToUpperInvariant();
 
@@ -308,7 +336,7 @@ public class WebSocketClientManager : MonoBehaviour
         {
             try
             {
-                var sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(parts[1]);
+                ModelBoundsSizeData sizeData = JsonUtility.FromJson<ModelBoundsSizeData>(parts[1]);
                 if (modelViewportController != null)
                 {
                     modelViewportController.UpdatePlaceholderSize(sizeData.size);
@@ -320,7 +348,7 @@ public class WebSocketClientManager : MonoBehaviour
         {
             try
             {
-                var listData = JsonUtility.FromJson<ModelMetadataList>(parts[1]);
+                ModelMetadataList listData = JsonUtility.FromJson<ModelMetadataList>(parts[1]);
                 if (uiManager != null && listData != null && listData.models != null)
                 {
                     uiManager.PopulateModelButtons(new List<ModelMetadata>(listData.models), this);
@@ -335,7 +363,7 @@ public class WebSocketClientManager : MonoBehaviour
         {
             try
             {
-                var meshData = JsonUtility.FromJson<MeshNetworkData>(parts[1]);
+                MeshNetworkData meshData = JsonUtility.FromJson<MeshNetworkData>(parts[1]);
                 if (modelViewportController != null)
                 {
                     modelViewportController.ApplyProxyMesh(meshData);
@@ -348,7 +376,8 @@ public class WebSocketClientManager : MonoBehaviour
 
     public Sprite Base64ToSprite(string base64)
     {
-        if (string.IsNullOrEmpty(base64)) return null;
+        if (string.IsNullOrEmpty(base64))
+            return null;
         try
         {
             byte[] imageBytes = Convert.FromBase64String(base64);
@@ -361,58 +390,77 @@ public class WebSocketClientManager : MonoBehaviour
 
     private void PerformDisconnectionCleanup()
     {
-        if (modelViewportController != null) modelViewportController.ResetState();
+        if (modelViewportController != null)
+            modelViewportController.ResetState();
         if (ws != null)
         {
-            try { ws.CloseAsync(); } catch { }
+            try
+            {
+                ws.CloseAsync();
+            }
+            catch { }
             ws = null;
         }
         isMockConnected = false;
         CuttingPlaneManager cpm = FindObjectOfType<CuttingPlaneManager>();
-        if (cpm != null) cpm.ResetCrop();
-        if (uiManager != null) uiManager.ShowConnectionPanel();
+        if (cpm != null)
+            cpm.ResetCrop();
+        if (uiManager != null)
+            uiManager.ShowConnectionPanel();
     }
 
     public void OnLoadModelSelected(string modelId)
     {
-        if (!IsConnected) return;
-        if (!autoConnectMode) SendMessageToServer(Constants.LOAD_MODEL + ":" + modelId);
+        if (!IsConnected)
+            return;
+        if (!autoConnectMode)
+            SendMessageToServer(Constants.LOAD_MODEL + ":" + modelId);
 
         ClientCameraStateData camState = new ClientCameraStateData { position = referenceCamera.transform.position, rotation = referenceCamera.transform.rotation };
         SendMessageToServer($"{Constants.UPDATE_CAMERA_TRANSFORM}:{JsonUtility.ToJson(camState)}");
 
-        if (modelViewportController != null) modelViewportController.LoadNewModel(modelId);
-        if (uiManager != null) uiManager.ShowModelViewPanel();
+        if (modelViewportController != null)
+            modelViewportController.LoadNewModel(modelId);
+        if (uiManager != null)
+            uiManager.ShowModelViewPanel();
         CuttingPlaneManager cpm = FindObjectOfType<CuttingPlaneManager>();
-        if (cpm != null) cpm.ResetCrop();
+        if (cpm != null)
+            cpm.ResetCrop();
     }
 
     private void OnBackToMainMenuPressed()
     {
-        if (modelViewportController != null) modelViewportController.ResetState();
+        if (modelViewportController != null)
+            modelViewportController.ResetState();
         CuttingPlaneManager cpm = FindObjectOfType<CuttingPlaneManager>();
-        if (cpm != null) cpm.ResetCrop();
+        if (cpm != null)
+            cpm.ResetCrop();
 
         if (IsConnected && !autoConnectMode)
         {
-            // Tell server to stop/unload regardless of current state
             SendMessageToServer(Constants.CANCEL_LOAD);
             SendMessageToServer(Constants.UNLOAD_MODEL);
         }
 
-        if (uiManager != null) uiManager.ShowMainMenuPanel();
+        if (uiManager != null)
+            uiManager.ShowMainMenuPanel();
     }
 
     public void SendMessageToServer(string message)
     {
-        if (!autoConnectMode && IsConnected) ws.Send(message);
+        if (!autoConnectMode && IsConnected)
+            ws.Send(message);
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
         if (ws != null)
         {
-            try { ws.CloseAsync(); } catch { }
+            try
+            {
+                ws.CloseAsync();
+            }
+            catch { }
             ws = null;
         }
     }

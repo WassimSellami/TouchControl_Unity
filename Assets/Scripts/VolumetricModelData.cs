@@ -6,7 +6,7 @@ using UnityVolumeRendering;
 public class VolumetricModelData : ModelData
 {
     public string rawFilePath;
-    public int dimX = 128;
+    public int dimX = 256;
     public int dimY = 256;
     public int dimZ = 256;
     public DataContentFormat contentFormat = DataContentFormat.Uint8;

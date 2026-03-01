@@ -1,8 +1,8 @@
+using System;
+using System.Net;
 using UnityEngine;
 using WebSocketSharp;
 using WebSocketSharp.Server;
-using System;
-using System.Net;
 
 public class WebSocketServerManager : MonoBehaviour
 {
@@ -44,13 +44,16 @@ public class WebSocketServerManager : MonoBehaviour
         }
     }
 
-    void Start()
+    private void Start()
     {
         Application.targetFrameRate = Constants.MODEL_UPDATE_FPS;
         QualitySettings.vSyncCount = 0;
-        if (modelController == null) Debug.LogError("[Server] ModelController reference not set!");
-        if (serverCamera == null) Debug.LogError("[Server] Server Camera reference not set!");
-        if (commandInterpreter == null) Debug.LogError("[Server] CommandInterpreter reference not set!");
+        if (modelController == null)
+            Debug.LogError("[Server] ModelController reference not set!");
+        if (serverCamera == null)
+            Debug.LogError("[Server] Server Camera reference not set!");
+        if (commandInterpreter == null)
+            Debug.LogError("[Server] CommandInterpreter reference not set!");
         else
         {
             commandInterpreter.WebSocketServerManager = this;
@@ -62,7 +65,7 @@ public class WebSocketServerManager : MonoBehaviour
         StartWebSocketServer();
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
         StopWebSocketServer();
     }
@@ -94,7 +97,8 @@ public class WebSocketServerManager : MonoBehaviour
     private void StartWebSocketServer()
     {
         wsServer = new WebSocketServer(IPAddress.Any, serverPort);
-        wsServer.AddWebSocketService<ModelControlService>(Constants.SERVICE_PATH, (serviceInstance) => {
+        wsServer.AddWebSocketService<ModelControlService>(Constants.SERVICE_PATH, (serviceInstance) =>
+        {
             serviceInstance.LogCallback = LogOnMainThread;
             serviceInstance.ProcessCommandCallback = ProcessReceivedCommand;
             serviceInstance.SendInitialDataCallback = SendInitialModelData;
@@ -129,21 +133,26 @@ public class WebSocketServerManager : MonoBehaviour
 
     private void ProcessReceivedCommand(string command)
     {
-        if (commandInterpreter == null) return;
+        if (commandInterpreter == null)
+            return;
         UnityMainThreadDispatcher.Instance().Enqueue(() => commandInterpreter.InterpretAndExecute(command));
     }
 
     private void LogOnMainThread(string message, bool isError = false)
     {
-        UnityMainThreadDispatcher.Instance().Enqueue(() => {
-            if (isError) Debug.LogError(message);
-            else Debug.Log(message);
+        UnityMainThreadDispatcher.Instance().Enqueue(() =>
+        {
+            if (isError)
+                Debug.LogError(message);
+            else
+                Debug.Log(message);
         });
     }
 
     private void SendInitialModelData(string clientID)
     {
-        if (modelController == null) return;
+        if (modelController == null)
+            return;
 
         UnityMainThreadDispatcher.Instance().Enqueue(() =>
         {
@@ -159,7 +168,7 @@ public class WebSocketServerManager : MonoBehaviour
     {
         if (wsServer != null && wsServer.IsListening)
         {
-            var service = wsServer.WebSocketServices[Constants.SERVICE_PATH];
+            WebSocketServiceHost service = wsServer.WebSocketServices[Constants.SERVICE_PATH];
             if (service != null)
             {
                 service.Sessions.SendTo(message, clientID);
@@ -184,10 +193,10 @@ public class WebSocketServerManager : MonoBehaviour
         }
     }
 
-    // -- New method for ModelController to use --
     public void BroadcastModelList()
     {
-        if (modelController == null) return;
+        if (modelController == null)
+            return;
         ModelMetadataList metadataList = modelController.GetAllModelsMetadata();
         string jsonData = JsonUtility.ToJson(metadataList);
         string message = $"{Constants.MODELS_LIST_UPDATE}:{jsonData}";
@@ -198,7 +207,7 @@ public class WebSocketServerManager : MonoBehaviour
     {
         if (wsServer != null && wsServer.IsListening)
         {
-            foreach (var serviceHost in wsServer.WebSocketServices.Hosts)
+            foreach (WebSocketServiceHost serviceHost in wsServer.WebSocketServices.Hosts)
             {
                 if (serviceHost.Sessions.Count > 0)
                 {

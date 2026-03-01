@@ -7,19 +7,21 @@ public static class ObjLoader
 {
     public static GameObject Load(string filePath)
     {
-        if (!File.Exists(filePath)) return null;
+        if (!File.Exists(filePath))
+            return null;
 
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
 
-        // Minimal parser for v and f
         string[] lines = File.ReadAllLines(filePath);
         foreach (string line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                continue;
 
             string[] parts = line.Split(new char[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) continue;
+            if (parts.Length == 0)
+                continue;
 
             switch (parts[0])
             {
@@ -29,19 +31,16 @@ public static class ObjLoader
                         float x = float.Parse(parts[1], CultureInfo.InvariantCulture);
                         float y = float.Parse(parts[2], CultureInfo.InvariantCulture);
                         float z = float.Parse(parts[3], CultureInfo.InvariantCulture);
-                        vertices.Add(new Vector3(x, y, z)); // Unity flips Z usually, but raw OBJ is often OK
+                        vertices.Add(new Vector3(x, y, z));
                     }
                     break;
                 case "f":
-                    // Simple triangulation (assumes convex polygons)
-                    // Format: f v1/vt1/vn1 v2/vt2/vn2 ...
                     List<int> faceIndices = new List<int>();
                     for (int i = 1; i < parts.Length; i++)
                     {
                         string[] facePart = parts[i].Split('/');
                         if (int.TryParse(facePart[0], out int vIndex))
                         {
-                            // OBJ is 1-based, Unity is 0-based
                             faceIndices.Add(vIndex < 0 ? vertices.Count + vIndex : vIndex - 1);
                         }
                     }
@@ -60,7 +59,8 @@ public static class ObjLoader
         }
 
         Mesh mesh = new Mesh();
-        if (vertices.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        if (vertices.Count > 65000)
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices = vertices.ToArray();
         mesh.triangles = triangles.ToArray();
         mesh.RecalculateNormals();
@@ -70,7 +70,6 @@ public static class ObjLoader
         go.AddComponent<MeshFilter>().mesh = mesh;
         go.AddComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
 
-        // Ensure pivot is centered for rotation
         go.transform.position = -mesh.bounds.center;
 
         GameObject parent = new GameObject("OBJ_Container");

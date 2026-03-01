@@ -1,6 +1,6 @@
-using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 public class ModelViewportController : MonoBehaviour, IModelManipulator
 {
     [Header("References")]
@@ -28,7 +28,10 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     private GameObject axesContainer;
     private Transform modelReferencePoint;
 
-    private enum OrbitAxis { None, Horizontal, Vertical }
+    private enum OrbitAxis
+    {
+        None, Horizontal, Vertical
+    }
     private OrbitAxis lockedOrbitAxis = OrbitAxis.None;
 
     private bool isAnimatingPresetView = false;
@@ -40,11 +43,14 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     private GameObject rootModel;
 
     public bool IsAutoRotating => isAutoRotating;
-    public string CurrentModelID { get; private set; }
+    public string CurrentModelID
+    {
+        get; private set;
+    }
 
     private AnimationCurve PRESET_VIEW_EASE_CURVE = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     private bool currentProxyIsVolumetric = false;
-    void Awake()
+    private void Awake()
     {
         initialPosition = transform.position;
         initialRotation = transform.rotation;
@@ -56,12 +62,15 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
             initialCameraRotation = referenceCamera.transform.rotation;
         }
 
-        if (redAxisMaterial == null) redAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.red };
-        if (greenAxisMaterial == null) greenAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.green };
-        if (blueAxisMaterial == null) blueAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.blue };
+        if (redAxisMaterial == null)
+            redAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.red };
+        if (greenAxisMaterial == null)
+            greenAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.green };
+        if (blueAxisMaterial == null)
+            blueAxisMaterial = new Material(Shader.Find("Standard")) { color = Color.blue };
     }
 
-    void Update()
+    private void Update()
     {
         if (isAutoRotating)
         {
@@ -70,7 +79,7 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         }
     }
 
-    void LateUpdate()
+    private void LateUpdate()
     {
         if (axesContainer != null && modelReferencePoint != null)
         {
@@ -80,7 +89,8 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     }
     private void UpdateAxisScale()
     {
-        if (axesContainer == null || referenceCamera == null) return;
+        if (axesContainer == null || referenceCamera == null)
+            return;
 
         // Calculate distance from camera to axes
         float distance = Vector3.Distance(referenceCamera.transform.position, axesContainer.transform.position);
@@ -271,7 +281,8 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
         if (placeholderMaterial != null)
         {
             Renderer r = rootModel.GetComponent<Renderer>();
-            if (r != null) r.material = placeholderMaterial;
+            if (r != null)
+                r.material = placeholderMaterial;
         }
 
         SetupReferencePoint(rootModel);
@@ -279,13 +290,15 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
     }
     public void ApplyProxyMesh(MeshNetworkData data)
     {
-        if (rootModel == null) return;
+        if (rootModel == null)
+            return;
 
         // Store the flag from the server
         currentProxyIsVolumetric = data.isVolumetric;
 
         MeshFilter mf = rootModel.GetComponent<MeshFilter>();
-        if (mf == null) mf = rootModel.AddComponent<MeshFilter>();
+        if (mf == null)
+            mf = rootModel.AddComponent<MeshFilter>();
 
         Mesh newMesh = new Mesh();
         newMesh.vertices = data.v;
@@ -299,17 +312,20 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
 
         // Initial scaling logic:
         // If it's poly, we must be at (1,1,1). If it's vol, wait for UpdatePlaceholderSize.
-        if (!currentProxyIsVolumetric) rootModel.transform.localScale = Vector3.one;
+        if (!currentProxyIsVolumetric)
+            rootModel.transform.localScale = Vector3.one;
 
         // Update Collider
         Collider oldCol = rootModel.GetComponent<Collider>();
-        if (oldCol != null) Destroy(oldCol);
+        if (oldCol != null)
+            Destroy(oldCol);
         rootModel.AddComponent<MeshCollider>().convex = true;
     }
 
     public void UpdatePlaceholderSize(Vector3 newSize)
     {
-        if (rootModel == null) return;
+        if (rootModel == null)
+            return;
 
         MeshFilter mf = rootModel.GetComponent<MeshFilter>();
 
@@ -393,7 +409,8 @@ public class ModelViewportController : MonoBehaviour, IModelManipulator
 
     private void CreateAxisVisuals()
     {
-        foreach (Transform child in axesContainer.transform) Destroy(child.gameObject);
+        foreach (Transform child in axesContainer.transform)
+            Destroy(child.gameObject);
         axisVisuals.Clear();
 
         axisVisuals = AxisGenerator.CreateAxes(

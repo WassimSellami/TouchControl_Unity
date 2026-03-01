@@ -1,10 +1,13 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 public class HistoryManager : MonoBehaviour
 {
-    public static HistoryManager Instance { get; private set; }
+    public static HistoryManager Instance
+    {
+        get; private set;
+    }
 
     [Header("UI Buttons")]
     [SerializeField] private Button undoButton;
@@ -14,7 +17,7 @@ public class HistoryManager : MonoBehaviour
     private Stack<ICommand> redoStack = new Stack<ICommand>();
     private WebSocketClientManager webSocketClientManager;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
         {
@@ -26,7 +29,7 @@ public class HistoryManager : MonoBehaviour
         }
     }
 
-    void Start()
+    private void Start()
     {
         webSocketClientManager = FindObjectOfType<WebSocketClientManager>();
         UpdateButtons();
@@ -37,7 +40,7 @@ public class HistoryManager : MonoBehaviour
         command.Execute();
         undoStack.Push(command);
 
-        foreach (var redoCommand in redoStack)
+        foreach (ICommand redoCommand in redoStack)
         {
             redoCommand.CleanUp();
         }
@@ -80,8 +83,10 @@ public class HistoryManager : MonoBehaviour
 
     public void ClearHistory()
     {
-        foreach (var command in undoStack) command.CleanUp();
-        foreach (var command in redoStack) command.CleanUp();
+        foreach (ICommand command in undoStack)
+            command.CleanUp();
+        foreach (ICommand command in redoStack)
+            command.CleanUp();
 
         undoStack.Clear();
         redoStack.Clear();
