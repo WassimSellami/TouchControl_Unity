@@ -24,10 +24,6 @@ public class ModelController : MonoBehaviour, IModelViewer
     [SerializeField] private Sprite sliceIconSprite;
     [SerializeField] private Image feedbackIconImage;
     [SerializeField] private GameObject lineRendererPrefab;
-    [SerializeField] private float sliceLineBaseWidth = 0.01f;   // tune in Inspector
-    [SerializeField] private float sliceLineReferenceDistance = 1.0f;
-    [SerializeField] private float sliceLineMinWidth = 0.001f;
-    [SerializeField] private float sliceLineMaxWidth = 0.05f;
     private GameObject modelContainer;
 
     private readonly Dictionary<string, ModelData> modelDataLookup = new();
@@ -261,30 +257,25 @@ public class ModelController : MonoBehaviour, IModelViewer
         if (activeLineRenderer == null || serverCamera == null)
             return;
 
-        // Midpoint of the line in world space
         Vector3 mid = (start + end) * 0.5f;
-
         float distance;
 
         if (serverCamera.orthographic)
         {
-            // For orthographic, use orthographicSize as a pseudo-distance
             distance = Mathf.Max(0.0001f, serverCamera.orthographicSize);
         }
         else
         {
-            // Perspective: distance from camera to line midpoint
             distance = Mathf.Max(0.0001f, Vector3.Distance(serverCamera.transform.position, mid));
         }
 
-        // Scale inversely with distance so it looks constant on screen
-        float scale = sliceLineReferenceDistance / distance;
-        float width = sliceLineBaseWidth * scale;
-
-        width = Mathf.Clamp(width, sliceLineMinWidth, sliceLineMaxWidth);
+        float scale = Constants.SLICE_LINE_REFERENCE_DISTANCE / distance;
+        float width = Constants.SLICE_LINE_BASE_WIDTH * scale;
+        width = Mathf.Clamp(width, Constants.SLICE_LINE_MIN_WIDTH, Constants.SLICE_LINE_MAX_WIDTH);
 
         activeLineRenderer.widthMultiplier = width;
     }
+
 
     public void UnloadCurrentModel()
     {

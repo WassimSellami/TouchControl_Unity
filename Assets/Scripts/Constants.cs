@@ -46,6 +46,10 @@ public static class Constants
     public const float VISUAL_DEPTH_OFFSET = 0.005f;
     public const float MIN_DRAG_DISTANCE_SQUARED = 4f;
     public const float ICON_VERTICAL_OFFSET_PERCENT = 0.05f;
+    public const float SLICE_LINE_BASE_WIDTH = 1.0f;
+    public const float SLICE_LINE_REFERENCE_DISTANCE = 0.1f;
+    public const float SLICE_LINE_MIN_WIDTH = 0.4f;
+    public const float SLICE_LINE_MAX_WIDTH = 5.0f;
 
     // server
     public const float WIGGLE_ANGLE = 2f;

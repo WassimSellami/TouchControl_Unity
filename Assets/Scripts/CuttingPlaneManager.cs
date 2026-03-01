@@ -167,6 +167,7 @@ public class CuttingPlaneManager : MonoBehaviour
         activeLineRenderer.SetPosition(1, endWorld);
         if (webSocketClientManager != null)
             webSocketClientManager.SendLineData(startWorld, endWorld);
+        UpdateSliceLineWidthClient(startWorld, endWorld);
     }
 
     private void DrawPlaneVisualizer()
@@ -324,6 +325,29 @@ public class CuttingPlaneManager : MonoBehaviour
     {
         if (feedbackIconImage != null)
             feedbackIconImage.gameObject.SetActive(false);
+    }
+    private void UpdateSliceLineWidthClient(Vector3 start, Vector3 end)
+    {
+        if (activeLineRenderer == null || mainCamera == null)
+            return;
+
+        Vector3 mid = (start + end) * 0.5f;
+        float distance;
+
+        if (mainCamera.orthographic)
+        {
+            distance = Mathf.Max(0.0001f, mainCamera.orthographicSize);
+        }
+        else
+        {
+            distance = Mathf.Max(0.0001f, Vector3.Distance(mainCamera.transform.position, mid));
+        }
+
+        float scale = Constants.SLICE_LINE_REFERENCE_DISTANCE / distance;
+        float width = Constants.SLICE_LINE_BASE_WIDTH * scale;
+        width = Mathf.Clamp(width, Constants.SLICE_LINE_MIN_WIDTH, Constants.SLICE_LINE_MAX_WIDTH);
+
+        activeLineRenderer.widthMultiplier = width;
     }
 
     private IEnumerator LocalShakeCoroutine(GameObject target)
