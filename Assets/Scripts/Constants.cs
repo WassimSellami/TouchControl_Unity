@@ -60,7 +60,6 @@ public static class Constants
     public const float AXIS_SCREEN_SCALE = 0.2f;
     public const int POLY_GRID_RESOLUTION = 180;
 
-
     //commands
     public const string CANCEL_LOAD = "CANCEL_LOAD";
     public const string TOGGLE_AXES = "TOGGLE_AXES";
@@ -83,4 +82,6 @@ public static class Constants
     public const string MODELS_LIST_UPDATE = "MODELS_LIST_UPDATE";
     public const string MODEL_SIZE_UPDATE = "MODEL_SIZE_UPDATE";
     public const string UPDATE_VOLUME_DENSITY = "UPDATE_VOLUME_DENSITY";
+    public const string ACK_RENDER = "ACK_RENDER";
+    public const string LATENCY_REPORT = "LATENCY_REPORT";
 }

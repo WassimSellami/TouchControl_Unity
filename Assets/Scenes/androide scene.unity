@@ -2604,6 +2604,7 @@ GameObject:
   - component: {fileID: 838438838}
   - component: {fileID: 838438841}
   - component: {fileID: 838438842}
+  - component: {fileID: 838438843}
   m_Layer: 0
   m_Name: ClientManager
   m_TagString: Untagged
@@ -2643,7 +2644,7 @@ MonoBehaviour:
   modelViewportController: {fileID: 980018137}
   referenceCamera: {fileID: 961739752}
   ipAddressInput: {fileID: 698393692}
-  defaultIpAddress: 192.168.88.77
+  defaultIpAddress: 192.168.0.35
   serverPort: 8070
   connectButton: {fileID: 885532448}
   connectButtonText: {fileID: 488383159}
@@ -2663,6 +2664,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d31300656f4bcc34bb143a927fc7ffe5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &838438843
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 838438837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e451c2c02fd8df34f838a1ea08dfcfda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isServer: 0
 --- !u!1 &885532446
 GameObject:
   m_ObjectHideFlags: 0

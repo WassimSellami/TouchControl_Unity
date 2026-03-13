@@ -32,6 +32,7 @@ public class WebSocketClientManager : MonoBehaviour
     private float modelUpdateInterval;
     private ModelTransformStateData lastSentState;
     private Coroutine connectionTimeoutCoroutine;
+    private Dictionary<string, float> pendingMessages = new Dictionary<string, float>();
 
     public bool IsConnected => autoConnectMode ? isMockConnected : (ws != null && ws.ReadyState == WebSocketState.Open);
 
@@ -329,8 +330,25 @@ public class WebSocketClientManager : MonoBehaviour
     {
         if (autoConnectMode)
             return;
+
         string[] parts = data.Split(new char[] { ':' }, 2);
         string command = parts[0].ToUpperInvariant();
+
+        if (command == Constants.ACK_RENDER && parts.Length > 1)
+        {
+            string msgId = parts[1];
+            if (pendingMessages.TryGetValue(msgId, out float sentTime))
+            {
+                float rttMs = (Time.realtimeSinceStartup - sentTime) * 1000f;
+                float oneWayLatency = rttMs / 2f;
+
+                if (PerformanceLogger.Instance != null)
+                    PerformanceLogger.Instance.LogLatency(oneWayLatency);
+
+                pendingMessages.Remove(msgId);
+            }
+            return;
+        }
 
         if (command == Constants.MODEL_SIZE_UPDATE && parts.Length > 1)
         {
@@ -449,7 +467,12 @@ public class WebSocketClientManager : MonoBehaviour
     public void SendMessageToServer(string message)
     {
         if (!autoConnectMode && IsConnected)
-            ws.Send(message);
+        {
+            string msgId = Guid.NewGuid().ToString("N");
+            pendingMessages[msgId] = Time.realtimeSinceStartup;
+
+            ws.Send($"{msgId}|{message}");
+        }
     }
 
     private void OnDestroy()

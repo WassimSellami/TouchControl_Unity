@@ -2000,10 +2000,6 @@ MonoBehaviour:
   sliceIconSprite: {fileID: 21300000, guid: b657f011063c522429e694bd00b97810, type: 3}
   feedbackIconImage: {fileID: 317553795}
   lineRendererPrefab: {fileID: 8422076216122914037, guid: ca7f265f74aee2e46a1063d05e893b13, type: 3}
-  sliceLineBaseWidth: 1
-  sliceLineReferenceDistance: 0.1
-  sliceLineMinWidth: 0.4
-  sliceLineMaxWidth: 5
   planeVisualizerPrefab: {fileID: 7341678815961961126, guid: a55f4e0d323cb0e4db1e8fafa83cb13b, type: 3}
   serverAxisOriginOffset: {x: 0, y: 0, z: 0}
   serverCamera: {fileID: 330585545}
@@ -2042,6 +2038,7 @@ GameObject:
   - component: {fileID: 2029125055}
   - component: {fileID: 2029125056}
   - component: {fileID: 2029125057}
+  - component: {fileID: 2029125058}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -2121,6 +2118,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   panel: {fileID: 2122720903}
   statusText: {fileID: 1076601724}
+--- !u!114 &2029125058
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2029125052}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e451c2c02fd8df34f838a1ea08dfcfda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isServer: 1
 --- !u!1 &2122382779 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4935364177055631399, guid: 12d4bc3e4dbced349949355cc0d3bbf6, type: 3}

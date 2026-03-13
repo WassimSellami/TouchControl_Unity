@@ -40,9 +40,20 @@ public class CommandInterpreter : MonoBehaviour
 
     public void InterpretAndExecute(string commandData)
     {
-        string[] parts = commandData.Split(new char[] { ':' }, 2);
+        string[] mainParts = commandData.Split(new char[] { '|' }, 2);
+        string msgId = null;
+        string actualCommand = commandData;
+
+        if (mainParts.Length == 2 && mainParts[0].Length == 32)
+        {
+            msgId = mainParts[0];
+            actualCommand = mainParts[1];
+        }
+
+        string[] parts = actualCommand.Split(new char[] { ':' }, 2);
         string command = parts[0].ToUpperInvariant();
         string args = parts.Length > 1 ? parts[1] : null;
+
 
         switch (command)
         {
@@ -99,6 +110,9 @@ public class CommandInterpreter : MonoBehaviour
             case Constants.UPDATE_CUT_LINE:
                 ProcessUpdateCutLineCommand(args);
                 break;
+            case Constants.LATENCY_REPORT:
+                ProcessLatencyReport(args);
+                break;
             case Constants.HIDE_CUT_LINE:
                 ProcessHideCutLineCommand();
                 break;
@@ -125,6 +139,38 @@ public class CommandInterpreter : MonoBehaviour
                 Debug.LogWarning($"[CommandInterpreter] Unknown command: {commandData}");
                 break;
         }
+        if (!string.IsNullOrEmpty(msgId) && WebSocketServerManager != null)
+        {
+            StartCoroutine(AcknowledgeAfterRender(msgId));
+        }
+    }
+
+    private void ProcessLatencyReport(string args)
+    {
+        if (string.IsNullOrEmpty(args))
+            return;
+
+        string[] stats = args.Split('|');
+        if (stats.Length == 5)
+        {
+            string report = $"=== LATENCY REPORT ===\n" +
+                            $"Total Samples (N): {stats[0]}\n" +
+                            $"Mean Latency: {stats[1]} ms\n" +
+                            $"Standard Deviation (SD): {stats[2]} ms\n" +
+                            $"Minimum: {stats[3]} ms\n" +
+                            $"Maximum: {stats[4]} ms\n" +
+                            $"==============================\n";
+
+            string filePath = System.IO.Path.Combine(Application.persistentDataPath, "Android_Client_Latency.txt");
+            System.IO.File.WriteAllText(filePath, report);
+
+            Debug.Log($"<color=green>[Latency Data Received]</color> Saved Android Latency Data to:\n{filePath}");
+        }
+    }
+    private System.Collections.IEnumerator AcknowledgeAfterRender(string msgId)
+    {
+        yield return new WaitForEndOfFrame();
+        WebSocketServerManager.BroadcastCustomCommand(Constants.ACK_RENDER, msgId);
     }
 
     private void ProcessUpdateModelTransformCommand(string args)
