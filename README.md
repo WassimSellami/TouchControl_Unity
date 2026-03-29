@@ -15,10 +15,10 @@ CAVE systems provide excellent visual immersion for complex 3D medical data, but
 
 ## System Architecture
 
-The system follows a **client–server architecture**:
+The system follows a **client–server architecture** — both sides are built in **Unity (C#)**:
 
-- **Touch Table (Client):** Captures raw touch events, performs local gesture recognition, and sends high-level gesture commands to the CAVE server over a persistent **WebSocket** connection. A local proxy mesh provides instant visual feedback to mask network latency.
-- **CAVE Server (Unity):** The authoritative source of truth for the 3D scene. Receives gesture commands, updates the scene graph, and renders the high-fidelity 3D models across all CAVE display walls.
+- **Touch Table Client — Android Scene:** A Unity project built and deployed as an Android application on the large-format multi-touch table. It captures raw touch events, performs local gesture recognition, and sends high-level gesture commands to the CAVE server over a persistent **WebSocket** connection. A local proxy mesh provides instant visual feedback to mask network latency.
+- **CAVE Server — Cube Scene:** A Unity project running on the CAVE server machine. It is the authoritative source of truth for the 3D scene. Receives gesture commands, updates the scene graph, and renders the high-fidelity 3D models across all CAVE display walls.
 
 This separation of concerns keeps network bandwidth low (only compact command identifiers and transform data are transmitted) while achieving the strict performance targets required for real-time immersive interaction.
 
@@ -98,8 +98,8 @@ The anticipated conflict between Slice and Destroy long-press mechanics did **no
 
 | Component | Technology |
 |---|---|
-| CAVE Server / Renderer | Unity (C#) |
-| Touch Table Client | Flutter (Dart) |
+| CAVE Server (Cube Scene) | Unity (C#) — desktop/server build |
+| Touch Table Client (Android Scene) | Unity (C#) — Android build |
 | Network Communication | WebSocket (persistent connection) |
 | Volumetric Rendering | Custom GLSL/HLSL ray-marching shader |
 | Mesh Slicing | EzySlice (open-source Unity library) |
@@ -110,11 +110,11 @@ The anticipated conflict between Slice and Destroy long-press mechanics did **no
 
 ```
 .
-├── Assets/                          # Unity project assets (server/CAVE app)
+├── Assets/                          # Unity project assets (shared — contains both scenes)
 ├── Packages/                        # Unity package manifest
 ├── ProjectSettings/                 # Unity project settings
-├── Touch Screen Controller_.../     # Flutter touch table client app
-├── apk/                             # Pre-built APK for the touch table client
+├── Touch Screen Controller_.../     # Additional touch table client resources
+├── apk/                             # Pre-built APK for the Android scene (touch table)
 ├── websockettest_.../               # WebSocket test utilities
 ├── .gitignore
 └── .vsconfig
@@ -124,16 +124,15 @@ The anticipated conflict between Slice and Destroy long-press mechanics did **no
 
 ### Prerequisites
 
-- **Unity** (for the CAVE server application)
-- **Flutter SDK** (for the touch table client)
+- **Unity** (for both scenes)
 - A large-format multi-touch display (touch table) running Android
 - A CAVE display system (or a standard monitor for development/testing)
 - Both devices on the same local network
 
 ### Running the System
 
-1. **Start the CAVE Server:** Open the Unity project in the `Assets/` directory, build and run it on the CAVE server machine. Note the machine's IP address.
-2. **Deploy the Touch Table Client:** Build and deploy the Flutter app from the `Touch Screen Controller_...` directory to the touch table device (or install the pre-built APK from `apk/`).
+1. **Start the CAVE Server (Cube Scene):** Open the Unity project, switch to the **Cube Scene**, build and run it on the CAVE server machine. Note the machine's IP address.
+2. **Deploy the Touch Table Client (Android Scene):** Switch to the **Android Scene**, build an Android APK and install it on the touch table device (or use the pre-built APK from `apk/`).
 3. **Connect:** On the touch table, enter the CAVE server's IP address on the Connection Screen and tap Connect.
 4. **Select a Model:** Choose a 3D anatomical model from the gallery or import a new one.
 5. **Interact:** Use the gesture vocabulary to manipulate the model on the CAVE display.
