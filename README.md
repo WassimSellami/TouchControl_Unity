@@ -90,7 +90,7 @@ Nine participants (university students, mixed technical/domain backgrounds) comp
 | Load Model (Flick) | 9.22 | Satisfying physics metaphor |
 | Pan / Move | 8.83 | Lowest rated; harder to execute consistently on large surface |
 
-**Overall average naturalness: 8.8 / 10** across all gestures.
+**Overall naturalness averaging > 8.8 / 10** across all gestures.
 
 The anticipated conflict between Slice and Destroy long-press mechanics did **not** materialize: 7 out of 9 users explicitly reported no confusion between the two.
 
